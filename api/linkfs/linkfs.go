@@ -1,0 +1,229 @@
+package linkfs
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"path"
+	"strings"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
+	"gitlab.com/labkode/reva/api"
+	"go.uber.org/zap"
+)
+
+type linkStorage struct {
+	vfs         api.VirtualStorage
+	linkManager api.PublicLinkManager
+	logger      *zap.Logger
+}
+
+func NewLinkFS(vfs api.VirtualStorage, lm api.PublicLinkManager, logger *zap.Logger) api.Storage {
+	return &linkStorage{vfs, lm, logger}
+}
+func (fs *linkStorage) getLink(ctx context.Context, name string) (*api.PublicLink, string, error) {
+	// path is /016633a5-22d0-478c-a148-be3000f15d62/Photos/Test
+	fs.logger.Debug("get link for path", zap.String("path", name))
+
+	items := strings.Split(name, "/")
+	if len(items) < 2 {
+		return nil, "", api.NewError(api.StorageNotFoundErrorCode)
+	}
+	token := items[1]
+	link, err := fs.linkManager.InspectPublicLink(ctx, token)
+	if err != nil {
+		return nil, "", err
+	}
+	if len(items) > 2 {
+		return link, path.Join(items[2:]...), nil
+	}
+	return link, "", nil
+}
+
+func (fs *linkStorage) GetPathByID(ctx context.Context, id string) (string, error) {
+	path := "/" + id
+	_, _, err := fs.getLink(ctx, path)
+	if err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+func (fs *linkStorage) getLinkMetadata(ctx context.Context, link *api.PublicLink) (*api.Metadata, error) {
+	l := ctx_zap.Extract(ctx)
+	finfo, err := fs.vfs.GetMetadata(ctx, link.Path)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	return finfo, nil
+}
+
+func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata, error) {
+	if p == "/" {
+		return &api.Metadata{
+			Path:  "/",
+			Size:  0,
+			Etag:  "TODO",
+			Mtime: 0,
+			IsDir: true,
+		}, nil
+	}
+	link, linkRelativePath, err := fs.getLink(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	linkMetadata, err := fs.getLinkMetadata(ctx, link)
+	if err != nil {
+		return nil, err
+	}
+
+	internalPath := path.Join(link.Path, linkRelativePath)
+	fmt.Println(link.Token + " >>> " + internalPath)
+	md, err := fs.vfs.GetMetadata(ctx, internalPath)
+	if err != nil {
+		return nil, err
+	}
+
+	md.Path = path.Join("/", link.Token, strings.Trim(md.Path, linkMetadata.Path))
+	md.Id = link.Token
+	return md, nil
+}
+
+func (fs *linkStorage) listRoot(ctx context.Context) ([]*api.Metadata, error) {
+	links, err := fs.linkManager.ListPublicLinks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	finfos := []*api.Metadata{}
+	for _, link := range links {
+		fi, err := fs.vfs.GetMetadata(ctx, link.Path)
+		if err != nil {
+			return nil, err
+		}
+		fi.Path = "/" + link.Token
+		fi.Id = link.Token
+		finfos = append(finfos, fi)
+	}
+	return finfos, nil
+
+}
+
+// name is /<token>/a/b/c
+func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Metadata, error) {
+	if name == "/" {
+		return fs.listRoot(ctx)
+	}
+
+	link, linkRelativePath, err := fs.getLink(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	linkMetadata, err := fs.getLinkMetadata(ctx, link)
+	if err != nil {
+		return nil, err
+	}
+
+	targetPath := path.Join(linkMetadata.Path, linkRelativePath)
+	fmt.Println(link.Token + " >>> " + targetPath)
+	mds, err := fs.vfs.ListFolder(ctx, targetPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, md := range mds {
+		p := path.Join(link.Token, strings.Trim(md.Path, linkMetadata.Path))
+		md.Path = path.Join("/", p)
+		md.Id = p
+	}
+
+	return mds, nil
+}
+
+func (fs *linkStorage) Download(ctx context.Context, name string) (io.ReadCloser, error) {
+	link, p, err := fs.getLink(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	p = path.Join(link.Path, p)
+	fmt.Println(link.Token + " >>> " + p)
+	return fs.vfs.Download(ctx, p)
+}
+
+func (fs *linkStorage) Upload(ctx context.Context, name string, r io.ReadCloser) error {
+	link, p, err := fs.getLink(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	p = path.Join(link.Path, p)
+	fmt.Println(link.Token + " >>> " + p)
+	return fs.vfs.Upload(ctx, p, r)
+}
+
+func (fs *linkStorage) Move(ctx context.Context, oldName, newName string) error {
+	oldLink, oldPath, err := fs.getLink(ctx, oldName)
+	if err != nil {
+		return err
+	}
+	newLink, newPath, err := fs.getLink(ctx, newName)
+	if err != nil {
+		return err
+	}
+	if oldLink.Token != newLink.Token {
+		return errors.New("cross-link rename forbidden")
+	}
+
+	oldPath = path.Join(oldLink.Path, oldPath)
+	newPath = path.Join(newLink.Path, newPath)
+	return fs.vfs.Move(ctx, oldPath, newPath)
+}
+
+func (fs *linkStorage) CreateDir(ctx context.Context, name string) error {
+	link, p, err := fs.getLink(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	p = path.Join(link.Path, p)
+	fmt.Println(link.Token + " >>> " + p)
+	return fs.vfs.CreateDir(ctx, p)
+}
+
+func (fs *linkStorage) Delete(ctx context.Context, name string) error {
+	link, p, err := fs.getLink(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	p = path.Join(link.Path, p)
+	fmt.Println(link.Token + " >>> " + p)
+	return fs.vfs.Delete(ctx, p)
+}
+
+func (fs *linkStorage) ListRevisions(ctx context.Context, path string) ([]*api.Revision, error) {
+	return nil, api.NewError(api.StorageNotSupportedErrorCode)
+}
+
+func (fs *linkStorage) DownloadRevision(ctx context.Context, path, revisionKey string) (io.ReadCloser, error) {
+	return nil, api.NewError(api.StorageNotSupportedErrorCode)
+}
+
+func (fs *linkStorage) RestoreRevision(ctx context.Context, path, revisionKey string) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+
+func (fs *linkStorage) EmptyRecycle(ctx context.Context, path string) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+
+func (fs *linkStorage) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
+	return nil, api.NewError(api.StorageNotSupportedErrorCode)
+}
+
+func (fs *linkStorage) RestoreRecycleEntry(ctx context.Context, restoreKey string) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}

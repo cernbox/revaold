@@ -7,9 +7,9 @@ import (
 	"path"
 	"strings"
 
+	"github.com/cernbox/reva/api"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"github.com/satori/go.uuid"
-	"github.com/cernbox/reva/api"
 	"go.uber.org/zap"
 )
 
@@ -189,11 +189,13 @@ func (v *vfs) inspectRootNode(ctx context.Context) (*api.Metadata, error) {
 			return nil, err
 		}
 	*/
+	uuid, _ := uuid.NewV4()
+	etag := uuid.String()
 
 	md := &api.Metadata{
 		Path:  "/",
 		Size:  0,
-		Etag:  uuid.NewV4().String(),
+		Etag:  etag,
 		IsDir: true,
 		Id:    "root",
 	}

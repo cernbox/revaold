@@ -14,8 +14,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/satori/go.uuid"
 	"github.com/cernbox/reva/api"
+	"github.com/satori/go.uuid"
 )
 
 const versionPrefix = ".sys.v#."
@@ -207,7 +207,9 @@ func (c *Client) Read(ctx context.Context, username, path string) (io.ReadCloser
 	if err != nil {
 		return nil, err
 	}
-	localTarget := fmt.Sprintf("%s/%s", c.opt.CacheDirectory, uuid.NewV4().String())
+	uuid, _ := uuid.NewV4()
+	rand := uuid.String()
+	localTarget := fmt.Sprintf("%s/%s", c.opt.CacheDirectory, rand)
 	xrdPath := fmt.Sprintf("%s//%s", c.opt.URL, path)
 	cmd := exec.Command("/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", xrdPath, localTarget, fmt.Sprintf("-OSeos.ruid=%s&eos.rgid=%s", unixUser.Uid, unixUser.Gid))
 	_, _, err = c.execute(cmd)

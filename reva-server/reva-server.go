@@ -7,14 +7,13 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/cernbox/reva/api"
 	"github.com/cernbox/reva/api/authmanager"
 	"github.com/cernbox/reva/api/eosfs"
 	"github.com/cernbox/reva/api/eosfs/eosclient"
 	"github.com/cernbox/reva/api/homefs"
 	"github.com/cernbox/reva/api/linkfs"
-	//"github.com/cernbox/reva/api/localfs"
+	"github.com/cernbox/reva/api/localfs"
 	"github.com/cernbox/reva/api/mount"
 	"github.com/cernbox/reva/api/oclinkmanager"
 	"github.com/cernbox/reva/api/tokenmanager"
@@ -23,6 +22,7 @@ import (
 	"github.com/cernbox/reva/reva-server/svcs/previewsvc"
 	"github.com/cernbox/reva/reva-server/svcs/sharesvc"
 	"github.com/cernbox/reva/reva-server/svcs/storagesvc"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
@@ -88,13 +88,11 @@ func main() {
 	config.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	logger, _ := config.Build()
 
-	/*
-		localStorage := localfs.New(&localfs.Options{Namespace: "/home/labkode/go/src/github.com/cernbox/reva", Logger: logger})
-		localMount := mount.New(localStorage, "/local")
+	localStorage := localfs.New(&localfs.Options{Namespace: "/home/labkode/go/src/github.com/cernbox/reva", Logger: logger})
+	localMount := mount.New(localStorage, "/local")
 
-		localTempStorage := localfs.New(&localfs.Options{Namespace: "/tmp", Logger: logger})
-		localTempMount := mount.New(localTempStorage, "/tmp")
-	*/
+	localTempStorage := localfs.New(&localfs.Options{Namespace: "/tmp", Logger: logger})
+	localTempMount := mount.New(localTempStorage, "/tmp")
 
 	// register an eos filesytem
 	eosClient, err := eosclient.New(&eosclient.Options{URL: "root://eosuat.cern.ch", EnableLogging: true})
@@ -123,8 +121,8 @@ func main() {
 	linksFS := linkfs.NewLinkFS(vFS, linkManager, logger)
 	linkMount := mount.New(linksFS, "/publiclinks")
 
-	//vFS.AddMount(context.Background(), localMount)
-	//vFS.AddMount(context.Background(), localTempMount)
+	vFS.AddMount(context.Background(), localMount)
+	vFS.AddMount(context.Background(), localTempMount)
 	vFS.AddMount(context.Background(), homeMount)
 	vFS.AddMount(context.Background(), eosLetterMount)
 	vFS.AddMount(context.Background(), linkMount)
@@ -181,7 +179,9 @@ func getAuthFunc(tm api.TokenManager) func(context.Context) (context.Context, er
 		}
 
 		grpc_ctxtags.Extract(ctx).Set("auth.accountid", user.AccountId)
-		grpc_ctxtags.Extract(ctx).Set("tid", uuid.NewV4().String())
+		uuid, _ := uuid.NewV4()
+		tid := uuid.String()
+		grpc_ctxtags.Extract(ctx).Set("tid", tid)
 		newCtx := api.ContextSetUser(ctx, user)
 		return newCtx, nil
 	}

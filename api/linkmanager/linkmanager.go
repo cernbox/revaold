@@ -19,9 +19,11 @@ type linkManager struct {
 
 // TODO(labkode): handle nil opt
 func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *api.PublicLinkOptions) (*api.PublicLink, error) {
+	uuid, _ := uuid.NewV4()
+	token := uuid.String()
 	link := &api.PublicLink{
 		Path:      path,
-		Token:     uuid.NewV4().String(),
+		Token:     token,
 		Protected: opt.Password != "",
 		ReadOnly:  opt.ReadOnly,
 		Expires:   opt.Expiration,

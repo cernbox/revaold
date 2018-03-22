@@ -262,7 +262,8 @@ func (s *svc) WriteChunk(stream api.Storage_WriteChunkServer) error {
 func (s *svc) StartWriteTx(ctx context.Context, req *api.EmptyReq) (*api.TxInfoResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	// create a temporary folder with the TX ID
-	txID := uuid.NewV4().String()
+	uuid, _ := uuid.NewV4()
+	txID := uuid.String()
 	if err := os.Mkdir(filepath.Join(os.TempDir(), txID), 0755); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
@@ -309,7 +310,9 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.EmptyResp
 	}
 	l.Info("number of chunks", zap.String("nchunks", fmt.Sprintf("%d", len(names))))
 
-	assembledFilename := filepath.Join(txFolder, fmt.Sprintf("assembled-%s", uuid.NewV4().String()))
+	uuid, _ := uuid.NewV4()
+	rand := uuid.String()
+	assembledFilename := filepath.Join(txFolder, fmt.Sprintf("assembled-%s", rand))
 	l.Info("", zap.String("assembledfilename", assembledFilename))
 
 	assembledFile, err := os.OpenFile(assembledFilename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)

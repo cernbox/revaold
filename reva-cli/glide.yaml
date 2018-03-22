@@ -1,0 +1,16 @@
+package: github.com/cernbox/reva/reva-cli
+import:
+- package: github.com/cernbox/reva
+  subpackages:
+  - api
+- package: github.com/codegangsta/cli
+  version: ^1.20.0
+- package: github.com/ryanuber/columnize
+  version: ^2.1.0
+- package: golang.org/x/net
+  subpackages:
+  - context
+- package: google.golang.org/grpc
+  version: ^1.10.0
+  subpackages:
+  - metadata

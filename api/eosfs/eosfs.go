@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
-	"gitlab.com/labkode/reva/api"
-	"gitlab.com/labkode/reva/api/eosfs/eosclient"
+	"github.com/cernbox/reva/api"
+	"github.com/cernbox/reva/api/eosfs/eosclient"
 	"go.uber.org/zap"
 )
 
@@ -91,7 +91,7 @@ func (fs *eosStorage) GetPathByID(ctx context.Context, id string) (string, error
 		return "", err
 	}
 
-	eosFileInfo, err := fs.c.GetFileInfoByInode(ctx, u.AccountID, fileId)
+	eosFileInfo, err := fs.c.GetFileInfoByInode(ctx, u.AccountId, fileId)
 	if err != nil {
 		return "", err
 	}
@@ -107,7 +107,7 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, path string) (*api.Metada
 	}
 
 	path = fs.getInternalPath(ctx, path)
-	eosFileInfo, err := fs.c.GetFileInfoByPath(ctx, u.AccountID, path)
+	eosFileInfo, err := fs.c.GetFileInfoByPath(ctx, u.AccountId, path)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (fs *eosStorage) ListFolder(ctx context.Context, path string) ([]*api.Metad
 	}
 
 	path = fs.getInternalPath(ctx, path)
-	eosFileInfos, err := fs.c.List(ctx, u.AccountID, path)
+	eosFileInfos, err := fs.c.List(ctx, u.AccountId, path)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (fs *eosStorage) CreateDir(ctx context.Context, path string) error {
 		return err
 	}
 	path = fs.getInternalPath(ctx, path)
-	return fs.c.CreateDir(ctx, u.AccountID, path)
+	return fs.c.CreateDir(ctx, u.AccountId, path)
 }
 
 func (fs *eosStorage) Delete(ctx context.Context, path string) error {
@@ -148,7 +148,7 @@ func (fs *eosStorage) Delete(ctx context.Context, path string) error {
 		return err
 	}
 	path = fs.getInternalPath(ctx, path)
-	return fs.c.Remove(ctx, u.AccountID, path)
+	return fs.c.Remove(ctx, u.AccountId, path)
 }
 
 func (fs *eosStorage) Move(ctx context.Context, oldPath, newPath string) error {
@@ -158,7 +158,7 @@ func (fs *eosStorage) Move(ctx context.Context, oldPath, newPath string) error {
 	}
 	oldPath = fs.getInternalPath(ctx, oldPath)
 	newPath = fs.getInternalPath(ctx, newPath)
-	return fs.c.Rename(ctx, u.AccountID, oldPath, newPath)
+	return fs.c.Rename(ctx, u.AccountId, oldPath, newPath)
 }
 
 func (fs *eosStorage) Download(ctx context.Context, path string) (io.ReadCloser, error) {
@@ -167,7 +167,7 @@ func (fs *eosStorage) Download(ctx context.Context, path string) (io.ReadCloser,
 		return nil, err
 	}
 	path = fs.getInternalPath(ctx, path)
-	return fs.c.Read(ctx, u.AccountID, path)
+	return fs.c.Read(ctx, u.AccountId, path)
 }
 
 func (fs *eosStorage) Upload(ctx context.Context, path string, r io.ReadCloser) error {
@@ -176,7 +176,7 @@ func (fs *eosStorage) Upload(ctx context.Context, path string, r io.ReadCloser) 
 		return err
 	}
 	path = fs.getInternalPath(ctx, path)
-	return fs.c.Write(ctx, u.AccountID, path, r)
+	return fs.c.Write(ctx, u.AccountId, path, r)
 }
 
 func (fs *eosStorage) ListRevisions(ctx context.Context, path string) ([]*api.Revision, error) {
@@ -185,7 +185,7 @@ func (fs *eosStorage) ListRevisions(ctx context.Context, path string) ([]*api.Re
 		return nil, err
 	}
 	path = fs.getInternalPath(ctx, path)
-	eosRevisions, err := fs.c.ListVersions(ctx, u.AccountID, path)
+	eosRevisions, err := fs.c.ListVersions(ctx, u.AccountId, path)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (fs *eosStorage) DownloadRevision(ctx context.Context, path, revisionKey st
 		return nil, err
 	}
 	path = fs.getInternalPath(ctx, path)
-	return fs.c.ReadVersion(ctx, u.AccountID, path, revisionKey)
+	return fs.c.ReadVersion(ctx, u.AccountId, path, revisionKey)
 }
 
 func (fs *eosStorage) RestoreRevision(ctx context.Context, path, revisionKey string) error {
@@ -212,7 +212,7 @@ func (fs *eosStorage) RestoreRevision(ctx context.Context, path, revisionKey str
 		return err
 	}
 	path = fs.getInternalPath(ctx, path)
-	return fs.c.RollbackToVersion(ctx, u.AccountID, path, revisionKey)
+	return fs.c.RollbackToVersion(ctx, u.AccountId, path, revisionKey)
 }
 
 func (fs *eosStorage) EmptyRecycle(ctx context.Context, path string) error {
@@ -220,7 +220,7 @@ func (fs *eosStorage) EmptyRecycle(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	return fs.c.PurgeDeletedEntries(ctx, u.AccountID)
+	return fs.c.PurgeDeletedEntries(ctx, u.AccountId)
 }
 
 func (fs *eosStorage) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
@@ -228,13 +228,13 @@ func (fs *eosStorage) ListRecycle(ctx context.Context, path string) ([]*api.Recy
 	if err != nil {
 		return nil, err
 	}
-	eosDeletedEntries, err := fs.c.ListDeletedEntries(ctx, u.AccountID)
+	eosDeletedEntries, err := fs.c.ListDeletedEntries(ctx, u.AccountId)
 	if err != nil {
 		return nil, err
 	}
 	recycleEntries := []*api.RecycleEntry{}
 	for _, entry := range eosDeletedEntries {
-		recycleEntry := convertToRecycleEntry(entry)
+		recycleEntry := fs.convertToRecycleEntry(entry)
 		recycleEntries = append(recycleEntries, recycleEntry)
 	}
 	return recycleEntries, nil
@@ -245,12 +245,12 @@ func (fs *eosStorage) RestoreRecycleEntry(ctx context.Context, restoreKey string
 	if err != nil {
 		return err
 	}
-	return fs.c.RestoreDeletedEntry(ctx, u.AccountID, restoreKey)
+	return fs.c.RestoreDeletedEntry(ctx, u.AccountId, restoreKey)
 }
 
-func convertToRecycleEntry(eosDeletedEntry *eosclient.DeletedEntry) *api.RecycleEntry {
+func (fs *eosStorage) convertToRecycleEntry(eosDeletedEntry *eosclient.DeletedEntry) *api.RecycleEntry {
 	recycleEntry := &api.RecycleEntry{
-		RestorePath: eosDeletedEntry.RestorePath,
+		RestorePath: fs.removeNamespace(eosDeletedEntry.RestorePath),
 		RestoreKey:  eosDeletedEntry.RestoreKey,
 		Size:        eosDeletedEntry.Size,
 		DelMtime:    eosDeletedEntry.DeletionMTime,

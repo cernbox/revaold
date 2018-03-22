@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"github.com/satori/go.uuid"
@@ -28,22 +28,22 @@ type svc struct {
 	vs api.VirtualStorage
 }
 
-func (s *svc) RestoreRevision(ctx context.Context, req *api.RevisionReq) (*api.Empty, error) {
+func (s *svc) RestoreRevision(ctx context.Context, req *api.RevisionReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.RestoreRevision(ctx, req.Path, req.RevKey); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	return &api.Empty{}, nil
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) RestoreRecycleEntry(ctx context.Context, req *api.RecycleEntryReq) (*api.Empty, error) {
+func (s *svc) RestoreRecycleEntry(ctx context.Context, req *api.RecycleEntryReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.RestoreRecycleEntry(ctx, req.RestoreKey); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	return nil, nil
+	return &api.EmptyResponse{}, nil
 }
 
 func (s *svc) ReadRevision(req *api.RevisionReq, stream api.Storage_ReadRevisionServer) error {
@@ -70,7 +70,8 @@ func (s *svc) ReadRevision(req *api.RevisionReq, stream api.Storage_ReadRevision
 			return err
 		}
 		dc := &api.DataChunk{Data: buffer, Length: uint64(n)}
-		if err := stream.Send(dc); err != nil {
+		dcRes := &api.DataChunkResponse{DataChunk: dc}
+		if err := stream.Send(dcRes); err != nil {
 			l.Error("", zap.Error(err))
 			return nil
 		}
@@ -84,11 +85,11 @@ func (s *svc) ReadFile(req *api.PathReq, stream api.Storage_ReadFileServer) erro
 	ctx := stream.Context()
 	l := ctx_zap.Extract(ctx)
 	readCloser, err := s.vs.Download(ctx, req.Path)
-	defer readCloser.Close()
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return err
 	}
+	defer readCloser.Close()
 
 	// send data chunks of maximum 3 MiB
 	buffer := make([]byte, 1024*1024*3)
@@ -96,7 +97,8 @@ func (s *svc) ReadFile(req *api.PathReq, stream api.Storage_ReadFileServer) erro
 		n, err := readCloser.Read(buffer)
 		if n > 0 {
 			dc := &api.DataChunk{Data: buffer[:n], Length: uint64(n)}
-			if err := stream.Send(dc); err != nil {
+			dcRes := &api.DataChunkResponse{DataChunk: dc}
+			if err := stream.Send(dcRes); err != nil {
 				l.Error("", zap.Error(err))
 				return nil
 			}
@@ -123,7 +125,8 @@ func (s *svc) ListRevisions(req *api.PathReq, stream api.Storage_ListRevisionsSe
 		return err
 	}
 	for _, rev := range revs {
-		if err := stream.Send(rev); err != nil {
+		revRes := &api.RevisionResponse{Revision: rev}
+		if err := stream.Send(revRes); err != nil {
 			l.Error("", zap.Error(err))
 			return err
 		}
@@ -140,7 +143,8 @@ func (s *svc) ListRecycle(req *api.PathReq, stream api.Storage_ListRecycleServer
 		return err
 	}
 	for _, e := range entries {
-		if err := stream.Send(e); err != nil {
+		recycleEntryRes := &api.RecycleEntryResponse{RecycleEntry: e}
+		if err := stream.Send(recycleEntryRes); err != nil {
 			l.Error("", zap.Error(err))
 			return err
 		}
@@ -154,10 +158,16 @@ func (s *svc) ListFolder(req *api.PathReq, stream api.Storage_ListFolderServer) 
 	mds, err := s.vs.ListFolder(ctx, req.Path)
 	if err != nil {
 		l.Error("", zap.Error(err))
-		return err
+		status := api.GetStatus(err)
+		mdRes := &api.MetadataResponse{Status: status}
+		if err := stream.Send(mdRes); err != nil {
+			return err
+		}
+		return nil
 	}
 	for _, md := range mds {
-		if err := stream.Send(md); err != nil {
+		mdRes := &api.MetadataResponse{Metadata: md}
+		if err := stream.Send(mdRes); err != nil {
 			l.Error("", zap.Error(err))
 			return err
 		}
@@ -165,41 +175,45 @@ func (s *svc) ListFolder(req *api.PathReq, stream api.Storage_ListFolderServer) 
 	return nil
 }
 
-func (s *svc) CreateDir(ctx context.Context, req *api.PathReq) (*api.Empty, error) {
+func (s *svc) CreateDir(ctx context.Context, req *api.PathReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.CreateDir(ctx, req.Path); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	return &api.Empty{}, nil
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) Delete(ctx context.Context, req *api.PathReq) (*api.Empty, error) {
+func (s *svc) Delete(ctx context.Context, req *api.PathReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.Delete(ctx, req.Path); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	return &api.Empty{}, nil
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) Inspect(ctx context.Context, req *api.PathReq) (*api.Metadata, error) {
+func (s *svc) Inspect(ctx context.Context, req *api.PathReq) (*api.MetadataResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	md, err := s.vs.GetMetadata(ctx, req.Path)
 	if err != nil {
 		l.Error("", zap.Error(err))
-		return nil, err
+		status := api.GetStatus(err)
+		mdRes := &api.MetadataResponse{Status: status}
+		return mdRes, nil
 	}
-	return md, nil
+	mdRes := &api.MetadataResponse{Metadata: md}
+	return mdRes, nil
 }
 
-func (s *svc) EmptyRecycle(ctx context.Context, req *api.PathReq) (*api.Empty, error) {
+func (s *svc) EmptyRecycle(ctx context.Context, req *api.PathReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.EmptyRecycle(ctx, req.Path); err != nil {
 		l.Error("", zap.Error(err))
-		return nil, err
+		status := api.GetStatus(err)
+		return &api.EmptyResponse{Status: status}, nil
 	}
-	return &api.Empty{}, nil
+	return &api.EmptyResponse{}, nil
 }
 
 func (s *svc) WriteChunk(stream api.Storage_WriteChunkServer) error {
@@ -239,10 +253,13 @@ func (s *svc) WriteChunk(stream api.Storage_WriteChunkServer) error {
 		totalSize += uint64(n)
 		fd.Close()
 	}
-	return stream.SendAndClose(&api.WriteSummary{Nchunks: numChunks, TotalSize: totalSize})
+
+	writeSummary := &api.WriteSummary{Nchunks: numChunks, TotalSize: totalSize}
+	writeSummaryRes := &api.WriteSummaryResponse{WriteSummary: writeSummary}
+	return stream.SendAndClose(writeSummaryRes)
 }
 
-func (s *svc) StartWriteTx(ctx context.Context, req *api.Empty) (*api.TxInfo, error) {
+func (s *svc) StartWriteTx(ctx context.Context, req *api.EmptyReq) (*api.TxInfoResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	// create a temporary folder with the TX ID
 	txID := uuid.NewV4().String()
@@ -250,7 +267,9 @@ func (s *svc) StartWriteTx(ctx context.Context, req *api.Empty) (*api.TxInfo, er
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	return &api.TxInfo{TxId: txID}, nil
+	txInfo := &api.TxInfo{TxId: txID}
+	txInfoRes := &api.TxInfoResponse{TxInfo: txInfo}
+	return txInfoRes, nil
 }
 
 type chunkInfo struct {
@@ -275,7 +294,7 @@ func parseChunkFilename(fn string) (*chunkInfo, error) {
 	return &chunkInfo{Offset: offset, ClientLength: clientLength}, nil
 }
 
-func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.Empty, error) {
+func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	txFolder := filepath.Join(os.TempDir(), req.TxId)
 	fd, err := os.Open(txFolder)
@@ -286,7 +305,7 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.Empty, er
 	// list all the chunks in the directory
 	names, err := fd.Readdirnames(0)
 	if err != nil {
-		return &api.Empty{}, err
+		return &api.EmptyResponse{}, err
 	}
 	l.Info("number of chunks", zap.String("nchunks", fmt.Sprintf("%d", len(names))))
 
@@ -304,7 +323,7 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.Empty, er
 
 		chunkInfo, err := parseChunkFilename(filepath.Base(chunkFilename))
 		if err != nil {
-			return &api.Empty{}, err
+			return &api.EmptyResponse{}, err
 		}
 		chunk, err := os.Open(chunkFilename)
 		defer chunk.Close()
@@ -331,14 +350,14 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.Empty, er
 		return nil, err
 	}
 
-	return &api.Empty{}, nil
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) Move(ctx context.Context, req *api.MoveReq) (*api.Empty, error) {
+func (s *svc) Move(ctx context.Context, req *api.MoveReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.Move(ctx, req.OldPath, req.NewPath); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	return &api.Empty{}, nil
+	return &api.EmptyResponse{}, nil
 }

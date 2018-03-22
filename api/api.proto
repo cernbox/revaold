@@ -4,52 +4,87 @@ syntax = "proto3";
 package api;
 
 service Auth {
-  rpc CreateToken(CreateTokenReq) returns (Token) {}
-  rpc VerifyToken(VerifyTokenReq) returns (Empty) {}
+  rpc CreateToken(CreateTokenReq) returns (TokenResponse) {}
+  rpc VerifyToken(VerifyTokenReq) returns (UserResponse) {}
 }
 
 
 service Storage {
-  rpc CreateDir(PathReq) returns (Empty) {}
-  rpc Delete(PathReq) returns (Empty) {}
-  rpc Move(MoveReq) returns (Empty) {}
-  rpc Inspect(PathReq) returns (Metadata) {}
-  rpc ListFolder(PathReq) returns (stream Metadata) {}
-  rpc StartWriteTx(Empty) returns (TxInfo) {}
-  rpc WriteChunk(stream TxChunk) returns (WriteSummary) {}
-  rpc FinishWriteTx(TxEnd) returns (Empty) {}
-  rpc ReadFile(PathReq) returns (stream DataChunk) {}
-  rpc ListRevisions(PathReq) returns (stream Revision) {}
-  rpc ReadRevision(RevisionReq) returns (stream DataChunk) {}
-  rpc RestoreRevision(RevisionReq) returns (Empty) {}
-  rpc ListRecycle(PathReq) returns (stream RecycleEntry) {}
-  rpc RestoreRecycleEntry(RecycleEntryReq) returns (Empty) {}
-  rpc EmptyRecycle(PathReq) returns (Empty) {}
+  rpc CreateDir(PathReq) returns (EmptyResponse) {}
+  rpc Delete(PathReq) returns (EmptyResponse) {}
+  rpc Move(MoveReq) returns (EmptyResponse) {}
+  rpc Inspect(PathReq) returns (MetadataResponse) {}
+  rpc ListFolder(PathReq) returns (stream MetadataResponse) {}
+  rpc StartWriteTx(EmptyReq) returns (TxInfoResponse) {}
+  rpc WriteChunk(stream TxChunk) returns (WriteSummaryResponse) {}
+  rpc FinishWriteTx(TxEnd) returns (EmptyResponse) {}
+  rpc ReadFile(PathReq) returns (stream DataChunkResponse) {}
+  rpc ListRevisions(PathReq) returns (stream RevisionResponse) {}
+  rpc ReadRevision(RevisionReq) returns (stream DataChunkResponse) {}
+  rpc RestoreRevision(RevisionReq) returns (EmptyResponse) {}
+  rpc ListRecycle(PathReq) returns (stream RecycleEntryResponse) {}
+  rpc RestoreRecycleEntry(RecycleEntryReq) returns (EmptyResponse) {}
+  rpc EmptyRecycle(PathReq) returns (EmptyResponse) {}
 }
 
 service Share {
-  rpc CreatePublicLink(NewLinkReq) returns (PublicLink) {}
-  rpc UpdatePublicLink(UpdateLinkReq) returns  (PublicLink) {}
-  rpc InspectPublicLink(TokenReq) returns (PublicLink) {}
-  rpc RevokePublicLink(TokenReq) returns  (Empty) {}
-  rpc ListPublicLinks(Empty) returns (stream PublicLink) {}
+  rpc CreatePublicLink(NewLinkReq) returns (PublicLinkResponse) {}
+  rpc UpdatePublicLink(UpdateLinkReq) returns  (PublicLinkResponse) {}
+  rpc InspectPublicLink(TokenReq) returns (PublicLinkResponse) {}
+  rpc RevokePublicLink(TokenReq) returns  (EmptyResponse) {}
+  rpc ListPublicLinks(EmptyReq) returns (stream PublicLinkResponse) {}
 
-  rpc AddFolderShare(NewFolderShareReq) returns (FolderShare) {}
-  rpc UpdateFolderShare(UpdateFolderShareReq) returns (Empty) {}
-  rpc ListFolderShares(ListFolderSharesReq) returns (stream FolderShare) {}
-  rpc UnshareFolder(UnshareFolderReq) returns (Empty) {}
+  rpc AddFolderShare(NewFolderShareReq) returns (FolderShareResponse) {}
+  rpc UpdateFolderShare(UpdateFolderShareReq) returns (EmptyResponse) {}
+  rpc ListFolderShares(ListFolderSharesReq) returns (stream FolderShareResponse) {}
+  rpc UnshareFolder(UnshareFolderReq) returns (EmptyResponse) {}
 
-  rpc ListReceivedShares(Empty) returns (stream ReceivedShare) {}
-  rpc MountReceivedShare(ReceivedShareReq) returns (Empty) {}
-  rpc UnmountReceivedShare(ReceivedShareReq) returns (Empty) {} 
+  rpc ListReceivedShares(EmptyReq) returns (stream ReceivedShareResponse) {}
+  rpc MountReceivedShare(ReceivedShareReq) returns (EmptyResponse) {}
+  rpc UnmountReceivedShare(ReceivedShareReq) returns (EmptyResponse) {} 
 }
 
 service Preview {
-  rpc ReadPreview(PathReq) returns (stream DataChunk) {}
+  rpc ReadPreview(PathReq) returns (stream DataChunkResponse) {}
 }
 
 
-message Empty {}
+message EmptyResponse {
+	StatusCode status = 1;
+}
+
+message EmptyReq {}
+
+message UserResponse {
+	StatusCode status = 1;
+	User user = 2;
+}
+
+message User {
+  string account_id = 1;
+  repeated string groups = 2;
+}
+
+enum StatusCode {
+  OK = 0;
+  UNKNOWN = 1;
+  STORAGE_NOT_FOUND = 2;
+  STORAGE_ALREADY_EXISTS = 3;
+  STORAGE_PERMISSIONDENIED = 4;
+  CONTEXT_USER_REQUIRED = 5;
+  PATH_INVALID = 6;
+  PUBLIC_LINK_NOT_FOUND = 7;
+  PUBLIC_LINK_INVALID_DATE = 8;
+  STORAGE_NOT_SUPPORTED = 9;
+  USER_NOT_FOUND = 10;
+  TOKEN_INVALID = 11;
+}
+
+
+message TxInfoResponse {
+	StatusCode status = 1;
+	TxInfo txInfo = 2;
+}
 
 message TxInfo {
   string tx_id = 1;
@@ -60,12 +95,23 @@ message CreateTokenReq {
   string client_secret = 2;
 }
 
+
+message TokenResponse {
+	StatusCode status = 1;
+	Token token = 2;
+}
+
 message Token {
   string token = 1;
 }
 
 message  VerifyTokenReq {
   string token = 1;
+}
+
+message MetadataResponse {
+	StatusCode status = 1;
+	Metadata metadata = 2;
 }
 
 message Metadata {
@@ -96,6 +142,11 @@ message TxChunk {
   bytes data = 4;  
 }
 
+
+message WriteSummaryResponse {
+	StatusCode status = 1;
+	WriteSummary writeSummary = 2;
+}
 message WriteSummary {
 	uint64 nchunks = 1;
 	uint64 total_size = 2;
@@ -108,10 +159,20 @@ message TxEnd {
 }
 
 
+message DataChunkResponse {
+	StatusCode status = 1;
+	DataChunk dataChunk = 2;
+}
+
 message DataChunk {
   uint64 length = 1;
   uint64 offset = 2;
   bytes data = 3;  
+}
+
+message RevisionResponse {
+	StatusCode status = 1;
+	Revision revision = 2;
 }
 
 message Revision {
@@ -124,6 +185,11 @@ message Revision {
 message RevisionReq {
   string path = 1;
   string rev_key = 2;
+}
+
+message RecycleEntryResponse {
+	StatusCode status = 1;
+	RecycleEntry recycleEntry = 2;
 }
 
 message RecycleEntry {
@@ -160,6 +226,11 @@ message UpdateLinkReq {
   bool update_read_only = 7;
 }
 
+message PublicLinkResponse {
+  StatusCode status = 1;
+  PublicLink publicLink = 2;
+}
+
 message PublicLink {
   string token = 1;
   string path = 2;
@@ -174,6 +245,11 @@ message TokenReq {
 
 }
 
+message FolderShareResponse {
+	StatusCode status = 1;
+	FolderShare folderShare = 2;
+}
+
 message FolderShare {
   string id = 1;
   string path = 2;
@@ -182,6 +258,12 @@ message FolderShare {
   bool read_only = 5;
   uint64 ctime = 7;
   uint64 mtime = 8;
+}
+
+
+message ReceivedShareResponse {
+	StatusCode status = 1;
+	ReceivedShare receivedShare = 2;
 }
 
 message ReceivedShare {

@@ -8,7 +8,8 @@ import (
 type key int
 
 const (
-	userKey key = 0
+	userKey  key = 0
+	tokenKey key = 1
 )
 
 func ContextGetUser(ctx context.Context) (*User, bool) {
@@ -18,6 +19,15 @@ func ContextGetUser(ctx context.Context) (*User, bool) {
 
 func ContextSetUser(ctx context.Context, u *User) context.Context {
 	return context.WithValue(ctx, userKey, u)
+}
+
+func ContextGetAccessToken(ctx context.Context) (string, bool) {
+	t, ok := ctx.Value(tokenKey).(string)
+	return t, ok
+}
+
+func ContextSetAccessToken(ctx context.Context, token string) context.Context {
+	return context.WithValue(ctx, tokenKey, token)
 }
 
 // MountOptions is an alias for mount options.
@@ -48,11 +58,6 @@ type Mount interface {
 	GetMountPoint() string
 	GetMountOptions() []MountOption
 	GetMountPointId() string
-}
-
-type User struct {
-	AccountID string   `json:"account_id"`
-	Groups    []string `json:"groups"`
 }
 
 // A VirtualStorage is similar to the
@@ -119,5 +124,41 @@ type AuthManager interface {
 
 type TokenManager interface {
 	ForgeToken(ctx context.Context, user *User) (string, error)
-	VerifyToken(ctx context, token string) bool
+	VerifyToken(ctx context.Context, token string) (*User, error)
+}
+
+func GetStatus(err error) StatusCode {
+	if err == nil {
+		return StatusCode_OK
+	}
+
+	appError, ok := err.(AppError)
+	if !ok {
+		return StatusCode_UNKNOWN
+	}
+
+	switch appError.Code {
+	case StorageNotFoundErrorCode:
+		return StatusCode_STORAGE_NOT_FOUND
+	case StorageAlreadyExistsErrorCode:
+		return StatusCode_STORAGE_ALREADY_EXISTS
+	case StorageNotSupportedErrorCode:
+		return StatusCode_STORAGE_NOT_SUPPORTED
+	case StoragePermissionDeniedErrorCode:
+		return StatusCode_STORAGE_PERMISSIONDENIED
+	case TokenInvalidErrorCode:
+		return StatusCode_TOKEN_INVALID
+	case UserNotFoundErrorCode:
+		return StatusCode_USER_NOT_FOUND
+	case PathInvalidError:
+		return StatusCode_PATH_INVALID
+	case ContextUserRequiredError:
+		return StatusCode_CONTEXT_USER_REQUIRED
+	case PublicLinkInvalidExpireDateErrorCode:
+		return StatusCode_PUBLIC_LINK_INVALID_DATE
+	case PublicLinkNotFoundErrorCode:
+		return StatusCode_PUBLIC_LINK_NOT_FOUND
+	default:
+		return StatusCode_UNKNOWN
+	}
 }

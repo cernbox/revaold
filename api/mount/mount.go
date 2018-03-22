@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 	"go.uber.org/zap"
 )
 
@@ -156,7 +156,7 @@ func (m *mount) Download(ctx context.Context, path string) (io.ReadCloser, error
 	if err != nil {
 		return nil, err
 	}
-	return m.Download(ctx, internalPath)
+	return m.storage.Download(ctx, internalPath)
 }
 
 func (m *mount) ListRevisions(ctx context.Context, path string) ([]*api.Revision, error) {
@@ -193,13 +193,14 @@ func (m *mount) EmptyRecycle(ctx context.Context, path string) error {
 	return m.storage.EmptyRecycle(ctx, path)
 }
 
-func (m *mount) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
-	entries, err := m.storage.ListRecycle(ctx, path)
+func (m *mount) ListRecycle(ctx context.Context, p string) ([]*api.RecycleEntry, error) {
+	entries, err := m.storage.ListRecycle(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	for _, e := range entries {
-		e.RestoreKey = fmt.Sprintf("%s:%s", m.mountPointId, e.RestoreKey)
+		e.RestoreKey = fmt.Sprintf("%s%s", m.mountPointId, e.RestoreKey)
+		e.RestorePath = path.Join(m.mountPoint, e.RestorePath)
 	}
 	return entries, nil
 }
@@ -208,7 +209,7 @@ func (m *mount) RestoreRecycleEntry(ctx context.Context, restoreKey string) erro
 	if m.isReadOnly() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
 	}
-	internalRestoreKey, _, err := m.getInternalPath(ctx, restoreKey)
+	internalRestoreKey, err := m.getInternalRestoreKey(ctx, restoreKey)
 	if err != nil {
 		return err
 	}
@@ -232,6 +233,17 @@ func (m *mount) getInternalIDPath(ctx context.Context, p string) (string, error)
 	}
 	return tokens[1], nil
 }
+
+func (m *mount) getInternalRestoreKey(ctx context.Context, restoreKey string) (string, error) {
+	l := ctx_zap.Extract(ctx)
+	if strings.HasPrefix(restoreKey, m.mountPointId) {
+		internalRestoreKey := strings.TrimPrefix(restoreKey, m.mountPointId)
+		l.Debug("restore key conversion: external => internal", zap.String("external", restoreKey), zap.String("internal", internalRestoreKey))
+		return internalRestoreKey, nil
+	}
+	return "", api.NewError(api.PathInvalidError).WithMessage("invalid  restore key for this mount")
+
+}
 func (m *mount) getInternalPath(ctx context.Context, p string) (string, string, error) {
 	l := ctx_zap.Extract(ctx)
 	if strings.HasPrefix(p, m.mountPoint) {
@@ -239,5 +251,5 @@ func (m *mount) getInternalPath(ctx context.Context, p string) (string, string, 
 		l.Debug("path conversion: external => internal", zap.String("external", p), zap.String("internal", internalPath))
 		return internalPath, m.mountPoint, nil
 	}
-	return "", "", api.NewError(api.PathInvalidError).WithMessage("invalid path for this mount")
+	return "", "", api.NewError(api.PathInvalidError).WithMessage("invalid path for this mount. mountpoint:" + m.mountPoint + " path:" + p)
 }

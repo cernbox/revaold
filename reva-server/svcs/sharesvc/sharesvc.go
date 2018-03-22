@@ -1,7 +1,7 @@
 package sharesvc
 
 import (
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 	"golang.org/x/net/context"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
@@ -16,19 +16,19 @@ type svc struct {
 	linkManager api.PublicLinkManager
 }
 
-func (s *svc) AddFolderShare(ctx context.Context, req *api.NewFolderShareReq) (*api.FolderShare, error) {
-	return &api.FolderShare{}, nil
+func (s *svc) AddFolderShare(ctx context.Context, req *api.NewFolderShareReq) (*api.FolderShareResponse, error) {
+	return &api.FolderShareResponse{}, nil
 }
 
-func (s *svc) UpdateFolderShare(ctx context.Context, req *api.UpdateFolderShareReq) (*api.Empty, error) {
-	return &api.Empty{}, nil
+func (s *svc) UpdateFolderShare(ctx context.Context, req *api.UpdateFolderShareReq) (*api.EmptyResponse, error) {
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) UnshareFolder(ctx context.Context, req *api.UnshareFolderReq) (*api.Empty, error) {
-	return &api.Empty{}, nil
+func (s *svc) UnshareFolder(ctx context.Context, req *api.UnshareFolderReq) (*api.EmptyResponse, error) {
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) ListPublicLinks(req *api.Empty, stream api.Share_ListPublicLinksServer) error {
+func (s *svc) ListPublicLinks(req *api.EmptyReq, stream api.Share_ListPublicLinksServer) error {
 	ctx := stream.Context()
 	l := ctx_zap.Extract(ctx)
 	links, err := s.linkManager.ListPublicLinks(ctx)
@@ -37,14 +37,15 @@ func (s *svc) ListPublicLinks(req *api.Empty, stream api.Share_ListPublicLinksSe
 		return err
 	}
 	for _, link := range links {
-		if err := stream.Send(link); err != nil {
+		publicLinkRes := &api.PublicLinkResponse{PublicLink: link}
+		if err := stream.Send(publicLinkRes); err != nil {
 			l.Error("error streaming link", zap.Error(err))
 			return err
 		}
 	}
 	return nil
 }
-func (s *svc) CreatePublicLink(ctx context.Context, req *api.NewLinkReq) (*api.PublicLink, error) {
+func (s *svc) CreatePublicLink(ctx context.Context, req *api.NewLinkReq) (*api.PublicLinkResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	opts := &api.PublicLinkOptions{
 		Password:   req.Password,
@@ -57,30 +58,32 @@ func (s *svc) CreatePublicLink(ctx context.Context, req *api.NewLinkReq) (*api.P
 		l.Error("error creating public link", zap.Error(err))
 		return nil, err
 	}
-	return publicLink, nil
+	publicLinkRes := &api.PublicLinkResponse{PublicLink: publicLink}
+	return publicLinkRes, nil
 }
 
-func (s *svc) InspectPublicLink(ctx context.Context, req *api.TokenReq) (*api.PublicLink, error) {
+func (s *svc) InspectPublicLink(ctx context.Context, req *api.TokenReq) (*api.PublicLinkResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	publicLink, err := s.linkManager.InspectPublicLink(ctx, req.Token)
 	if err != nil {
 		l.Error("error inspecting public link", zap.Error(err))
 		return nil, err
 	}
-	return publicLink, nil
+	publicLinkRes := &api.PublicLinkResponse{PublicLink: publicLink}
+	return publicLinkRes, nil
 }
 
-func (s *svc) RevokePublicLink(ctx context.Context, req *api.TokenReq) (*api.Empty, error) {
+func (s *svc) RevokePublicLink(ctx context.Context, req *api.TokenReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	err := s.linkManager.RevokePublicLink(ctx, req.Token)
 	if err != nil {
 		l.Error("error revoking public link", zap.Error(err))
 		return nil, err
 	}
-	return &api.Empty{}, nil
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) UpdatePublicLink(ctx context.Context, req *api.UpdateLinkReq) (*api.PublicLink, error) {
+func (s *svc) UpdatePublicLink(ctx context.Context, req *api.UpdateLinkReq) (*api.PublicLinkResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	opts := &api.PublicLinkOptions{
 		Password:         req.Password,
@@ -96,21 +99,22 @@ func (s *svc) UpdatePublicLink(ctx context.Context, req *api.UpdateLinkReq) (*ap
 		l.Error("error updating public link", zap.Error(err))
 		return nil, err
 	}
-	return publicLink, nil
+	publicLinkRes := &api.PublicLinkResponse{PublicLink: publicLink}
+	return publicLinkRes, nil
 }
 
 func (s *svc) ListFolderShares(req *api.ListFolderSharesReq, stream api.Share_ListFolderSharesServer) error {
 	return nil
 }
 
-func (s *svc) ListReceivedShares(req *api.Empty, stream api.Share_ListReceivedSharesServer) error {
+func (s *svc) ListReceivedShares(req *api.EmptyReq, stream api.Share_ListReceivedSharesServer) error {
 	return nil
 }
 
-func (s *svc) MountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.Empty, error) {
-	return &api.Empty{}, nil
+func (s *svc) MountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
+	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) UnmountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.Empty, error) {
-	return &api.Empty{}, nil
+func (s *svc) UnmountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
+	return &api.EmptyResponse{}, nil
 }

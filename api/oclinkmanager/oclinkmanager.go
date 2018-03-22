@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
@@ -83,7 +83,7 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 	}
 
 	stmtString := "insert into oc_share set share_type=?,uid_owner=?,uid_initiator=?,item_type=?,item_source=?,file_source=?,permissions=?,stime=?,token=?"
-	stmtValues := []interface{}{3, u.AccountID, u.AccountID, itemType, itemSource, fileSource, permissions, time.Now().Unix(), token}
+	stmtValues := []interface{}{3, u.AccountId, u.AccountId, itemType, itemSource, fileSource, permissions, time.Now().Unix(), token}
 
 	if opt.Password != "" {
 		hashedPassword, err := hashPassword(opt.Password)
@@ -185,7 +185,7 @@ func (lm *linkManager) UpdatePublicLink(ctx context.Context, token string, opt *
 	}
 
 	stmtString += strings.Join(stmtTail, ",") + " where uid_owner=? and token=?"
-	stmtValues = append(stmtValues, u.AccountID, token)
+	stmtValues = append(stmtValues, u.AccountId, token)
 
 	stmt, err := lm.db.Prepare(stmtString)
 	if err != nil {
@@ -215,7 +215,7 @@ func (lm *linkManager) InspectPublicLink(ctx context.Context, token string) (*ap
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	dbShare, err := lm.getDBShare(ctx, u.AccountID, token)
+	dbShare, err := lm.getDBShare(ctx, u.AccountId, token)
 	if err != nil {
 		l.Error("cannot get db share", zap.Error(err), zap.String("token", token))
 		return nil, err
@@ -236,7 +236,7 @@ func (lm *linkManager) ListPublicLinks(ctx context.Context) ([]*api.PublicLink, 
 		return nil, err
 	}
 
-	dbShares, err := lm.getDBShares(ctx, u.AccountID)
+	dbShares, err := lm.getDBShares(ctx, u.AccountId)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (lm *linkManager) RevokePublicLink(ctx context.Context, token string) error
 		return err
 	}
 
-	res, err := stmt.Exec(u.AccountID, token)
+	res, err := stmt.Exec(u.AccountId, token)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return err

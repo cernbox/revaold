@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"gitlab.com/labkode/reva/api"
-	"gitlab.com/labkode/reva/reva-cli/util"
+	"github.com/cernbox/reva/api"
+	"github.com/cernbox/reva/reva-cli/util"
 
 	"github.com/codegangsta/cli"
 	"github.com/ryanuber/columnize"
@@ -111,10 +111,14 @@ func inspect(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	md, err := client.Inspect(util.GetContextWithAuth(), req)
+	mdRes, err := client.Inspect(util.GetContextWithAuth(), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
+	if mdRes.Status != api.StatusCode_OK {
+		return cli.NewExitError(mdRes.Status, 1)
+	}
+	md := mdRes.Metadata
 
 	_type := "File"
 	if md.IsDir {
@@ -146,13 +150,17 @@ func listFolder(c *cli.Context) error {
 
 	lines := []string{"#Type|Id|Size|MTime|ETag|Path"}
 	for {
-		md, err := stream.Recv()
+		mdRes, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			return cli.NewExitError(err, 1)
 		}
+		if mdRes.Status != api.StatusCode_OK {
+			return cli.NewExitError(mdRes.Status, 1)
+		}
+		md := mdRes.Metadata
 		_type := "file"
 		if md.IsDir {
 			_type = "dir"
@@ -197,7 +205,17 @@ func download(c *cli.Context) error {
 
 	var reader io.Reader
 	for {
-		dc, err := stream.Recv()
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+		if dcRes.Status != api.StatusCode_OK {
+			return cli.NewExitError(dcRes.Status, 1)
+		}
+		dc := dcRes.DataChunk
 		if dc != nil {
 			if dc.Length > 0 {
 				reader = bytes.NewReader(dc.Data)
@@ -207,12 +225,6 @@ func download(c *cli.Context) error {
 				}
 			}
 
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return cli.NewExitError(err, 1)
 		}
 
 	}
@@ -244,10 +256,14 @@ func upload(c *cli.Context) error {
 	}
 
 	ctx := util.GetContextWithAuth()
-	txInfo, err := client.StartWriteTx(ctx, &api.Empty{})
+	txInfoRes, err := client.StartWriteTx(ctx, &api.EmptyReq{})
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
+	if txInfoRes.Status != api.StatusCode_OK {
+		return cli.NewExitError(txInfoRes.Status, 1)
+	}
+	txInfo := txInfoRes.TxInfo
 
 	stream, err := client.WriteChunk(ctx)
 	if err != nil {
@@ -378,7 +394,17 @@ func listRecycle(c *cli.Context) error {
 
 	lines := []string{"#Type|RestoreKey|Deleted|Size|RestorePath"}
 	for {
-		re, err := stream.Recv()
+		recycleEntryRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+		if recycleEntryRes.Status != api.StatusCode_OK {
+			return cli.NewExitError(err, 1)
+		}
+		re := recycleEntryRes.RecycleEntry
 		if re != nil {
 			_type := "file"
 			if re.IsDir {
@@ -386,12 +412,6 @@ func listRecycle(c *cli.Context) error {
 			}
 			line := fmt.Sprintf("%s|%s|%d|%d|%s", _type, re.RestoreKey, re.DelMtime, re.Size, re.RestorePath)
 			lines = append(lines, line)
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return cli.NewExitError(err, 1)
 		}
 	}
 	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))
@@ -437,7 +457,17 @@ func listRevisions(c *cli.Context) error {
 
 	lines := []string{"#Type|RevisionKey|Modified|Size"}
 	for {
-		rev, err := stream.Recv()
+		revRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+		if revRes.Status != api.StatusCode_OK {
+			return cli.NewExitError(revRes.Status, 1)
+		}
+		rev := revRes.Revision
 		if rev != nil {
 			_type := "file"
 			if rev.IsDir {
@@ -445,12 +475,6 @@ func listRevisions(c *cli.Context) error {
 			}
 			line := fmt.Sprintf("%s|%s|%d|%d", _type, rev.RevKey, rev.Mtime, rev.Size)
 			lines = append(lines, line)
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return cli.NewExitError(err, 1)
 		}
 	}
 	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))
@@ -495,10 +519,17 @@ func downloadRevision(c *cli.Context) error {
 
 	var reader io.Reader
 	for {
-		dc, err := stream.Recv()
+		dcRes, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+		if dcRes.Status != api.StatusCode_OK {
+			return cli.NewExitError(dcRes.Status, 1)
+		}
+		dc := dcRes.DataChunk
 
 		if dc.Length > 0 {
 			reader = bytes.NewReader(dc.Data)

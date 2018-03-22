@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 
 	"github.com/satori/go.uuid"
 )

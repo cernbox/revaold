@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 )
 
 type nopStorage struct {

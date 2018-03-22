@@ -9,28 +9,41 @@ It is generated from these files:
 	api.proto
 
 It has these top-level messages:
-	Empty
+	EmptyResponse
+	EmptyReq
+	UserResponse
+	User
+	TxInfoResponse
 	TxInfo
 	CreateTokenReq
+	TokenResponse
 	Token
 	VerifyTokenReq
+	MetadataResponse
 	Metadata
 	PathReq
 	MoveReq
 	TxChunk
+	WriteSummaryResponse
 	WriteSummary
 	TxEnd
+	DataChunkResponse
 	DataChunk
+	RevisionResponse
 	Revision
 	RevisionReq
+	RecycleEntryResponse
 	RecycleEntry
 	RecycleEntryReq
 	LinkPermissions
 	NewLinkReq
 	UpdateLinkReq
+	PublicLinkResponse
 	PublicLink
 	TokenReq
+	FolderShareResponse
 	FolderShare
+	ReceivedShareResponse
 	ReceivedShare
 	NewFolderShareReq
 	UpdateFolderShareReq
@@ -60,13 +73,152 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
-type Empty struct {
+type StatusCode int32
+
+const (
+	StatusCode_OK                       StatusCode = 0
+	StatusCode_UNKNOWN                  StatusCode = 1
+	StatusCode_STORAGE_NOT_FOUND        StatusCode = 2
+	StatusCode_STORAGE_ALREADY_EXISTS   StatusCode = 3
+	StatusCode_STORAGE_PERMISSIONDENIED StatusCode = 4
+	StatusCode_CONTEXT_USER_REQUIRED    StatusCode = 5
+	StatusCode_PATH_INVALID             StatusCode = 6
+	StatusCode_PUBLIC_LINK_NOT_FOUND    StatusCode = 7
+	StatusCode_PUBLIC_LINK_INVALID_DATE StatusCode = 8
+	StatusCode_STORAGE_NOT_SUPPORTED    StatusCode = 9
+	StatusCode_USER_NOT_FOUND           StatusCode = 10
+	StatusCode_TOKEN_INVALID            StatusCode = 11
+)
+
+var StatusCode_name = map[int32]string{
+	0:  "OK",
+	1:  "UNKNOWN",
+	2:  "STORAGE_NOT_FOUND",
+	3:  "STORAGE_ALREADY_EXISTS",
+	4:  "STORAGE_PERMISSIONDENIED",
+	5:  "CONTEXT_USER_REQUIRED",
+	6:  "PATH_INVALID",
+	7:  "PUBLIC_LINK_NOT_FOUND",
+	8:  "PUBLIC_LINK_INVALID_DATE",
+	9:  "STORAGE_NOT_SUPPORTED",
+	10: "USER_NOT_FOUND",
+	11: "TOKEN_INVALID",
+}
+var StatusCode_value = map[string]int32{
+	"OK":                       0,
+	"UNKNOWN":                  1,
+	"STORAGE_NOT_FOUND":        2,
+	"STORAGE_ALREADY_EXISTS":   3,
+	"STORAGE_PERMISSIONDENIED": 4,
+	"CONTEXT_USER_REQUIRED":    5,
+	"PATH_INVALID":             6,
+	"PUBLIC_LINK_NOT_FOUND":    7,
+	"PUBLIC_LINK_INVALID_DATE": 8,
+	"STORAGE_NOT_SUPPORTED":    9,
+	"USER_NOT_FOUND":           10,
+	"TOKEN_INVALID":            11,
 }
 
-func (m *Empty) Reset()                    { *m = Empty{} }
-func (m *Empty) String() string            { return proto.CompactTextString(m) }
-func (*Empty) ProtoMessage()               {}
-func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+func (x StatusCode) String() string {
+	return proto.EnumName(StatusCode_name, int32(x))
+}
+func (StatusCode) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+type EmptyResponse struct {
+	Status StatusCode `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+}
+
+func (m *EmptyResponse) Reset()                    { *m = EmptyResponse{} }
+func (m *EmptyResponse) String() string            { return proto.CompactTextString(m) }
+func (*EmptyResponse) ProtoMessage()               {}
+func (*EmptyResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+func (m *EmptyResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+type EmptyReq struct {
+}
+
+func (m *EmptyReq) Reset()                    { *m = EmptyReq{} }
+func (m *EmptyReq) String() string            { return proto.CompactTextString(m) }
+func (*EmptyReq) ProtoMessage()               {}
+func (*EmptyReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+type UserResponse struct {
+	Status StatusCode `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	User   *User      `protobuf:"bytes,2,opt,name=user" json:"user,omitempty"`
+}
+
+func (m *UserResponse) Reset()                    { *m = UserResponse{} }
+func (m *UserResponse) String() string            { return proto.CompactTextString(m) }
+func (*UserResponse) ProtoMessage()               {}
+func (*UserResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+
+func (m *UserResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *UserResponse) GetUser() *User {
+	if m != nil {
+		return m.User
+	}
+	return nil
+}
+
+type User struct {
+	AccountId string   `protobuf:"bytes,1,opt,name=account_id,json=accountId" json:"account_id,omitempty"`
+	Groups    []string `protobuf:"bytes,2,rep,name=groups" json:"groups,omitempty"`
+}
+
+func (m *User) Reset()                    { *m = User{} }
+func (m *User) String() string            { return proto.CompactTextString(m) }
+func (*User) ProtoMessage()               {}
+func (*User) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
+func (m *User) GetAccountId() string {
+	if m != nil {
+		return m.AccountId
+	}
+	return ""
+}
+
+func (m *User) GetGroups() []string {
+	if m != nil {
+		return m.Groups
+	}
+	return nil
+}
+
+type TxInfoResponse struct {
+	Status StatusCode `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	TxInfo *TxInfo    `protobuf:"bytes,2,opt,name=txInfo" json:"txInfo,omitempty"`
+}
+
+func (m *TxInfoResponse) Reset()                    { *m = TxInfoResponse{} }
+func (m *TxInfoResponse) String() string            { return proto.CompactTextString(m) }
+func (*TxInfoResponse) ProtoMessage()               {}
+func (*TxInfoResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+
+func (m *TxInfoResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *TxInfoResponse) GetTxInfo() *TxInfo {
+	if m != nil {
+		return m.TxInfo
+	}
+	return nil
+}
 
 type TxInfo struct {
 	TxId string `protobuf:"bytes,1,opt,name=tx_id,json=txId" json:"tx_id,omitempty"`
@@ -75,7 +227,7 @@ type TxInfo struct {
 func (m *TxInfo) Reset()                    { *m = TxInfo{} }
 func (m *TxInfo) String() string            { return proto.CompactTextString(m) }
 func (*TxInfo) ProtoMessage()               {}
-func (*TxInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+func (*TxInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
 
 func (m *TxInfo) GetTxId() string {
 	if m != nil {
@@ -92,7 +244,7 @@ type CreateTokenReq struct {
 func (m *CreateTokenReq) Reset()                    { *m = CreateTokenReq{} }
 func (m *CreateTokenReq) String() string            { return proto.CompactTextString(m) }
 func (*CreateTokenReq) ProtoMessage()               {}
-func (*CreateTokenReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+func (*CreateTokenReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{6} }
 
 func (m *CreateTokenReq) GetClientId() string {
 	if m != nil {
@@ -108,6 +260,30 @@ func (m *CreateTokenReq) GetClientSecret() string {
 	return ""
 }
 
+type TokenResponse struct {
+	Status StatusCode `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	Token  *Token     `protobuf:"bytes,2,opt,name=token" json:"token,omitempty"`
+}
+
+func (m *TokenResponse) Reset()                    { *m = TokenResponse{} }
+func (m *TokenResponse) String() string            { return proto.CompactTextString(m) }
+func (*TokenResponse) ProtoMessage()               {}
+func (*TokenResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{7} }
+
+func (m *TokenResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *TokenResponse) GetToken() *Token {
+	if m != nil {
+		return m.Token
+	}
+	return nil
+}
+
 type Token struct {
 	Token string `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
 }
@@ -115,7 +291,7 @@ type Token struct {
 func (m *Token) Reset()                    { *m = Token{} }
 func (m *Token) String() string            { return proto.CompactTextString(m) }
 func (*Token) ProtoMessage()               {}
-func (*Token) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+func (*Token) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{8} }
 
 func (m *Token) GetToken() string {
 	if m != nil {
@@ -131,13 +307,37 @@ type VerifyTokenReq struct {
 func (m *VerifyTokenReq) Reset()                    { *m = VerifyTokenReq{} }
 func (m *VerifyTokenReq) String() string            { return proto.CompactTextString(m) }
 func (*VerifyTokenReq) ProtoMessage()               {}
-func (*VerifyTokenReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
+func (*VerifyTokenReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{9} }
 
 func (m *VerifyTokenReq) GetToken() string {
 	if m != nil {
 		return m.Token
 	}
 	return ""
+}
+
+type MetadataResponse struct {
+	Status   StatusCode `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	Metadata *Metadata  `protobuf:"bytes,2,opt,name=metadata" json:"metadata,omitempty"`
+}
+
+func (m *MetadataResponse) Reset()                    { *m = MetadataResponse{} }
+func (m *MetadataResponse) String() string            { return proto.CompactTextString(m) }
+func (*MetadataResponse) ProtoMessage()               {}
+func (*MetadataResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{10} }
+
+func (m *MetadataResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *MetadataResponse) GetMetadata() *Metadata {
+	if m != nil {
+		return m.Metadata
+	}
+	return nil
 }
 
 type Metadata struct {
@@ -154,7 +354,7 @@ type Metadata struct {
 func (m *Metadata) Reset()                    { *m = Metadata{} }
 func (m *Metadata) String() string            { return proto.CompactTextString(m) }
 func (*Metadata) ProtoMessage()               {}
-func (*Metadata) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
+func (*Metadata) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{11} }
 
 func (m *Metadata) GetId() string {
 	if m != nil {
@@ -219,7 +419,7 @@ type PathReq struct {
 func (m *PathReq) Reset()                    { *m = PathReq{} }
 func (m *PathReq) String() string            { return proto.CompactTextString(m) }
 func (*PathReq) ProtoMessage()               {}
-func (*PathReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{6} }
+func (*PathReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{12} }
 
 func (m *PathReq) GetPath() string {
 	if m != nil {
@@ -236,7 +436,7 @@ type MoveReq struct {
 func (m *MoveReq) Reset()                    { *m = MoveReq{} }
 func (m *MoveReq) String() string            { return proto.CompactTextString(m) }
 func (*MoveReq) ProtoMessage()               {}
-func (*MoveReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{7} }
+func (*MoveReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{13} }
 
 func (m *MoveReq) GetOldPath() string {
 	if m != nil {
@@ -263,7 +463,7 @@ type TxChunk struct {
 func (m *TxChunk) Reset()                    { *m = TxChunk{} }
 func (m *TxChunk) String() string            { return proto.CompactTextString(m) }
 func (*TxChunk) ProtoMessage()               {}
-func (*TxChunk) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{8} }
+func (*TxChunk) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{14} }
 
 func (m *TxChunk) GetTxId() string {
 	if m != nil {
@@ -293,6 +493,30 @@ func (m *TxChunk) GetData() []byte {
 	return nil
 }
 
+type WriteSummaryResponse struct {
+	Status       StatusCode    `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	WriteSummary *WriteSummary `protobuf:"bytes,2,opt,name=writeSummary" json:"writeSummary,omitempty"`
+}
+
+func (m *WriteSummaryResponse) Reset()                    { *m = WriteSummaryResponse{} }
+func (m *WriteSummaryResponse) String() string            { return proto.CompactTextString(m) }
+func (*WriteSummaryResponse) ProtoMessage()               {}
+func (*WriteSummaryResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{15} }
+
+func (m *WriteSummaryResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *WriteSummaryResponse) GetWriteSummary() *WriteSummary {
+	if m != nil {
+		return m.WriteSummary
+	}
+	return nil
+}
+
 type WriteSummary struct {
 	Nchunks   uint64 `protobuf:"varint,1,opt,name=nchunks" json:"nchunks,omitempty"`
 	TotalSize uint64 `protobuf:"varint,2,opt,name=total_size,json=totalSize" json:"total_size,omitempty"`
@@ -301,7 +525,7 @@ type WriteSummary struct {
 func (m *WriteSummary) Reset()                    { *m = WriteSummary{} }
 func (m *WriteSummary) String() string            { return proto.CompactTextString(m) }
 func (*WriteSummary) ProtoMessage()               {}
-func (*WriteSummary) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{9} }
+func (*WriteSummary) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{16} }
 
 func (m *WriteSummary) GetNchunks() uint64 {
 	if m != nil {
@@ -326,7 +550,7 @@ type TxEnd struct {
 func (m *TxEnd) Reset()                    { *m = TxEnd{} }
 func (m *TxEnd) String() string            { return proto.CompactTextString(m) }
 func (*TxEnd) ProtoMessage()               {}
-func (*TxEnd) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{10} }
+func (*TxEnd) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{17} }
 
 func (m *TxEnd) GetTxId() string {
 	if m != nil {
@@ -349,6 +573,30 @@ func (m *TxEnd) GetChecksum() string {
 	return ""
 }
 
+type DataChunkResponse struct {
+	Status    StatusCode `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	DataChunk *DataChunk `protobuf:"bytes,2,opt,name=dataChunk" json:"dataChunk,omitempty"`
+}
+
+func (m *DataChunkResponse) Reset()                    { *m = DataChunkResponse{} }
+func (m *DataChunkResponse) String() string            { return proto.CompactTextString(m) }
+func (*DataChunkResponse) ProtoMessage()               {}
+func (*DataChunkResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{18} }
+
+func (m *DataChunkResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *DataChunkResponse) GetDataChunk() *DataChunk {
+	if m != nil {
+		return m.DataChunk
+	}
+	return nil
+}
+
 type DataChunk struct {
 	Length uint64 `protobuf:"varint,1,opt,name=length" json:"length,omitempty"`
 	Offset uint64 `protobuf:"varint,2,opt,name=offset" json:"offset,omitempty"`
@@ -358,7 +606,7 @@ type DataChunk struct {
 func (m *DataChunk) Reset()                    { *m = DataChunk{} }
 func (m *DataChunk) String() string            { return proto.CompactTextString(m) }
 func (*DataChunk) ProtoMessage()               {}
-func (*DataChunk) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{11} }
+func (*DataChunk) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{19} }
 
 func (m *DataChunk) GetLength() uint64 {
 	if m != nil {
@@ -381,6 +629,30 @@ func (m *DataChunk) GetData() []byte {
 	return nil
 }
 
+type RevisionResponse struct {
+	Status   StatusCode `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	Revision *Revision  `protobuf:"bytes,2,opt,name=revision" json:"revision,omitempty"`
+}
+
+func (m *RevisionResponse) Reset()                    { *m = RevisionResponse{} }
+func (m *RevisionResponse) String() string            { return proto.CompactTextString(m) }
+func (*RevisionResponse) ProtoMessage()               {}
+func (*RevisionResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20} }
+
+func (m *RevisionResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *RevisionResponse) GetRevision() *Revision {
+	if m != nil {
+		return m.Revision
+	}
+	return nil
+}
+
 type Revision struct {
 	RevKey string `protobuf:"bytes,1,opt,name=rev_key,json=revKey" json:"rev_key,omitempty"`
 	Size   uint64 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
@@ -391,7 +663,7 @@ type Revision struct {
 func (m *Revision) Reset()                    { *m = Revision{} }
 func (m *Revision) String() string            { return proto.CompactTextString(m) }
 func (*Revision) ProtoMessage()               {}
-func (*Revision) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{12} }
+func (*Revision) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{21} }
 
 func (m *Revision) GetRevKey() string {
 	if m != nil {
@@ -429,7 +701,7 @@ type RevisionReq struct {
 func (m *RevisionReq) Reset()                    { *m = RevisionReq{} }
 func (m *RevisionReq) String() string            { return proto.CompactTextString(m) }
 func (*RevisionReq) ProtoMessage()               {}
-func (*RevisionReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{13} }
+func (*RevisionReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22} }
 
 func (m *RevisionReq) GetPath() string {
 	if m != nil {
@@ -445,6 +717,30 @@ func (m *RevisionReq) GetRevKey() string {
 	return ""
 }
 
+type RecycleEntryResponse struct {
+	Status       StatusCode    `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	RecycleEntry *RecycleEntry `protobuf:"bytes,2,opt,name=recycleEntry" json:"recycleEntry,omitempty"`
+}
+
+func (m *RecycleEntryResponse) Reset()                    { *m = RecycleEntryResponse{} }
+func (m *RecycleEntryResponse) String() string            { return proto.CompactTextString(m) }
+func (*RecycleEntryResponse) ProtoMessage()               {}
+func (*RecycleEntryResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{23} }
+
+func (m *RecycleEntryResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *RecycleEntryResponse) GetRecycleEntry() *RecycleEntry {
+	if m != nil {
+		return m.RecycleEntry
+	}
+	return nil
+}
+
 type RecycleEntry struct {
 	RestorePath string `protobuf:"bytes,1,opt,name=restore_path,json=restorePath" json:"restore_path,omitempty"`
 	RestoreKey  string `protobuf:"bytes,2,opt,name=restore_key,json=restoreKey" json:"restore_key,omitempty"`
@@ -456,7 +752,7 @@ type RecycleEntry struct {
 func (m *RecycleEntry) Reset()                    { *m = RecycleEntry{} }
 func (m *RecycleEntry) String() string            { return proto.CompactTextString(m) }
 func (*RecycleEntry) ProtoMessage()               {}
-func (*RecycleEntry) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{14} }
+func (*RecycleEntry) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{24} }
 
 func (m *RecycleEntry) GetRestorePath() string {
 	if m != nil {
@@ -500,7 +796,7 @@ type RecycleEntryReq struct {
 func (m *RecycleEntryReq) Reset()                    { *m = RecycleEntryReq{} }
 func (m *RecycleEntryReq) String() string            { return proto.CompactTextString(m) }
 func (*RecycleEntryReq) ProtoMessage()               {}
-func (*RecycleEntryReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{15} }
+func (*RecycleEntryReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{25} }
 
 func (m *RecycleEntryReq) GetRestoreKey() string {
 	if m != nil {
@@ -517,7 +813,7 @@ type LinkPermissions struct {
 func (m *LinkPermissions) Reset()                    { *m = LinkPermissions{} }
 func (m *LinkPermissions) String() string            { return proto.CompactTextString(m) }
 func (*LinkPermissions) ProtoMessage()               {}
-func (*LinkPermissions) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{16} }
+func (*LinkPermissions) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{26} }
 
 func (m *LinkPermissions) GetRead() bool {
 	if m != nil {
@@ -543,7 +839,7 @@ type NewLinkReq struct {
 func (m *NewLinkReq) Reset()                    { *m = NewLinkReq{} }
 func (m *NewLinkReq) String() string            { return proto.CompactTextString(m) }
 func (*NewLinkReq) ProtoMessage()               {}
-func (*NewLinkReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{17} }
+func (*NewLinkReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{27} }
 
 func (m *NewLinkReq) GetPath() string {
 	if m != nil {
@@ -586,7 +882,7 @@ type UpdateLinkReq struct {
 func (m *UpdateLinkReq) Reset()                    { *m = UpdateLinkReq{} }
 func (m *UpdateLinkReq) String() string            { return proto.CompactTextString(m) }
 func (*UpdateLinkReq) ProtoMessage()               {}
-func (*UpdateLinkReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{18} }
+func (*UpdateLinkReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{28} }
 
 func (m *UpdateLinkReq) GetToken() string {
 	if m != nil {
@@ -637,6 +933,30 @@ func (m *UpdateLinkReq) GetUpdateReadOnly() bool {
 	return false
 }
 
+type PublicLinkResponse struct {
+	Status     StatusCode  `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	PublicLink *PublicLink `protobuf:"bytes,2,opt,name=publicLink" json:"publicLink,omitempty"`
+}
+
+func (m *PublicLinkResponse) Reset()                    { *m = PublicLinkResponse{} }
+func (m *PublicLinkResponse) String() string            { return proto.CompactTextString(m) }
+func (*PublicLinkResponse) ProtoMessage()               {}
+func (*PublicLinkResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{29} }
+
+func (m *PublicLinkResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *PublicLinkResponse) GetPublicLink() *PublicLink {
+	if m != nil {
+		return m.PublicLink
+	}
+	return nil
+}
+
 type PublicLink struct {
 	Token     string `protobuf:"bytes,1,opt,name=token" json:"token,omitempty"`
 	Path      string `protobuf:"bytes,2,opt,name=path" json:"path,omitempty"`
@@ -649,7 +969,7 @@ type PublicLink struct {
 func (m *PublicLink) Reset()                    { *m = PublicLink{} }
 func (m *PublicLink) String() string            { return proto.CompactTextString(m) }
 func (*PublicLink) ProtoMessage()               {}
-func (*PublicLink) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{19} }
+func (*PublicLink) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{30} }
 
 func (m *PublicLink) GetToken() string {
 	if m != nil {
@@ -700,13 +1020,37 @@ type TokenReq struct {
 func (m *TokenReq) Reset()                    { *m = TokenReq{} }
 func (m *TokenReq) String() string            { return proto.CompactTextString(m) }
 func (*TokenReq) ProtoMessage()               {}
-func (*TokenReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{20} }
+func (*TokenReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{31} }
 
 func (m *TokenReq) GetToken() string {
 	if m != nil {
 		return m.Token
 	}
 	return ""
+}
+
+type FolderShareResponse struct {
+	Status      StatusCode   `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	FolderShare *FolderShare `protobuf:"bytes,2,opt,name=folderShare" json:"folderShare,omitempty"`
+}
+
+func (m *FolderShareResponse) Reset()                    { *m = FolderShareResponse{} }
+func (m *FolderShareResponse) String() string            { return proto.CompactTextString(m) }
+func (*FolderShareResponse) ProtoMessage()               {}
+func (*FolderShareResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{32} }
+
+func (m *FolderShareResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *FolderShareResponse) GetFolderShare() *FolderShare {
+	if m != nil {
+		return m.FolderShare
+	}
+	return nil
 }
 
 type FolderShare struct {
@@ -722,7 +1066,7 @@ type FolderShare struct {
 func (m *FolderShare) Reset()                    { *m = FolderShare{} }
 func (m *FolderShare) String() string            { return proto.CompactTextString(m) }
 func (*FolderShare) ProtoMessage()               {}
-func (*FolderShare) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{21} }
+func (*FolderShare) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{33} }
 
 func (m *FolderShare) GetId() string {
 	if m != nil {
@@ -773,6 +1117,30 @@ func (m *FolderShare) GetMtime() uint64 {
 	return 0
 }
 
+type ReceivedShareResponse struct {
+	Status        StatusCode     `protobuf:"varint,1,opt,name=status,enum=api.StatusCode" json:"status,omitempty"`
+	ReceivedShare *ReceivedShare `protobuf:"bytes,2,opt,name=receivedShare" json:"receivedShare,omitempty"`
+}
+
+func (m *ReceivedShareResponse) Reset()                    { *m = ReceivedShareResponse{} }
+func (m *ReceivedShareResponse) String() string            { return proto.CompactTextString(m) }
+func (*ReceivedShareResponse) ProtoMessage()               {}
+func (*ReceivedShareResponse) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{34} }
+
+func (m *ReceivedShareResponse) GetStatus() StatusCode {
+	if m != nil {
+		return m.Status
+	}
+	return StatusCode_OK
+}
+
+func (m *ReceivedShareResponse) GetReceivedShare() *ReceivedShare {
+	if m != nil {
+		return m.ReceivedShare
+	}
+	return nil
+}
+
 type ReceivedShare struct {
 	Id          string `protobuf:"bytes,1,opt,name=id" json:"id,omitempty"`
 	Path        string `protobuf:"bytes,2,opt,name=path" json:"path,omitempty"`
@@ -788,7 +1156,7 @@ type ReceivedShare struct {
 func (m *ReceivedShare) Reset()                    { *m = ReceivedShare{} }
 func (m *ReceivedShare) String() string            { return proto.CompactTextString(m) }
 func (*ReceivedShare) ProtoMessage()               {}
-func (*ReceivedShare) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{22} }
+func (*ReceivedShare) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{35} }
 
 func (m *ReceivedShare) GetId() string {
 	if m != nil {
@@ -862,7 +1230,7 @@ type NewFolderShareReq struct {
 func (m *NewFolderShareReq) Reset()                    { *m = NewFolderShareReq{} }
 func (m *NewFolderShareReq) String() string            { return proto.CompactTextString(m) }
 func (*NewFolderShareReq) ProtoMessage()               {}
-func (*NewFolderShareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{23} }
+func (*NewFolderShareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{36} }
 
 func (m *NewFolderShareReq) GetPath() string {
 	if m != nil {
@@ -893,7 +1261,7 @@ type UpdateFolderShareReq struct {
 func (m *UpdateFolderShareReq) Reset()                    { *m = UpdateFolderShareReq{} }
 func (m *UpdateFolderShareReq) String() string            { return proto.CompactTextString(m) }
 func (*UpdateFolderShareReq) ProtoMessage()               {}
-func (*UpdateFolderShareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{24} }
+func (*UpdateFolderShareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{37} }
 
 func (m *UpdateFolderShareReq) GetId() string {
 	if m != nil {
@@ -916,7 +1284,7 @@ type UnshareFolderReq struct {
 func (m *UnshareFolderReq) Reset()                    { *m = UnshareFolderReq{} }
 func (m *UnshareFolderReq) String() string            { return proto.CompactTextString(m) }
 func (*UnshareFolderReq) ProtoMessage()               {}
-func (*UnshareFolderReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{25} }
+func (*UnshareFolderReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{38} }
 
 func (m *UnshareFolderReq) GetId() string {
 	if m != nil {
@@ -932,7 +1300,7 @@ type ListFolderSharesReq struct {
 func (m *ListFolderSharesReq) Reset()                    { *m = ListFolderSharesReq{} }
 func (m *ListFolderSharesReq) String() string            { return proto.CompactTextString(m) }
 func (*ListFolderSharesReq) ProtoMessage()               {}
-func (*ListFolderSharesReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{26} }
+func (*ListFolderSharesReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{39} }
 
 func (m *ListFolderSharesReq) GetPath() string {
 	if m != nil {
@@ -948,7 +1316,7 @@ type ReceivedShareReq struct {
 func (m *ReceivedShareReq) Reset()                    { *m = ReceivedShareReq{} }
 func (m *ReceivedShareReq) String() string            { return proto.CompactTextString(m) }
 func (*ReceivedShareReq) ProtoMessage()               {}
-func (*ReceivedShareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{27} }
+func (*ReceivedShareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{40} }
 
 func (m *ReceivedShareReq) GetShareId() string {
 	if m != nil {
@@ -958,34 +1326,48 @@ func (m *ReceivedShareReq) GetShareId() string {
 }
 
 func init() {
-	proto.RegisterType((*Empty)(nil), "api.Empty")
+	proto.RegisterType((*EmptyResponse)(nil), "api.EmptyResponse")
+	proto.RegisterType((*EmptyReq)(nil), "api.EmptyReq")
+	proto.RegisterType((*UserResponse)(nil), "api.UserResponse")
+	proto.RegisterType((*User)(nil), "api.User")
+	proto.RegisterType((*TxInfoResponse)(nil), "api.TxInfoResponse")
 	proto.RegisterType((*TxInfo)(nil), "api.TxInfo")
 	proto.RegisterType((*CreateTokenReq)(nil), "api.CreateTokenReq")
+	proto.RegisterType((*TokenResponse)(nil), "api.TokenResponse")
 	proto.RegisterType((*Token)(nil), "api.Token")
 	proto.RegisterType((*VerifyTokenReq)(nil), "api.VerifyTokenReq")
+	proto.RegisterType((*MetadataResponse)(nil), "api.MetadataResponse")
 	proto.RegisterType((*Metadata)(nil), "api.Metadata")
 	proto.RegisterType((*PathReq)(nil), "api.PathReq")
 	proto.RegisterType((*MoveReq)(nil), "api.MoveReq")
 	proto.RegisterType((*TxChunk)(nil), "api.TxChunk")
+	proto.RegisterType((*WriteSummaryResponse)(nil), "api.WriteSummaryResponse")
 	proto.RegisterType((*WriteSummary)(nil), "api.WriteSummary")
 	proto.RegisterType((*TxEnd)(nil), "api.TxEnd")
+	proto.RegisterType((*DataChunkResponse)(nil), "api.DataChunkResponse")
 	proto.RegisterType((*DataChunk)(nil), "api.DataChunk")
+	proto.RegisterType((*RevisionResponse)(nil), "api.RevisionResponse")
 	proto.RegisterType((*Revision)(nil), "api.Revision")
 	proto.RegisterType((*RevisionReq)(nil), "api.RevisionReq")
+	proto.RegisterType((*RecycleEntryResponse)(nil), "api.RecycleEntryResponse")
 	proto.RegisterType((*RecycleEntry)(nil), "api.RecycleEntry")
 	proto.RegisterType((*RecycleEntryReq)(nil), "api.RecycleEntryReq")
 	proto.RegisterType((*LinkPermissions)(nil), "api.LinkPermissions")
 	proto.RegisterType((*NewLinkReq)(nil), "api.NewLinkReq")
 	proto.RegisterType((*UpdateLinkReq)(nil), "api.UpdateLinkReq")
+	proto.RegisterType((*PublicLinkResponse)(nil), "api.PublicLinkResponse")
 	proto.RegisterType((*PublicLink)(nil), "api.PublicLink")
 	proto.RegisterType((*TokenReq)(nil), "api.TokenReq")
+	proto.RegisterType((*FolderShareResponse)(nil), "api.FolderShareResponse")
 	proto.RegisterType((*FolderShare)(nil), "api.FolderShare")
+	proto.RegisterType((*ReceivedShareResponse)(nil), "api.ReceivedShareResponse")
 	proto.RegisterType((*ReceivedShare)(nil), "api.ReceivedShare")
 	proto.RegisterType((*NewFolderShareReq)(nil), "api.NewFolderShareReq")
 	proto.RegisterType((*UpdateFolderShareReq)(nil), "api.UpdateFolderShareReq")
 	proto.RegisterType((*UnshareFolderReq)(nil), "api.UnshareFolderReq")
 	proto.RegisterType((*ListFolderSharesReq)(nil), "api.ListFolderSharesReq")
 	proto.RegisterType((*ReceivedShareReq)(nil), "api.ReceivedShareReq")
+	proto.RegisterEnum("api.StatusCode", StatusCode_name, StatusCode_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -999,8 +1381,8 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for Auth service
 
 type AuthClient interface {
-	CreateToken(ctx context.Context, in *CreateTokenReq, opts ...grpc.CallOption) (*Token, error)
-	VerifyToken(ctx context.Context, in *VerifyTokenReq, opts ...grpc.CallOption) (*Empty, error)
+	CreateToken(ctx context.Context, in *CreateTokenReq, opts ...grpc.CallOption) (*TokenResponse, error)
+	VerifyToken(ctx context.Context, in *VerifyTokenReq, opts ...grpc.CallOption) (*UserResponse, error)
 }
 
 type authClient struct {
@@ -1011,8 +1393,8 @@ func NewAuthClient(cc *grpc.ClientConn) AuthClient {
 	return &authClient{cc}
 }
 
-func (c *authClient) CreateToken(ctx context.Context, in *CreateTokenReq, opts ...grpc.CallOption) (*Token, error) {
-	out := new(Token)
+func (c *authClient) CreateToken(ctx context.Context, in *CreateTokenReq, opts ...grpc.CallOption) (*TokenResponse, error) {
+	out := new(TokenResponse)
 	err := grpc.Invoke(ctx, "/api.Auth/CreateToken", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1020,8 +1402,8 @@ func (c *authClient) CreateToken(ctx context.Context, in *CreateTokenReq, opts .
 	return out, nil
 }
 
-func (c *authClient) VerifyToken(ctx context.Context, in *VerifyTokenReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *authClient) VerifyToken(ctx context.Context, in *VerifyTokenReq, opts ...grpc.CallOption) (*UserResponse, error) {
+	out := new(UserResponse)
 	err := grpc.Invoke(ctx, "/api.Auth/VerifyToken", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1032,8 +1414,8 @@ func (c *authClient) VerifyToken(ctx context.Context, in *VerifyTokenReq, opts .
 // Server API for Auth service
 
 type AuthServer interface {
-	CreateToken(context.Context, *CreateTokenReq) (*Token, error)
-	VerifyToken(context.Context, *VerifyTokenReq) (*Empty, error)
+	CreateToken(context.Context, *CreateTokenReq) (*TokenResponse, error)
+	VerifyToken(context.Context, *VerifyTokenReq) (*UserResponse, error)
 }
 
 func RegisterAuthServer(s *grpc.Server, srv AuthServer) {
@@ -1096,21 +1478,21 @@ var _Auth_serviceDesc = grpc.ServiceDesc{
 // Client API for Storage service
 
 type StorageClient interface {
-	CreateDir(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Empty, error)
-	Delete(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Empty, error)
-	Move(ctx context.Context, in *MoveReq, opts ...grpc.CallOption) (*Empty, error)
-	Inspect(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Metadata, error)
+	CreateDir(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*EmptyResponse, error)
+	Delete(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*EmptyResponse, error)
+	Move(ctx context.Context, in *MoveReq, opts ...grpc.CallOption) (*EmptyResponse, error)
+	Inspect(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*MetadataResponse, error)
 	ListFolder(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (Storage_ListFolderClient, error)
-	StartWriteTx(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TxInfo, error)
+	StartWriteTx(ctx context.Context, in *EmptyReq, opts ...grpc.CallOption) (*TxInfoResponse, error)
 	WriteChunk(ctx context.Context, opts ...grpc.CallOption) (Storage_WriteChunkClient, error)
-	FinishWriteTx(ctx context.Context, in *TxEnd, opts ...grpc.CallOption) (*Empty, error)
+	FinishWriteTx(ctx context.Context, in *TxEnd, opts ...grpc.CallOption) (*EmptyResponse, error)
 	ReadFile(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (Storage_ReadFileClient, error)
 	ListRevisions(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (Storage_ListRevisionsClient, error)
 	ReadRevision(ctx context.Context, in *RevisionReq, opts ...grpc.CallOption) (Storage_ReadRevisionClient, error)
-	RestoreRevision(ctx context.Context, in *RevisionReq, opts ...grpc.CallOption) (*Empty, error)
+	RestoreRevision(ctx context.Context, in *RevisionReq, opts ...grpc.CallOption) (*EmptyResponse, error)
 	ListRecycle(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (Storage_ListRecycleClient, error)
-	RestoreRecycleEntry(ctx context.Context, in *RecycleEntryReq, opts ...grpc.CallOption) (*Empty, error)
-	EmptyRecycle(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Empty, error)
+	RestoreRecycleEntry(ctx context.Context, in *RecycleEntryReq, opts ...grpc.CallOption) (*EmptyResponse, error)
+	EmptyRecycle(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*EmptyResponse, error)
 }
 
 type storageClient struct {
@@ -1121,8 +1503,8 @@ func NewStorageClient(cc *grpc.ClientConn) StorageClient {
 	return &storageClient{cc}
 }
 
-func (c *storageClient) CreateDir(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *storageClient) CreateDir(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/CreateDir", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1130,8 +1512,8 @@ func (c *storageClient) CreateDir(ctx context.Context, in *PathReq, opts ...grpc
 	return out, nil
 }
 
-func (c *storageClient) Delete(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *storageClient) Delete(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/Delete", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1139,8 +1521,8 @@ func (c *storageClient) Delete(ctx context.Context, in *PathReq, opts ...grpc.Ca
 	return out, nil
 }
 
-func (c *storageClient) Move(ctx context.Context, in *MoveReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *storageClient) Move(ctx context.Context, in *MoveReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/Move", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1148,8 +1530,8 @@ func (c *storageClient) Move(ctx context.Context, in *MoveReq, opts ...grpc.Call
 	return out, nil
 }
 
-func (c *storageClient) Inspect(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Metadata, error) {
-	out := new(Metadata)
+func (c *storageClient) Inspect(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*MetadataResponse, error) {
+	out := new(MetadataResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/Inspect", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1173,7 +1555,7 @@ func (c *storageClient) ListFolder(ctx context.Context, in *PathReq, opts ...grp
 }
 
 type Storage_ListFolderClient interface {
-	Recv() (*Metadata, error)
+	Recv() (*MetadataResponse, error)
 	grpc.ClientStream
 }
 
@@ -1181,16 +1563,16 @@ type storageListFolderClient struct {
 	grpc.ClientStream
 }
 
-func (x *storageListFolderClient) Recv() (*Metadata, error) {
-	m := new(Metadata)
+func (x *storageListFolderClient) Recv() (*MetadataResponse, error) {
+	m := new(MetadataResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *storageClient) StartWriteTx(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TxInfo, error) {
-	out := new(TxInfo)
+func (c *storageClient) StartWriteTx(ctx context.Context, in *EmptyReq, opts ...grpc.CallOption) (*TxInfoResponse, error) {
+	out := new(TxInfoResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/StartWriteTx", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1209,7 +1591,7 @@ func (c *storageClient) WriteChunk(ctx context.Context, opts ...grpc.CallOption)
 
 type Storage_WriteChunkClient interface {
 	Send(*TxChunk) error
-	CloseAndRecv() (*WriteSummary, error)
+	CloseAndRecv() (*WriteSummaryResponse, error)
 	grpc.ClientStream
 }
 
@@ -1221,19 +1603,19 @@ func (x *storageWriteChunkClient) Send(m *TxChunk) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *storageWriteChunkClient) CloseAndRecv() (*WriteSummary, error) {
+func (x *storageWriteChunkClient) CloseAndRecv() (*WriteSummaryResponse, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	m := new(WriteSummary)
+	m := new(WriteSummaryResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *storageClient) FinishWriteTx(ctx context.Context, in *TxEnd, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *storageClient) FinishWriteTx(ctx context.Context, in *TxEnd, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/FinishWriteTx", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1257,7 +1639,7 @@ func (c *storageClient) ReadFile(ctx context.Context, in *PathReq, opts ...grpc.
 }
 
 type Storage_ReadFileClient interface {
-	Recv() (*DataChunk, error)
+	Recv() (*DataChunkResponse, error)
 	grpc.ClientStream
 }
 
@@ -1265,8 +1647,8 @@ type storageReadFileClient struct {
 	grpc.ClientStream
 }
 
-func (x *storageReadFileClient) Recv() (*DataChunk, error) {
-	m := new(DataChunk)
+func (x *storageReadFileClient) Recv() (*DataChunkResponse, error) {
+	m := new(DataChunkResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -1289,7 +1671,7 @@ func (c *storageClient) ListRevisions(ctx context.Context, in *PathReq, opts ...
 }
 
 type Storage_ListRevisionsClient interface {
-	Recv() (*Revision, error)
+	Recv() (*RevisionResponse, error)
 	grpc.ClientStream
 }
 
@@ -1297,8 +1679,8 @@ type storageListRevisionsClient struct {
 	grpc.ClientStream
 }
 
-func (x *storageListRevisionsClient) Recv() (*Revision, error) {
-	m := new(Revision)
+func (x *storageListRevisionsClient) Recv() (*RevisionResponse, error) {
+	m := new(RevisionResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -1321,7 +1703,7 @@ func (c *storageClient) ReadRevision(ctx context.Context, in *RevisionReq, opts 
 }
 
 type Storage_ReadRevisionClient interface {
-	Recv() (*DataChunk, error)
+	Recv() (*DataChunkResponse, error)
 	grpc.ClientStream
 }
 
@@ -1329,16 +1711,16 @@ type storageReadRevisionClient struct {
 	grpc.ClientStream
 }
 
-func (x *storageReadRevisionClient) Recv() (*DataChunk, error) {
-	m := new(DataChunk)
+func (x *storageReadRevisionClient) Recv() (*DataChunkResponse, error) {
+	m := new(DataChunkResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *storageClient) RestoreRevision(ctx context.Context, in *RevisionReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *storageClient) RestoreRevision(ctx context.Context, in *RevisionReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/RestoreRevision", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1362,7 +1744,7 @@ func (c *storageClient) ListRecycle(ctx context.Context, in *PathReq, opts ...gr
 }
 
 type Storage_ListRecycleClient interface {
-	Recv() (*RecycleEntry, error)
+	Recv() (*RecycleEntryResponse, error)
 	grpc.ClientStream
 }
 
@@ -1370,16 +1752,16 @@ type storageListRecycleClient struct {
 	grpc.ClientStream
 }
 
-func (x *storageListRecycleClient) Recv() (*RecycleEntry, error) {
-	m := new(RecycleEntry)
+func (x *storageListRecycleClient) Recv() (*RecycleEntryResponse, error) {
+	m := new(RecycleEntryResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *storageClient) RestoreRecycleEntry(ctx context.Context, in *RecycleEntryReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *storageClient) RestoreRecycleEntry(ctx context.Context, in *RecycleEntryReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/RestoreRecycleEntry", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1387,8 +1769,8 @@ func (c *storageClient) RestoreRecycleEntry(ctx context.Context, in *RecycleEntr
 	return out, nil
 }
 
-func (c *storageClient) EmptyRecycle(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *storageClient) EmptyRecycle(ctx context.Context, in *PathReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Storage/EmptyRecycle", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1399,21 +1781,21 @@ func (c *storageClient) EmptyRecycle(ctx context.Context, in *PathReq, opts ...g
 // Server API for Storage service
 
 type StorageServer interface {
-	CreateDir(context.Context, *PathReq) (*Empty, error)
-	Delete(context.Context, *PathReq) (*Empty, error)
-	Move(context.Context, *MoveReq) (*Empty, error)
-	Inspect(context.Context, *PathReq) (*Metadata, error)
+	CreateDir(context.Context, *PathReq) (*EmptyResponse, error)
+	Delete(context.Context, *PathReq) (*EmptyResponse, error)
+	Move(context.Context, *MoveReq) (*EmptyResponse, error)
+	Inspect(context.Context, *PathReq) (*MetadataResponse, error)
 	ListFolder(*PathReq, Storage_ListFolderServer) error
-	StartWriteTx(context.Context, *Empty) (*TxInfo, error)
+	StartWriteTx(context.Context, *EmptyReq) (*TxInfoResponse, error)
 	WriteChunk(Storage_WriteChunkServer) error
-	FinishWriteTx(context.Context, *TxEnd) (*Empty, error)
+	FinishWriteTx(context.Context, *TxEnd) (*EmptyResponse, error)
 	ReadFile(*PathReq, Storage_ReadFileServer) error
 	ListRevisions(*PathReq, Storage_ListRevisionsServer) error
 	ReadRevision(*RevisionReq, Storage_ReadRevisionServer) error
-	RestoreRevision(context.Context, *RevisionReq) (*Empty, error)
+	RestoreRevision(context.Context, *RevisionReq) (*EmptyResponse, error)
 	ListRecycle(*PathReq, Storage_ListRecycleServer) error
-	RestoreRecycleEntry(context.Context, *RecycleEntryReq) (*Empty, error)
-	EmptyRecycle(context.Context, *PathReq) (*Empty, error)
+	RestoreRecycleEntry(context.Context, *RecycleEntryReq) (*EmptyResponse, error)
+	EmptyRecycle(context.Context, *PathReq) (*EmptyResponse, error)
 }
 
 func RegisterStorageServer(s *grpc.Server, srv StorageServer) {
@@ -1501,7 +1883,7 @@ func _Storage_ListFolder_Handler(srv interface{}, stream grpc.ServerStream) erro
 }
 
 type Storage_ListFolderServer interface {
-	Send(*Metadata) error
+	Send(*MetadataResponse) error
 	grpc.ServerStream
 }
 
@@ -1509,12 +1891,12 @@ type storageListFolderServer struct {
 	grpc.ServerStream
 }
 
-func (x *storageListFolderServer) Send(m *Metadata) error {
+func (x *storageListFolderServer) Send(m *MetadataResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
 func _Storage_StartWriteTx_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Empty)
+	in := new(EmptyReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -1526,7 +1908,7 @@ func _Storage_StartWriteTx_Handler(srv interface{}, ctx context.Context, dec fun
 		FullMethod: "/api.Storage/StartWriteTx",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StorageServer).StartWriteTx(ctx, req.(*Empty))
+		return srv.(StorageServer).StartWriteTx(ctx, req.(*EmptyReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1536,7 +1918,7 @@ func _Storage_WriteChunk_Handler(srv interface{}, stream grpc.ServerStream) erro
 }
 
 type Storage_WriteChunkServer interface {
-	SendAndClose(*WriteSummary) error
+	SendAndClose(*WriteSummaryResponse) error
 	Recv() (*TxChunk, error)
 	grpc.ServerStream
 }
@@ -1545,7 +1927,7 @@ type storageWriteChunkServer struct {
 	grpc.ServerStream
 }
 
-func (x *storageWriteChunkServer) SendAndClose(m *WriteSummary) error {
+func (x *storageWriteChunkServer) SendAndClose(m *WriteSummaryResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -1584,7 +1966,7 @@ func _Storage_ReadFile_Handler(srv interface{}, stream grpc.ServerStream) error 
 }
 
 type Storage_ReadFileServer interface {
-	Send(*DataChunk) error
+	Send(*DataChunkResponse) error
 	grpc.ServerStream
 }
 
@@ -1592,7 +1974,7 @@ type storageReadFileServer struct {
 	grpc.ServerStream
 }
 
-func (x *storageReadFileServer) Send(m *DataChunk) error {
+func (x *storageReadFileServer) Send(m *DataChunkResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -1605,7 +1987,7 @@ func _Storage_ListRevisions_Handler(srv interface{}, stream grpc.ServerStream) e
 }
 
 type Storage_ListRevisionsServer interface {
-	Send(*Revision) error
+	Send(*RevisionResponse) error
 	grpc.ServerStream
 }
 
@@ -1613,7 +1995,7 @@ type storageListRevisionsServer struct {
 	grpc.ServerStream
 }
 
-func (x *storageListRevisionsServer) Send(m *Revision) error {
+func (x *storageListRevisionsServer) Send(m *RevisionResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -1626,7 +2008,7 @@ func _Storage_ReadRevision_Handler(srv interface{}, stream grpc.ServerStream) er
 }
 
 type Storage_ReadRevisionServer interface {
-	Send(*DataChunk) error
+	Send(*DataChunkResponse) error
 	grpc.ServerStream
 }
 
@@ -1634,7 +2016,7 @@ type storageReadRevisionServer struct {
 	grpc.ServerStream
 }
 
-func (x *storageReadRevisionServer) Send(m *DataChunk) error {
+func (x *storageReadRevisionServer) Send(m *DataChunkResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -1665,7 +2047,7 @@ func _Storage_ListRecycle_Handler(srv interface{}, stream grpc.ServerStream) err
 }
 
 type Storage_ListRecycleServer interface {
-	Send(*RecycleEntry) error
+	Send(*RecycleEntryResponse) error
 	grpc.ServerStream
 }
 
@@ -1673,7 +2055,7 @@ type storageListRecycleServer struct {
 	grpc.ServerStream
 }
 
-func (x *storageListRecycleServer) Send(m *RecycleEntry) error {
+func (x *storageListRecycleServer) Send(m *RecycleEntryResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -1792,18 +2174,18 @@ var _Storage_serviceDesc = grpc.ServiceDesc{
 // Client API for Share service
 
 type ShareClient interface {
-	CreatePublicLink(ctx context.Context, in *NewLinkReq, opts ...grpc.CallOption) (*PublicLink, error)
-	UpdatePublicLink(ctx context.Context, in *UpdateLinkReq, opts ...grpc.CallOption) (*PublicLink, error)
-	InspectPublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*PublicLink, error)
-	RevokePublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*Empty, error)
-	ListPublicLinks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Share_ListPublicLinksClient, error)
-	AddFolderShare(ctx context.Context, in *NewFolderShareReq, opts ...grpc.CallOption) (*FolderShare, error)
-	UpdateFolderShare(ctx context.Context, in *UpdateFolderShareReq, opts ...grpc.CallOption) (*Empty, error)
+	CreatePublicLink(ctx context.Context, in *NewLinkReq, opts ...grpc.CallOption) (*PublicLinkResponse, error)
+	UpdatePublicLink(ctx context.Context, in *UpdateLinkReq, opts ...grpc.CallOption) (*PublicLinkResponse, error)
+	InspectPublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*PublicLinkResponse, error)
+	RevokePublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*EmptyResponse, error)
+	ListPublicLinks(ctx context.Context, in *EmptyReq, opts ...grpc.CallOption) (Share_ListPublicLinksClient, error)
+	AddFolderShare(ctx context.Context, in *NewFolderShareReq, opts ...grpc.CallOption) (*FolderShareResponse, error)
+	UpdateFolderShare(ctx context.Context, in *UpdateFolderShareReq, opts ...grpc.CallOption) (*EmptyResponse, error)
 	ListFolderShares(ctx context.Context, in *ListFolderSharesReq, opts ...grpc.CallOption) (Share_ListFolderSharesClient, error)
-	UnshareFolder(ctx context.Context, in *UnshareFolderReq, opts ...grpc.CallOption) (*Empty, error)
-	ListReceivedShares(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Share_ListReceivedSharesClient, error)
-	MountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*Empty, error)
-	UnmountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*Empty, error)
+	UnshareFolder(ctx context.Context, in *UnshareFolderReq, opts ...grpc.CallOption) (*EmptyResponse, error)
+	ListReceivedShares(ctx context.Context, in *EmptyReq, opts ...grpc.CallOption) (Share_ListReceivedSharesClient, error)
+	MountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*EmptyResponse, error)
+	UnmountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*EmptyResponse, error)
 }
 
 type shareClient struct {
@@ -1814,8 +2196,8 @@ func NewShareClient(cc *grpc.ClientConn) ShareClient {
 	return &shareClient{cc}
 }
 
-func (c *shareClient) CreatePublicLink(ctx context.Context, in *NewLinkReq, opts ...grpc.CallOption) (*PublicLink, error) {
-	out := new(PublicLink)
+func (c *shareClient) CreatePublicLink(ctx context.Context, in *NewLinkReq, opts ...grpc.CallOption) (*PublicLinkResponse, error) {
+	out := new(PublicLinkResponse)
 	err := grpc.Invoke(ctx, "/api.Share/CreatePublicLink", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1823,8 +2205,8 @@ func (c *shareClient) CreatePublicLink(ctx context.Context, in *NewLinkReq, opts
 	return out, nil
 }
 
-func (c *shareClient) UpdatePublicLink(ctx context.Context, in *UpdateLinkReq, opts ...grpc.CallOption) (*PublicLink, error) {
-	out := new(PublicLink)
+func (c *shareClient) UpdatePublicLink(ctx context.Context, in *UpdateLinkReq, opts ...grpc.CallOption) (*PublicLinkResponse, error) {
+	out := new(PublicLinkResponse)
 	err := grpc.Invoke(ctx, "/api.Share/UpdatePublicLink", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1832,8 +2214,8 @@ func (c *shareClient) UpdatePublicLink(ctx context.Context, in *UpdateLinkReq, o
 	return out, nil
 }
 
-func (c *shareClient) InspectPublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*PublicLink, error) {
-	out := new(PublicLink)
+func (c *shareClient) InspectPublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*PublicLinkResponse, error) {
+	out := new(PublicLinkResponse)
 	err := grpc.Invoke(ctx, "/api.Share/InspectPublicLink", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1841,8 +2223,8 @@ func (c *shareClient) InspectPublicLink(ctx context.Context, in *TokenReq, opts 
 	return out, nil
 }
 
-func (c *shareClient) RevokePublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *shareClient) RevokePublicLink(ctx context.Context, in *TokenReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Share/RevokePublicLink", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1850,7 +2232,7 @@ func (c *shareClient) RevokePublicLink(ctx context.Context, in *TokenReq, opts .
 	return out, nil
 }
 
-func (c *shareClient) ListPublicLinks(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Share_ListPublicLinksClient, error) {
+func (c *shareClient) ListPublicLinks(ctx context.Context, in *EmptyReq, opts ...grpc.CallOption) (Share_ListPublicLinksClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_Share_serviceDesc.Streams[0], c.cc, "/api.Share/ListPublicLinks", opts...)
 	if err != nil {
 		return nil, err
@@ -1866,7 +2248,7 @@ func (c *shareClient) ListPublicLinks(ctx context.Context, in *Empty, opts ...gr
 }
 
 type Share_ListPublicLinksClient interface {
-	Recv() (*PublicLink, error)
+	Recv() (*PublicLinkResponse, error)
 	grpc.ClientStream
 }
 
@@ -1874,16 +2256,16 @@ type shareListPublicLinksClient struct {
 	grpc.ClientStream
 }
 
-func (x *shareListPublicLinksClient) Recv() (*PublicLink, error) {
-	m := new(PublicLink)
+func (x *shareListPublicLinksClient) Recv() (*PublicLinkResponse, error) {
+	m := new(PublicLinkResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *shareClient) AddFolderShare(ctx context.Context, in *NewFolderShareReq, opts ...grpc.CallOption) (*FolderShare, error) {
-	out := new(FolderShare)
+func (c *shareClient) AddFolderShare(ctx context.Context, in *NewFolderShareReq, opts ...grpc.CallOption) (*FolderShareResponse, error) {
+	out := new(FolderShareResponse)
 	err := grpc.Invoke(ctx, "/api.Share/AddFolderShare", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1891,8 +2273,8 @@ func (c *shareClient) AddFolderShare(ctx context.Context, in *NewFolderShareReq,
 	return out, nil
 }
 
-func (c *shareClient) UpdateFolderShare(ctx context.Context, in *UpdateFolderShareReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *shareClient) UpdateFolderShare(ctx context.Context, in *UpdateFolderShareReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Share/UpdateFolderShare", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1916,7 +2298,7 @@ func (c *shareClient) ListFolderShares(ctx context.Context, in *ListFolderShares
 }
 
 type Share_ListFolderSharesClient interface {
-	Recv() (*FolderShare, error)
+	Recv() (*FolderShareResponse, error)
 	grpc.ClientStream
 }
 
@@ -1924,16 +2306,16 @@ type shareListFolderSharesClient struct {
 	grpc.ClientStream
 }
 
-func (x *shareListFolderSharesClient) Recv() (*FolderShare, error) {
-	m := new(FolderShare)
+func (x *shareListFolderSharesClient) Recv() (*FolderShareResponse, error) {
+	m := new(FolderShareResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *shareClient) UnshareFolder(ctx context.Context, in *UnshareFolderReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *shareClient) UnshareFolder(ctx context.Context, in *UnshareFolderReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Share/UnshareFolder", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1941,7 +2323,7 @@ func (c *shareClient) UnshareFolder(ctx context.Context, in *UnshareFolderReq, o
 	return out, nil
 }
 
-func (c *shareClient) ListReceivedShares(ctx context.Context, in *Empty, opts ...grpc.CallOption) (Share_ListReceivedSharesClient, error) {
+func (c *shareClient) ListReceivedShares(ctx context.Context, in *EmptyReq, opts ...grpc.CallOption) (Share_ListReceivedSharesClient, error) {
 	stream, err := grpc.NewClientStream(ctx, &_Share_serviceDesc.Streams[2], c.cc, "/api.Share/ListReceivedShares", opts...)
 	if err != nil {
 		return nil, err
@@ -1957,7 +2339,7 @@ func (c *shareClient) ListReceivedShares(ctx context.Context, in *Empty, opts ..
 }
 
 type Share_ListReceivedSharesClient interface {
-	Recv() (*ReceivedShare, error)
+	Recv() (*ReceivedShareResponse, error)
 	grpc.ClientStream
 }
 
@@ -1965,16 +2347,16 @@ type shareListReceivedSharesClient struct {
 	grpc.ClientStream
 }
 
-func (x *shareListReceivedSharesClient) Recv() (*ReceivedShare, error) {
-	m := new(ReceivedShare)
+func (x *shareListReceivedSharesClient) Recv() (*ReceivedShareResponse, error) {
+	m := new(ReceivedShareResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func (c *shareClient) MountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *shareClient) MountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Share/MountReceivedShare", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1982,8 +2364,8 @@ func (c *shareClient) MountReceivedShare(ctx context.Context, in *ReceivedShareR
 	return out, nil
 }
 
-func (c *shareClient) UnmountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*Empty, error) {
-	out := new(Empty)
+func (c *shareClient) UnmountReceivedShare(ctx context.Context, in *ReceivedShareReq, opts ...grpc.CallOption) (*EmptyResponse, error) {
+	out := new(EmptyResponse)
 	err := grpc.Invoke(ctx, "/api.Share/UnmountReceivedShare", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
@@ -1994,18 +2376,18 @@ func (c *shareClient) UnmountReceivedShare(ctx context.Context, in *ReceivedShar
 // Server API for Share service
 
 type ShareServer interface {
-	CreatePublicLink(context.Context, *NewLinkReq) (*PublicLink, error)
-	UpdatePublicLink(context.Context, *UpdateLinkReq) (*PublicLink, error)
-	InspectPublicLink(context.Context, *TokenReq) (*PublicLink, error)
-	RevokePublicLink(context.Context, *TokenReq) (*Empty, error)
-	ListPublicLinks(*Empty, Share_ListPublicLinksServer) error
-	AddFolderShare(context.Context, *NewFolderShareReq) (*FolderShare, error)
-	UpdateFolderShare(context.Context, *UpdateFolderShareReq) (*Empty, error)
+	CreatePublicLink(context.Context, *NewLinkReq) (*PublicLinkResponse, error)
+	UpdatePublicLink(context.Context, *UpdateLinkReq) (*PublicLinkResponse, error)
+	InspectPublicLink(context.Context, *TokenReq) (*PublicLinkResponse, error)
+	RevokePublicLink(context.Context, *TokenReq) (*EmptyResponse, error)
+	ListPublicLinks(*EmptyReq, Share_ListPublicLinksServer) error
+	AddFolderShare(context.Context, *NewFolderShareReq) (*FolderShareResponse, error)
+	UpdateFolderShare(context.Context, *UpdateFolderShareReq) (*EmptyResponse, error)
 	ListFolderShares(*ListFolderSharesReq, Share_ListFolderSharesServer) error
-	UnshareFolder(context.Context, *UnshareFolderReq) (*Empty, error)
-	ListReceivedShares(*Empty, Share_ListReceivedSharesServer) error
-	MountReceivedShare(context.Context, *ReceivedShareReq) (*Empty, error)
-	UnmountReceivedShare(context.Context, *ReceivedShareReq) (*Empty, error)
+	UnshareFolder(context.Context, *UnshareFolderReq) (*EmptyResponse, error)
+	ListReceivedShares(*EmptyReq, Share_ListReceivedSharesServer) error
+	MountReceivedShare(context.Context, *ReceivedShareReq) (*EmptyResponse, error)
+	UnmountReceivedShare(context.Context, *ReceivedShareReq) (*EmptyResponse, error)
 }
 
 func RegisterShareServer(s *grpc.Server, srv ShareServer) {
@@ -2085,7 +2467,7 @@ func _Share_RevokePublicLink_Handler(srv interface{}, ctx context.Context, dec f
 }
 
 func _Share_ListPublicLinks_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Empty)
+	m := new(EmptyReq)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -2093,7 +2475,7 @@ func _Share_ListPublicLinks_Handler(srv interface{}, stream grpc.ServerStream) e
 }
 
 type Share_ListPublicLinksServer interface {
-	Send(*PublicLink) error
+	Send(*PublicLinkResponse) error
 	grpc.ServerStream
 }
 
@@ -2101,7 +2483,7 @@ type shareListPublicLinksServer struct {
 	grpc.ServerStream
 }
 
-func (x *shareListPublicLinksServer) Send(m *PublicLink) error {
+func (x *shareListPublicLinksServer) Send(m *PublicLinkResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -2150,7 +2532,7 @@ func _Share_ListFolderShares_Handler(srv interface{}, stream grpc.ServerStream) 
 }
 
 type Share_ListFolderSharesServer interface {
-	Send(*FolderShare) error
+	Send(*FolderShareResponse) error
 	grpc.ServerStream
 }
 
@@ -2158,7 +2540,7 @@ type shareListFolderSharesServer struct {
 	grpc.ServerStream
 }
 
-func (x *shareListFolderSharesServer) Send(m *FolderShare) error {
+func (x *shareListFolderSharesServer) Send(m *FolderShareResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -2181,7 +2563,7 @@ func _Share_UnshareFolder_Handler(srv interface{}, ctx context.Context, dec func
 }
 
 func _Share_ListReceivedShares_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Empty)
+	m := new(EmptyReq)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -2189,7 +2571,7 @@ func _Share_ListReceivedShares_Handler(srv interface{}, stream grpc.ServerStream
 }
 
 type Share_ListReceivedSharesServer interface {
-	Send(*ReceivedShare) error
+	Send(*ReceivedShareResponse) error
 	grpc.ServerStream
 }
 
@@ -2197,7 +2579,7 @@ type shareListReceivedSharesServer struct {
 	grpc.ServerStream
 }
 
-func (x *shareListReceivedSharesServer) Send(m *ReceivedShare) error {
+func (x *shareListReceivedSharesServer) Send(m *ReceivedShareResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -2328,7 +2710,7 @@ func (c *previewClient) ReadPreview(ctx context.Context, in *PathReq, opts ...gr
 }
 
 type Preview_ReadPreviewClient interface {
-	Recv() (*DataChunk, error)
+	Recv() (*DataChunkResponse, error)
 	grpc.ClientStream
 }
 
@@ -2336,8 +2718,8 @@ type previewReadPreviewClient struct {
 	grpc.ClientStream
 }
 
-func (x *previewReadPreviewClient) Recv() (*DataChunk, error) {
-	m := new(DataChunk)
+func (x *previewReadPreviewClient) Recv() (*DataChunkResponse, error) {
+	m := new(DataChunkResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -2363,7 +2745,7 @@ func _Preview_ReadPreview_Handler(srv interface{}, stream grpc.ServerStream) err
 }
 
 type Preview_ReadPreviewServer interface {
-	Send(*DataChunk) error
+	Send(*DataChunkResponse) error
 	grpc.ServerStream
 }
 
@@ -2371,7 +2753,7 @@ type previewReadPreviewServer struct {
 	grpc.ServerStream
 }
 
-func (x *previewReadPreviewServer) Send(m *DataChunk) error {
+func (x *previewReadPreviewServer) Send(m *DataChunkResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -2392,95 +2774,125 @@ var _Preview_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("api.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 1426 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x58, 0x49, 0x73, 0xdb, 0xc6,
-	0x12, 0x16, 0x24, 0x92, 0x00, 0x5b, 0xa4, 0x96, 0x91, 0xec, 0x47, 0xcb, 0xd6, 0x7b, 0x7a, 0xf3,
-	0x5e, 0xc5, 0x72, 0x12, 0xdb, 0xb2, 0xb2, 0x54, 0xbc, 0x54, 0xa5, 0x1c, 0x5b, 0x4e, 0xa9, 0x62,
-	0xd9, 0x2a, 0x48, 0x4e, 0x8e, 0x2c, 0x08, 0x68, 0x59, 0x13, 0x81, 0x00, 0x03, 0x0c, 0x37, 0xff,
-	0x94, 0xdc, 0xf2, 0x2f, 0x72, 0xf2, 0x21, 0x7f, 0x29, 0xf7, 0x54, 0x6a, 0x16, 0x10, 0x03, 0x10,
-	0x94, 0x53, 0x39, 0xe5, 0x24, 0x74, 0xa3, 0xb7, 0xaf, 0xd1, 0xd3, 0xf3, 0x89, 0xd0, 0xf4, 0xfa,
-	0xec, 0x5e, 0x3f, 0x89, 0x79, 0x4c, 0x96, 0xbc, 0x3e, 0xa3, 0x36, 0xd4, 0x0f, 0x7a, 0x7d, 0x3e,
-	0xa1, 0xdb, 0xd0, 0x38, 0x1d, 0x1f, 0x46, 0xe7, 0x31, 0xd9, 0x80, 0x3a, 0x1f, 0x77, 0x59, 0xd0,
-	0xb1, 0x76, 0xac, 0xdd, 0xa6, 0x5b, 0xe3, 0xe3, 0xc3, 0x80, 0xba, 0xb0, 0xf2, 0x2c, 0x41, 0x8f,
-	0xe3, 0x69, 0x7c, 0x89, 0x91, 0x8b, 0x3f, 0x91, 0x9b, 0xd0, 0xf4, 0x43, 0x86, 0x11, 0xcf, 0x4d,
-	0x1d, 0xa5, 0x38, 0x0c, 0xc8, 0xff, 0xa0, 0xad, 0x5f, 0xa6, 0xe8, 0x27, 0xc8, 0x3b, 0x8b, 0xd2,
-	0xa0, 0xa5, 0x94, 0x27, 0x52, 0x47, 0xb7, 0xa1, 0x2e, 0xa3, 0x91, 0x4d, 0xa8, 0x73, 0xf1, 0xa0,
-	0xc3, 0x28, 0x81, 0x7e, 0x04, 0x2b, 0xdf, 0x63, 0xc2, 0xce, 0x27, 0xd3, 0x94, 0xd5, 0x76, 0xef,
-	0x2d, 0x70, 0x8e, 0x90, 0x7b, 0x81, 0xc7, 0x3d, 0xb2, 0x02, 0x8b, 0xd3, 0x72, 0x16, 0x59, 0x40,
-	0x08, 0xd4, 0xfa, 0x1e, 0xbf, 0xd0, 0xf9, 0xe5, 0xb3, 0xd0, 0xa5, 0xec, 0x1d, 0x76, 0x96, 0x76,
-	0xac, 0xdd, 0x9a, 0x2b, 0x9f, 0x45, 0xe8, 0x1e, 0x67, 0x3d, 0xec, 0xd4, 0xa4, 0x52, 0x09, 0xe4,
-	0x1a, 0x34, 0x58, 0xda, 0x0d, 0x58, 0xd2, 0xa9, 0xef, 0x58, 0xbb, 0x8e, 0x5b, 0x67, 0xe9, 0x73,
-	0x96, 0x88, 0x00, 0xc8, 0xbd, 0xb7, 0x9d, 0x86, 0x0a, 0x2a, 0x9e, 0xc9, 0x16, 0x38, 0xfe, 0x05,
-	0xfa, 0x97, 0xe9, 0xa0, 0xd7, 0xb1, 0x75, 0x37, 0xb4, 0x4c, 0xb6, 0x01, 0x02, 0x4c, 0xf0, 0xbc,
-	0x2b, 0x4b, 0x71, 0xe4, 0xdb, 0xa6, 0xd4, 0x1c, 0x7b, 0xfc, 0x82, 0x6e, 0x83, 0x2d, 0xfe, 0x0a,
-	0x84, 0x59, 0xb9, 0x56, 0x5e, 0x2e, 0xfd, 0x1a, 0xec, 0xa3, 0x78, 0x88, 0xe2, 0xf5, 0x0d, 0x70,
-	0xe2, 0x30, 0xe8, 0x1a, 0x26, 0x76, 0x1c, 0x06, 0xc2, 0x59, 0xbc, 0x8a, 0x70, 0xd4, 0x35, 0xc0,
-	0xda, 0x11, 0x8e, 0x64, 0xfc, 0x33, 0xb0, 0x4f, 0xc7, 0xcf, 0x2e, 0x06, 0xd1, 0x65, 0xe5, 0xb7,
-	0x25, 0xd7, 0xa1, 0x11, 0x62, 0xf4, 0x56, 0x3b, 0xd6, 0x5c, 0x2d, 0x09, 0x7d, 0x7c, 0x7e, 0x9e,
-	0x22, 0xd7, 0x9d, 0xd2, 0x92, 0x28, 0x52, 0xf4, 0x5a, 0xb6, 0xaa, 0xe5, 0xca, 0x67, 0xfa, 0x2d,
-	0xb4, 0x7e, 0x48, 0x18, 0xc7, 0x93, 0x41, 0xaf, 0xe7, 0x25, 0x13, 0xd2, 0x01, 0x3b, 0xf2, 0x45,
-	0xca, 0x54, 0xa6, 0xaa, 0xb9, 0x99, 0x28, 0x9a, 0xc1, 0x63, 0xee, 0x85, 0x5d, 0xf9, 0x0d, 0x54,
-	0xc6, 0xa6, 0xd4, 0x9c, 0xb0, 0x77, 0x48, 0x5f, 0x42, 0xfd, 0x74, 0x7c, 0x10, 0x05, 0xd5, 0xa5,
-	0x56, 0x7d, 0x4e, 0xb3, 0xf3, 0x4b, 0xc5, 0xce, 0xd3, 0xd7, 0xd0, 0x7c, 0xee, 0x71, 0x4f, 0x81,
-	0xcf, 0x71, 0x5a, 0x73, 0x70, 0x2e, 0x56, 0xe2, 0x5c, 0x32, 0x70, 0x06, 0xe0, 0xb8, 0x38, 0x64,
-	0x29, 0x8b, 0x23, 0xf2, 0x2f, 0xb0, 0x13, 0x1c, 0x76, 0x2f, 0x71, 0xa2, 0x6b, 0x6c, 0x24, 0x38,
-	0xfc, 0x0e, 0x27, 0xd3, 0x01, 0x5b, 0xac, 0x1a, 0xb0, 0xa5, 0xea, 0x01, 0xab, 0x19, 0x03, 0x46,
-	0x1f, 0xc1, 0x72, 0x96, 0x65, 0xce, 0x54, 0x98, 0xc9, 0x17, 0xcd, 0xe4, 0xf4, 0x67, 0x0b, 0x5a,
-	0x2e, 0xfa, 0x13, 0x3f, 0xc4, 0x83, 0x88, 0x27, 0x13, 0xf2, 0x5f, 0x68, 0x25, 0x98, 0xf2, 0x38,
-	0x41, 0x73, 0x70, 0x96, 0xb5, 0x4e, 0x0e, 0xcf, 0x7f, 0x20, 0x13, 0x8d, 0x80, 0xa0, 0x55, 0x26,
-	0x22, 0xf3, 0xc8, 0xdc, 0x84, 0x66, 0x80, 0x61, 0xd7, 0x3c, 0x36, 0x4e, 0x80, 0xe1, 0xd1, 0x15,
-	0x27, 0x87, 0xee, 0xc3, 0xaa, 0x59, 0x9b, 0x00, 0x57, 0xca, 0x6d, 0x95, 0x73, 0xd3, 0xc7, 0xb0,
-	0xfa, 0x92, 0x45, 0x97, 0xc7, 0x98, 0xf4, 0x58, 0x2a, 0x5a, 0x92, 0x8a, 0x72, 0x12, 0xf4, 0xd4,
-	0x68, 0x38, 0xae, 0x7c, 0x16, 0x0d, 0x1e, 0x89, 0x09, 0x94, 0xd5, 0x3b, 0xae, 0x12, 0x68, 0x0a,
-	0xf0, 0x0a, 0x47, 0xc2, 0x7f, 0x5e, 0x23, 0x6f, 0x42, 0x53, 0xf8, 0x77, 0xe3, 0x28, 0x9c, 0x68,
-	0x5f, 0x47, 0x28, 0x5e, 0x47, 0xe1, 0x44, 0xcc, 0x56, 0xdf, 0x4b, 0xd3, 0x51, 0x9c, 0x04, 0xd9,
-	0x6c, 0x65, 0xb2, 0x18, 0x71, 0x1c, 0xf7, 0x59, 0x82, 0xa9, 0x46, 0x9f, 0x89, 0xf4, 0x0f, 0x0b,
-	0xda, 0x6f, 0xfa, 0x81, 0xc7, 0x31, 0x4b, 0x5c, 0xb9, 0xb9, 0xc8, 0x6d, 0x58, 0x1d, 0x48, 0xb3,
-	0xee, 0x34, 0x89, 0x2a, 0x60, 0x45, 0xa9, 0x8f, 0xb3, 0x54, 0x57, 0x95, 0xf1, 0x09, 0xac, 0xeb,
-	0x20, 0x32, 0xbd, 0xc7, 0x59, 0x1c, 0xe9, 0x69, 0x5a, 0x53, 0x2f, 0x0e, 0xa6, 0x7a, 0xf2, 0x6f,
-	0x00, 0xc3, 0xaa, 0x2e, 0xcb, 0x36, 0x34, 0xc5, 0x66, 0x34, 0x4a, 0xcd, 0xd8, 0x05, 0x1d, 0xb0,
-	0x9b, 0xdb, 0xd8, 0x66, 0xbd, 0xae, 0xb6, 0xa4, 0xbf, 0x58, 0x00, 0xc7, 0x83, 0xb3, 0x90, 0xf9,
-	0xa2, 0x01, 0x73, 0xd0, 0x57, 0x9d, 0xe5, 0x5b, 0xd0, 0x14, 0x97, 0x13, 0xfa, 0x1c, 0x15, 0x52,
-	0xc7, 0xcd, 0x15, 0x66, 0xc7, 0xeb, 0x85, 0x8e, 0x5f, 0x5d, 0xf7, 0xf4, 0xe8, 0x39, 0xc6, 0xd1,
-	0xa3, 0x3b, 0xe0, 0x7c, 0xe0, 0x62, 0xf9, 0xd5, 0x82, 0xe5, 0x17, 0x71, 0x18, 0x60, 0x72, 0x72,
-	0xe1, 0x25, 0xf8, 0x97, 0xee, 0x16, 0xb1, 0xa1, 0x47, 0x11, 0x26, 0x62, 0x71, 0x2d, 0xe9, 0x0d,
-	0x2d, 0xe4, 0xc3, 0x40, 0x9d, 0x43, 0x9f, 0xf5, 0xb3, 0x3b, 0xb3, 0x96, 0x9d, 0x43, 0xad, 0x3b,
-	0x0c, 0x8a, 0x30, 0xea, 0xb3, 0x30, 0x7c, 0x09, 0xc3, 0x56, 0x30, 0xa4, 0x30, 0x07, 0xdc, 0xef,
-	0x16, 0xb4, 0x5d, 0xf4, 0x91, 0x0d, 0x31, 0xf8, 0x47, 0x14, 0xdf, 0x01, 0xbb, 0x17, 0x0f, 0x22,
-	0xf1, 0x59, 0xd5, 0xe7, 0xc9, 0x44, 0x71, 0x1f, 0xc8, 0xc7, 0x6e, 0xe4, 0x69, 0x6c, 0x4d, 0xb7,
-	0x29, 0x35, 0xaf, 0x3c, 0x85, 0xcf, 0x37, 0xf1, 0x95, 0x50, 0x37, 0x4d, 0xd4, 0x67, 0xb0, 0xfe,
-	0x0a, 0x47, 0xc6, 0x27, 0x9b, 0x77, 0xe6, 0x6f, 0x89, 0x52, 0x75, 0xe5, 0xba, 0x03, 0xb9, 0xa2,
-	0x08, 0x64, 0xa9, 0x08, 0x84, 0x3e, 0x83, 0x4d, 0x75, 0xb4, 0x4b, 0x69, 0xca, 0xfd, 0xbd, 0x6a,
-	0xad, 0x50, 0x0a, 0x6b, 0x6f, 0xa2, 0x54, 0xb8, 0xaa, 0x28, 0x15, 0x01, 0xe8, 0x1d, 0xd8, 0x78,
-	0xc9, 0x52, 0x6e, 0xa4, 0x49, 0xe7, 0x31, 0x84, 0xbb, 0xb0, 0x56, 0xf8, 0xd8, 0x9a, 0x2a, 0xc8,
-	0x04, 0xf9, 0x0d, 0x6a, 0x4b, 0xf9, 0x30, 0xd8, 0xff, 0x11, 0x6a, 0x4f, 0x07, 0xfc, 0x82, 0xec,
-	0xc1, 0xb2, 0xc1, 0xe9, 0xc8, 0xc6, 0x3d, 0xc1, 0x0d, 0x8b, 0x2c, 0x6f, 0x0b, 0xa4, 0x52, 0x8a,
-	0x74, 0x41, 0x78, 0x18, 0x94, 0x4c, 0x7b, 0x14, 0x49, 0x9a, 0xf6, 0x50, 0xa4, 0x72, 0x61, 0xff,
-	0xb7, 0x3a, 0xd8, 0x27, 0x3c, 0x4e, 0xbc, 0xb7, 0x48, 0x6e, 0x43, 0x53, 0x45, 0x17, 0x1c, 0xaa,
-	0x25, 0xcd, 0x34, 0xef, 0x29, 0x3a, 0x91, 0xff, 0x43, 0xe3, 0x39, 0x86, 0xc8, 0xf1, 0x4a, 0x2b,
-	0x0a, 0x35, 0xc1, 0x8b, 0xb4, 0x8d, 0xa6, 0x48, 0x25, 0x9b, 0x5d, 0xb0, 0x0f, 0xa3, 0xb4, 0x8f,
-	0x3e, 0x2f, 0x85, 0x6a, 0x2b, 0x27, 0x4d, 0x1b, 0xe9, 0x02, 0xb9, 0x0b, 0x90, 0xb7, 0xfb, 0x03,
-	0xc6, 0x7b, 0x16, 0xb9, 0x03, 0xad, 0x13, 0xee, 0x25, 0x5c, 0x92, 0x9e, 0xd3, 0x31, 0x31, 0xd2,
-	0x6e, 0x2d, 0xab, 0x9e, 0x49, 0x36, 0x4d, 0x17, 0xc8, 0x03, 0x00, 0x69, 0xa5, 0x48, 0x48, 0x4b,
-	0xbf, 0x94, 0xd2, 0xd6, 0xba, 0x94, 0x4c, 0xe6, 0x44, 0x17, 0x76, 0x45, 0xf4, 0xf6, 0x0b, 0x16,
-	0xb1, 0xf4, 0xa2, 0x18, 0x5e, 0x12, 0xa3, 0x12, 0xc2, 0x4f, 0x05, 0x21, 0xf1, 0x82, 0x17, 0x2c,
-	0x2c, 0x77, 0x6b, 0x45, 0x4a, 0x53, 0xfa, 0x23, 0xcb, 0xde, 0x83, 0xb6, 0x40, 0x99, 0x91, 0x8b,
-	0xb4, 0x12, 0x68, 0xf6, 0x56, 0x7a, 0x7c, 0x2e, 0xd8, 0x84, 0x17, 0x4c, 0x49, 0xcf, 0x5a, 0xc1,
-	0x64, 0x5e, 0x9e, 0x07, 0xe2, 0x9e, 0x97, 0x37, 0xf8, 0x15, 0x8e, 0x45, 0x20, 0xfb, 0xb0, 0xac,
-	0x4a, 0x93, 0xf4, 0xa0, 0x54, 0xd8, 0xba, 0x76, 0xce, 0xa9, 0x83, 0x4c, 0xf3, 0x10, 0x36, 0xa6,
-	0x69, 0x0c, 0xc6, 0xb3, 0x39, 0x63, 0x3d, 0x9b, 0xee, 0x63, 0x68, 0xc9, 0xc7, 0xea, 0x7c, 0xc5,
-	0x21, 0x7e, 0x5f, 0x87, 0xba, 0xda, 0xa2, 0x5f, 0xc2, 0x9a, 0x1a, 0x61, 0xe3, 0x76, 0x5b, 0x95,
-	0xb6, 0x39, 0xcb, 0xd8, 0x52, 0x8a, 0xdc, 0x82, 0x2e, 0x90, 0x87, 0xb0, 0xa6, 0xb6, 0x86, 0xe1,
-	0x47, 0xa4, 0x59, 0x81, 0x27, 0x54, 0xb9, 0x7e, 0x01, 0xeb, 0x7a, 0x84, 0x0d, 0xdf, 0x76, 0x7e,
-	0x2c, 0xe7, 0xb8, 0xdd, 0x17, 0x3b, 0x61, 0x18, 0x5f, 0xe2, 0x7c, 0xaf, 0x72, 0xff, 0x57, 0x45,
-	0xff, 0x73, 0xf3, 0xb4, 0x30, 0xd4, 0xb3, 0x29, 0xf6, 0x2c, 0xf2, 0x04, 0x56, 0x9e, 0x06, 0x81,
-	0x79, 0x47, 0x5e, 0xcf, 0x9a, 0x51, 0x5c, 0x8f, 0x5b, 0xea, 0xeb, 0x1b, 0x4a, 0xba, 0x40, 0x9e,
-	0xc0, 0xfa, 0xcc, 0x2a, 0x25, 0x37, 0x8c, 0xae, 0x94, 0x62, 0x14, 0xeb, 0xfd, 0x06, 0xd6, 0xca,
-	0xfb, 0x91, 0x74, 0xa4, 0x45, 0xc5, 0xda, 0xac, 0xca, 0x2f, 0x87, 0xbb, 0x5d, 0xd8, 0xc3, 0xe4,
-	0x9a, 0xca, 0x5e, 0xda, 0xcd, 0xa5, 0xcc, 0x5f, 0x01, 0xd1, 0x93, 0x9a, 0xaf, 0xdc, 0x62, 0xb3,
-	0x48, 0x36, 0x80, 0xb9, 0x81, 0x9e, 0x57, 0x72, 0x24, 0x6e, 0xb6, 0xe2, 0xd5, 0x7c, 0x6d, 0xd6,
-	0x7a, 0x36, 0xe9, 0x63, 0xd8, 0x7c, 0x13, 0xf5, 0xfe, 0x9e, 0xf3, 0xfe, 0x23, 0xb0, 0x8f, 0x13,
-	0x1c, 0x32, 0x1c, 0x91, 0xfb, 0xe2, 0x5f, 0x0b, 0x2f, 0xc8, 0xc4, 0x0f, 0xae, 0x8c, 0xb3, 0x86,
-	0xfc, 0xb5, 0xe0, 0xb3, 0x3f, 0x03, 0x00, 0x00, 0xff, 0xff, 0xe8, 0x04, 0x40, 0x42, 0x3a, 0x10,
-	0x00, 0x00,
+	// 1918 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xc4, 0x58, 0x5b, 0x73, 0xdb, 0xc6,
+	0x15, 0x0e, 0x78, 0xc7, 0xe1, 0xc5, 0xe0, 0x4a, 0x72, 0x28, 0xda, 0x6a, 0xd5, 0xcd, 0x4c, 0xa3,
+	0xa4, 0x69, 0xe2, 0xb2, 0xc9, 0xc4, 0x49, 0xeb, 0x76, 0x18, 0x91, 0x4e, 0x59, 0x49, 0x24, 0x0b,
+	0x92, 0x4e, 0xda, 0x87, 0x62, 0x60, 0x62, 0x65, 0xa1, 0x22, 0x01, 0x1a, 0x58, 0xea, 0xe2, 0x9f,
+	0x92, 0xb7, 0xce, 0xf4, 0x47, 0xf4, 0xa5, 0xfd, 0x53, 0x7d, 0xef, 0x74, 0xf6, 0x02, 0x62, 0x41,
+	0x81, 0xac, 0xe5, 0x3e, 0xf4, 0x89, 0xd8, 0xb3, 0xe7, 0xfa, 0xed, 0x9e, 0xb3, 0xe7, 0x10, 0x74,
+	0x7b, 0xe1, 0x7e, 0xba, 0x08, 0x7c, 0xea, 0xa3, 0xac, 0xbd, 0x70, 0xf1, 0x53, 0xa8, 0x76, 0xe7,
+	0x0b, 0x7a, 0x6b, 0x92, 0x70, 0xe1, 0x7b, 0x21, 0x41, 0x1f, 0x42, 0x21, 0xa4, 0x36, 0x5d, 0x86,
+	0x0d, 0xed, 0x50, 0x3b, 0xaa, 0xb5, 0x1e, 0x7c, 0xca, 0x24, 0x46, 0x9c, 0x74, 0xec, 0x3b, 0xc4,
+	0x94, 0xdb, 0x18, 0xa0, 0x24, 0x25, 0x5f, 0xe3, 0x17, 0x50, 0x99, 0x84, 0x24, 0xb8, 0xb7, 0x12,
+	0x74, 0x00, 0xb9, 0x65, 0x48, 0x82, 0x46, 0xe6, 0x50, 0x3b, 0x2a, 0xb7, 0x74, 0xce, 0xc6, 0x35,
+	0x71, 0x32, 0x7e, 0x06, 0x39, 0xb6, 0x42, 0x07, 0x00, 0xf6, 0x74, 0xea, 0x2f, 0x3d, 0x6a, 0xb9,
+	0x0e, 0xd7, 0xa9, 0x9b, 0xba, 0xa4, 0xf4, 0x1c, 0xf4, 0x10, 0x0a, 0xaf, 0x02, 0x7f, 0xb9, 0x08,
+	0x1b, 0x99, 0xc3, 0xec, 0x91, 0x6e, 0xca, 0x15, 0xfe, 0x33, 0xd4, 0xc6, 0x37, 0x3d, 0xef, 0xdc,
+	0xbf, 0xbf, 0x63, 0x1f, 0x40, 0x81, 0x72, 0x51, 0xe9, 0x5a, 0x99, 0x33, 0x4a, 0x6d, 0x72, 0x0b,
+	0x1f, 0x40, 0x41, 0x50, 0xd0, 0x0e, 0xe4, 0xe9, 0x4d, 0xec, 0x5b, 0x8e, 0xde, 0xf4, 0x1c, 0x6c,
+	0x42, 0xed, 0x38, 0x20, 0x36, 0x25, 0x63, 0xff, 0x92, 0x78, 0x26, 0x79, 0x8d, 0x1e, 0x81, 0x3e,
+	0x9d, 0xb9, 0x44, 0x0d, 0xa3, 0x24, 0x08, 0x3d, 0x07, 0x7d, 0x00, 0x55, 0xb9, 0x19, 0x92, 0x69,
+	0x40, 0x28, 0xb7, 0xac, 0x9b, 0x15, 0x41, 0x1c, 0x71, 0x1a, 0xfe, 0x13, 0x54, 0xa5, 0xb6, 0xfb,
+	0x46, 0x74, 0x08, 0x79, 0xca, 0x24, 0x65, 0x40, 0x20, 0x02, 0xe2, 0xba, 0xc4, 0x06, 0x3e, 0x80,
+	0x3c, 0x5f, 0xa3, 0xdd, 0x88, 0x55, 0xb8, 0x28, 0xb7, 0x7f, 0x0a, 0xb5, 0x17, 0x24, 0x70, 0xcf,
+	0x6f, 0x57, 0xe1, 0xa4, 0xf3, 0x9d, 0x83, 0x71, 0x46, 0xa8, 0xed, 0xd8, 0xd4, 0xbe, 0xbf, 0x97,
+	0x1f, 0x41, 0x69, 0x2e, 0x85, 0xa5, 0xa3, 0x55, 0xce, 0xba, 0xd2, 0xb8, 0xda, 0xc6, 0xff, 0xd4,
+	0xa0, 0x14, 0x91, 0x51, 0x0d, 0x32, 0x2b, 0x48, 0x33, 0xae, 0x83, 0x10, 0xe4, 0x16, 0x36, 0xbd,
+	0x90, 0x18, 0xf2, 0x6f, 0x46, 0x0b, 0xdd, 0x37, 0xa4, 0x91, 0x3d, 0xd4, 0x8e, 0x72, 0x26, 0xff,
+	0x66, 0x21, 0xcc, 0xa9, 0x3b, 0x27, 0x8d, 0x1c, 0x27, 0x8a, 0x05, 0xda, 0x83, 0x82, 0x1b, 0x5a,
+	0x8e, 0x1b, 0x34, 0xf2, 0x87, 0xda, 0x51, 0xc9, 0xcc, 0xbb, 0x61, 0xc7, 0x0d, 0x98, 0x02, 0x42,
+	0xed, 0x57, 0x8d, 0x82, 0x50, 0xca, 0xbe, 0x51, 0x13, 0x4a, 0xd3, 0x0b, 0x32, 0xbd, 0x0c, 0x97,
+	0xf3, 0x46, 0x51, 0x9e, 0xa8, 0x5c, 0xb3, 0x6b, 0xeb, 0x90, 0x80, 0x9c, 0x5b, 0xdc, 0x95, 0x92,
+	0xb8, 0xb6, 0x9c, 0x32, 0xb4, 0xe9, 0x05, 0x3e, 0x80, 0x22, 0xfb, 0x65, 0x48, 0x46, 0xee, 0x6a,
+	0xb1, 0xbb, 0xf8, 0xb7, 0x50, 0x3c, 0xf3, 0xaf, 0x08, 0xdb, 0xde, 0x87, 0x92, 0x3f, 0x73, 0x2c,
+	0x85, 0xa5, 0xe8, 0xcf, 0x1c, 0x26, 0xcc, 0xb6, 0x3c, 0x72, 0x6d, 0x29, 0xc1, 0x16, 0x3d, 0x72,
+	0xcd, 0xf5, 0xbf, 0x84, 0xe2, 0xf8, 0xe6, 0xf8, 0x62, 0xe9, 0x5d, 0xa6, 0xde, 0x4f, 0x96, 0x36,
+	0x33, 0xe2, 0xbd, 0x92, 0x82, 0x39, 0x53, 0xae, 0x18, 0xdd, 0x3f, 0x3f, 0x0f, 0x09, 0x95, 0x48,
+	0xc9, 0x15, 0x73, 0x92, 0x9f, 0x0b, 0x83, 0xaa, 0x62, 0xf2, 0x6f, 0x7c, 0x05, 0xbb, 0xdf, 0x05,
+	0x2e, 0x25, 0xa3, 0xe5, 0x7c, 0x6e, 0x07, 0xf7, 0x2f, 0x23, 0xe8, 0x0b, 0xa8, 0x5c, 0x2b, 0x0a,
+	0xe4, 0xa1, 0xd7, 0x39, 0x7b, 0x42, 0x73, 0x82, 0x0d, 0x7f, 0x0b, 0x15, 0x75, 0x17, 0x35, 0xa0,
+	0xe8, 0x4d, 0x59, 0xa8, 0xc2, 0x60, 0xce, 0x8c, 0x96, 0xec, 0x10, 0xa8, 0x4f, 0xed, 0x99, 0xc5,
+	0xcf, 0x5e, 0x44, 0xaa, 0x73, 0xca, 0xc8, 0x7d, 0x43, 0xf0, 0x29, 0xe4, 0xc7, 0x37, 0x5d, 0xcf,
+	0x49, 0x87, 0x28, 0xed, 0x1a, 0xa9, 0x27, 0x9e, 0x4d, 0x9e, 0x38, 0xfe, 0x0b, 0xd4, 0x3b, 0x36,
+	0xb5, 0x39, 0xe8, 0xf7, 0xc7, 0xe2, 0x13, 0xd0, 0x9d, 0x48, 0x5a, 0x02, 0x51, 0xe3, 0xbc, 0xb1,
+	0xce, 0x98, 0x01, 0x0f, 0x40, 0x5f, 0xd1, 0x95, 0xb3, 0xd4, 0x36, 0x9c, 0x65, 0x26, 0xf5, 0x2c,
+	0xb3, 0xca, 0x59, 0x9e, 0x83, 0x61, 0x92, 0x2b, 0x37, 0x74, 0x7d, 0xef, 0x9d, 0x12, 0x37, 0x90,
+	0xc2, 0x89, 0xc4, 0x5d, 0x69, 0x5c, 0x6d, 0x63, 0x07, 0x4a, 0x11, 0x15, 0xbd, 0x0f, 0xc5, 0x80,
+	0x5c, 0x59, 0x97, 0xe4, 0x56, 0xe2, 0x5e, 0x08, 0xc8, 0xd5, 0x09, 0xb9, 0x5d, 0x25, 0x6b, 0x26,
+	0x2d, 0x59, 0xb3, 0xe9, 0xc9, 0x9a, 0x53, 0x92, 0x15, 0x7f, 0x0d, 0xe5, 0x38, 0x9a, 0xd4, 0x0c,
+	0x53, 0x8d, 0x67, 0x54, 0xe3, 0xec, 0x56, 0x9b, 0x64, 0x7a, 0x3b, 0x9d, 0x91, 0xae, 0x47, 0xdf,
+	0xf1, 0x56, 0x07, 0x8a, 0x82, 0xc4, 0xad, 0x4e, 0x68, 0x4e, 0xb0, 0xe1, 0x1f, 0x34, 0xa8, 0xa8,
+	0xdb, 0xe8, 0x27, 0x4c, 0x4f, 0x48, 0xfd, 0x80, 0xa8, 0xc9, 0x5f, 0x96, 0x34, 0x5e, 0x00, 0x7e,
+	0x0c, 0xd1, 0x52, 0x09, 0x04, 0x24, 0x49, 0x45, 0x52, 0x2d, 0x7b, 0x8f, 0x40, 0x77, 0xc8, 0xcc,
+	0x52, 0x4b, 0x5f, 0xc9, 0x21, 0xb3, 0xb3, 0x2d, 0xd5, 0x0f, 0xb7, 0xe0, 0x41, 0x12, 0x94, 0xd7,
+	0xeb, 0xb6, 0xb5, 0x75, 0xdb, 0xf8, 0x57, 0xf0, 0xe0, 0xd4, 0xf5, 0x2e, 0x87, 0x24, 0x98, 0xbb,
+	0x21, 0x3b, 0x8a, 0x90, 0xb9, 0x13, 0x10, 0x5b, 0xa4, 0x59, 0xc9, 0xe4, 0xdf, 0xec, 0x60, 0x79,
+	0x76, 0x73, 0xef, 0x4b, 0xa6, 0x58, 0xe0, 0x10, 0xa0, 0x4f, 0xae, 0x99, 0xfc, 0xa6, 0x03, 0x7c,
+	0x04, 0x3a, 0x93, 0xb7, 0x7c, 0x6f, 0x76, 0x2b, 0x65, 0x4b, 0x8c, 0x30, 0xf0, 0x66, 0xb7, 0x2c,
+	0x4f, 0x17, 0x76, 0x18, 0x5e, 0xfb, 0x81, 0x13, 0xe5, 0x69, 0xb4, 0x66, 0xe5, 0x82, 0xdc, 0x2c,
+	0xdc, 0x80, 0x84, 0x32, 0xfa, 0x68, 0x89, 0xff, 0xad, 0x41, 0x75, 0xb2, 0x70, 0x6c, 0x4a, 0x22,
+	0xc3, 0xa9, 0xaf, 0x1c, 0xfa, 0x10, 0x1e, 0x2c, 0x39, 0x9b, 0xb5, 0x32, 0x22, 0x1c, 0xa8, 0x09,
+	0xf2, 0x30, 0x32, 0xb5, 0xcd, 0x8d, 0x9f, 0x41, 0x5d, 0x2a, 0xe1, 0xe6, 0x6d, 0xca, 0xb2, 0x47,
+	0xdc, 0x62, 0x43, 0x6c, 0x74, 0x57, 0x74, 0xf4, 0x23, 0x00, 0x85, 0x2b, 0xcf, 0xdd, 0x56, 0x28,
+	0x49, 0x30, 0x0a, 0x6b, 0x60, 0x1c, 0x81, 0x54, 0x68, 0xc5, 0x3c, 0x45, 0xd5, 0x5f, 0x53, 0x72,
+	0x62, 0x0f, 0xd0, 0x70, 0xf9, 0x72, 0xe6, 0x4e, 0x45, 0xfc, 0xf7, 0xbd, 0xf9, 0x9f, 0x01, 0x2c,
+	0x56, 0xe2, 0xf2, 0xde, 0x0b, 0x66, 0x45, 0xab, 0xc2, 0x82, 0xff, 0xaa, 0x01, 0xc4, 0x5b, 0x1b,
+	0xd0, 0x4e, 0xab, 0xc3, 0x8f, 0x41, 0x67, 0x8d, 0x2c, 0x99, 0x52, 0x22, 0x90, 0x2d, 0x99, 0x31,
+	0x41, 0x3d, 0xe1, 0x7c, 0xe2, 0x84, 0xb7, 0xe3, 0xb4, 0x2a, 0x31, 0x25, 0xa5, 0xc4, 0xe0, 0x43,
+	0x28, 0xfd, 0x97, 0xa6, 0x27, 0x80, 0x9d, 0xe7, 0xfe, 0xcc, 0x21, 0xc1, 0xe8, 0xc2, 0x0e, 0xc8,
+	0xfd, 0x61, 0x6b, 0x41, 0xf9, 0x3c, 0x96, 0x97, 0xb8, 0x19, 0x9c, 0x5b, 0xd5, 0xab, 0x32, 0xe1,
+	0xbf, 0x6b, 0x50, 0x56, 0x36, 0xdf, 0xaa, 0x07, 0x62, 0x9d, 0xc4, 0xb5, 0x47, 0x02, 0xf6, 0xd0,
+	0x65, 0x65, 0x27, 0xc1, 0xd6, 0x3d, 0x47, 0xd4, 0x9a, 0xa9, 0xbb, 0x88, 0xfa, 0xd3, 0x5c, 0x54,
+	0x6b, 0x24, 0xad, 0xe7, 0x24, 0xa1, 0xcb, 0xdf, 0x85, 0x6e, 0xca, 0xa1, 0x2b, 0x0a, 0xe8, 0xf8,
+	0x62, 0x03, 0xa0, 0x6f, 0x60, 0xcf, 0x24, 0x53, 0xe2, 0x5e, 0x11, 0xe7, 0x1d, 0x01, 0x7b, 0x0a,
+	0xd5, 0x40, 0xd5, 0x20, 0x21, 0x43, 0x51, 0x89, 0x55, 0x74, 0x27, 0x19, 0xf1, 0xbf, 0x34, 0xa8,
+	0x26, 0x18, 0xfe, 0xdf, 0xc0, 0x35, 0xa0, 0x38, 0x67, 0x93, 0x0c, 0x71, 0xe4, 0x75, 0x8c, 0x96,
+	0xac, 0x77, 0xe1, 0x9f, 0x96, 0x67, 0x4b, 0x5c, 0x75, 0x53, 0xe7, 0x94, 0xbe, 0x2d, 0xb0, 0x9d,
+	0xaa, 0xd8, 0xae, 0x21, 0xae, 0xab, 0x88, 0xbf, 0x84, 0x7a, 0x9f, 0x5c, 0x27, 0xee, 0x68, 0x7a,
+	0x4d, 0x7d, 0xcc, 0x5c, 0x95, 0x9e, 0x4b, 0x04, 0x62, 0x42, 0x32, 0x90, 0x6c, 0x32, 0x10, 0x7c,
+	0x0c, 0xbb, 0xa2, 0x74, 0xae, 0x99, 0x59, 0xc7, 0x77, 0x5b, 0xd9, 0xc6, 0x18, 0x8c, 0x89, 0x17,
+	0x32, 0x51, 0xa1, 0x25, 0x45, 0x01, 0xfe, 0x08, 0x76, 0x4e, 0xdd, 0x90, 0x2a, 0x66, 0xc2, 0x4d,
+	0x5d, 0xf4, 0xcf, 0x59, 0x53, 0x93, 0xb8, 0x69, 0xbc, 0x9d, 0xe6, 0x06, 0xe2, 0x6e, 0xaf, 0xc8,
+	0xd7, 0x3d, 0xe7, 0xe3, 0x1f, 0x32, 0x00, 0xf1, 0x6d, 0x43, 0x05, 0xc8, 0x0c, 0x4e, 0x8c, 0xf7,
+	0x50, 0x19, 0x8a, 0x93, 0xfe, 0x49, 0x7f, 0xf0, 0x5d, 0xdf, 0xd0, 0xd0, 0x1e, 0xd4, 0x47, 0xe3,
+	0x81, 0xd9, 0xfe, 0xb6, 0x6b, 0xf5, 0x07, 0x63, 0xeb, 0xf9, 0x60, 0xd2, 0xef, 0x18, 0x19, 0xd4,
+	0x84, 0x87, 0x11, 0xb9, 0x7d, 0x6a, 0x76, 0xdb, 0x9d, 0x3f, 0x5a, 0xdd, 0xef, 0x7b, 0xa3, 0xf1,
+	0xc8, 0xc8, 0xa2, 0xc7, 0xd0, 0x88, 0xf6, 0x86, 0x5d, 0xf3, 0xac, 0x37, 0x1a, 0xf5, 0x06, 0xfd,
+	0x4e, 0xb7, 0xdf, 0xeb, 0x76, 0x8c, 0x1c, 0xda, 0x87, 0xbd, 0xe3, 0x41, 0x7f, 0xdc, 0xfd, 0x7e,
+	0x6c, 0x4d, 0x46, 0x5d, 0xd3, 0x32, 0xbb, 0x7f, 0x98, 0xf4, 0xcc, 0x6e, 0xc7, 0xc8, 0x23, 0x03,
+	0x2a, 0xc3, 0xf6, 0xf8, 0x77, 0x56, 0xaf, 0xff, 0xa2, 0x7d, 0xda, 0xeb, 0x18, 0x05, 0xc6, 0x3c,
+	0x9c, 0x7c, 0x73, 0xda, 0x3b, 0xb6, 0x4e, 0x7b, 0xfd, 0x13, 0xc5, 0x83, 0x22, 0xb3, 0xa2, 0x6e,
+	0x49, 0x19, 0xab, 0xd3, 0x1e, 0x77, 0x8d, 0x12, 0x13, 0x54, 0xdd, 0x1e, 0x4d, 0x86, 0xc3, 0x81,
+	0x39, 0xee, 0x76, 0x0c, 0x1d, 0x21, 0xa8, 0x71, 0xc3, 0xb1, 0x32, 0x40, 0x75, 0xa8, 0x8e, 0x07,
+	0x27, 0xdd, 0xfe, 0xca, 0x74, 0xb9, 0x75, 0x0b, 0xb9, 0xf6, 0x92, 0x5e, 0xa0, 0xa7, 0x50, 0x56,
+	0x06, 0x5b, 0xb4, 0xc3, 0x73, 0x2e, 0x39, 0xea, 0x36, 0x91, 0x32, 0x5f, 0xca, 0xe4, 0xc6, 0xef,
+	0xa1, 0x2f, 0xa1, 0xac, 0xcc, 0x90, 0x52, 0x32, 0x39, 0x55, 0x36, 0xeb, 0xf1, 0xbf, 0x00, 0x2b,
+	0xc1, 0xd6, 0x3f, 0x0a, 0x50, 0x1c, 0x51, 0x3f, 0xb0, 0x5f, 0x11, 0xf4, 0x19, 0xe8, 0xc2, 0x18,
+	0x9b, 0xc9, 0x2a, 0xe2, 0x6d, 0x11, 0x73, 0x94, 0xb4, 0x9a, 0xf8, 0x47, 0x03, 0xbf, 0x87, 0x3e,
+	0x81, 0x42, 0x87, 0xcc, 0x08, 0x25, 0x6f, 0xc5, 0xfd, 0x31, 0xe4, 0xd8, 0xdc, 0x25, 0x79, 0xe5,
+	0x08, 0xb6, 0x81, 0xf7, 0x09, 0x14, 0x7b, 0x5e, 0xb8, 0x20, 0x53, 0xba, 0xa6, 0x7a, 0x2f, 0x39,
+	0xb5, 0xc6, 0x12, 0x5f, 0x00, 0xc4, 0x57, 0xf7, 0x2d, 0x85, 0x9e, 0x68, 0xe8, 0x73, 0xa8, 0x8c,
+	0xa8, 0x1d, 0x50, 0x3e, 0xf4, 0x8c, 0x6f, 0x50, 0x55, 0x75, 0xe7, 0x75, 0x73, 0x47, 0xfd, 0x7b,
+	0x22, 0x36, 0xf6, 0x15, 0x00, 0x17, 0x10, 0x33, 0x42, 0x45, 0x32, 0xf1, 0x55, 0x73, 0xff, 0xee,
+	0x88, 0xb5, 0x12, 0x3c, 0xd2, 0xd0, 0x2f, 0xa0, 0xfa, 0xdc, 0xf5, 0xdc, 0xf0, 0x22, 0xb2, 0x28,
+	0xff, 0x30, 0x60, 0xb3, 0xd2, 0x06, 0x30, 0x3e, 0x67, 0x7d, 0xbd, 0xed, 0x3c, 0x77, 0x67, 0xeb,
+	0x40, 0x3f, 0x5c, 0x9b, 0x62, 0xd4, 0xc8, 0x9e, 0x42, 0x95, 0x01, 0x12, 0xf5, 0xea, 0x61, 0x2a,
+	0x26, 0xeb, 0x73, 0x09, 0x97, 0xfc, 0x35, 0x6b, 0x96, 0x6d, 0x67, 0x35, 0x4b, 0x18, 0x6b, 0xac,
+	0xdb, 0xed, 0x7e, 0xc5, 0xda, 0x59, 0xde, 0xa8, 0x6e, 0x51, 0x90, 0x1e, 0xe8, 0xd7, 0x50, 0x16,
+	0x2e, 0xf3, 0x6e, 0x78, 0xcd, 0xe1, 0xfd, 0xbb, 0x4d, 0xbe, 0x6a, 0xb6, 0x0d, 0x3b, 0x2b, 0xb3,
+	0x4a, 0xa3, 0xbf, 0x9b, 0x22, 0xb5, 0xc9, 0x7c, 0x0b, 0x2a, 0x92, 0x94, 0x66, 0x3f, 0x55, 0xa6,
+	0xf5, 0xb7, 0x02, 0xe4, 0xc5, 0x63, 0xf7, 0x1b, 0x30, 0x44, 0xf6, 0x28, 0x4d, 0x97, 0x78, 0x65,
+	0xe3, 0x66, 0xbb, 0xf9, 0xfe, 0x7a, 0xc7, 0x16, 0x5b, 0x6f, 0x83, 0x21, 0x8a, 0xbc, 0x22, 0x2f,
+	0x6c, 0x26, 0xda, 0xe6, 0x6d, 0x2a, 0x9e, 0x41, 0x5d, 0x66, 0x8d, 0xa2, 0xa3, 0xaa, 0x16, 0x8c,
+	0xad, 0xe2, 0x5f, 0xf2, 0x39, 0xd5, 0xbf, 0x24, 0x9b, 0xa5, 0xd3, 0x81, 0x7b, 0xc6, 0xa6, 0x91,
+	0x50, 0x31, 0x1a, 0xae, 0xe7, 0xd1, 0x66, 0xab, 0x4f, 0x34, 0xd4, 0x81, 0x5a, 0xdb, 0x71, 0xd4,
+	0x8e, 0xeb, 0x61, 0x84, 0x5b, 0xf2, 0xc1, 0x6b, 0x36, 0xee, 0x34, 0x6e, 0xb1, 0x13, 0x1d, 0xa8,
+	0xdf, 0x79, 0x24, 0xd1, 0xbe, 0x02, 0xe0, 0x9a, 0xae, 0xf4, 0x50, 0x7e, 0x0f, 0xc6, 0xfa, 0x0b,
+	0x88, 0x84, 0xd5, 0x94, 0x87, 0x71, 0x9b, 0x3f, 0x3c, 0x8f, 0xaa, 0x89, 0x17, 0x17, 0x89, 0x9c,
+	0x5b, 0x7f, 0x85, 0x37, 0x78, 0x72, 0x0c, 0x48, 0x26, 0x43, 0xfc, 0xc8, 0xde, 0xc1, 0xb5, 0x99,
+	0xd2, 0x96, 0x25, 0xb3, 0x02, 0x9d, 0xb1, 0xb6, 0x26, 0xd9, 0x97, 0xed, 0xa5, 0x49, 0x6d, 0xf6,
+	0x63, 0x77, 0xe2, 0xcd, 0xff, 0x37, 0x25, 0xad, 0x6f, 0xa0, 0x38, 0x0c, 0xc8, 0x95, 0x4b, 0xae,
+	0xd9, 0x53, 0xc5, 0xaa, 0x4b, 0xb4, 0x7c, 0xeb, 0x82, 0xf6, 0xb2, 0xc0, 0xff, 0x5e, 0xff, 0xe5,
+	0x7f, 0x02, 0x00, 0x00, 0xff, 0xff, 0xb1, 0xad, 0xb7, 0x85, 0x6b, 0x17, 0x00, 0x00,
 }

@@ -1,0 +1,13 @@
+ldaphostname: cerndc.cern.ch
+ldapport: 636
+ldapbindusername: "CERN\\octest1"
+ldapbindpassword: Zadise05
+ldapbasedn: "OU=Users,OU=Organic Units,DC=cern,DC=ch"
+ldapsearch: "(samaccountname=%s)"
+
+linkdbhostname: playground.cern.ch
+linkdbport: 3306
+linkdbusername: octest
+linkdbpassword: octest
+linkdbname: cernbox9
+

@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 	"gopkg.in/ldap.v2"
 )
 
@@ -70,5 +70,5 @@ func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret 
 		return nil, err
 	}
 
-	return &api.User{AccountID: clientID}, nil
+	return &api.User{AccountId: clientID, Groups: []string{}}, nil
 }

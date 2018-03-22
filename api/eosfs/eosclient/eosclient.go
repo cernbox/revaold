@@ -12,8 +12,10 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/satori/go.uuid"
+	"github.com/cernbox/reva/api"
 )
 
 const versionPrefix = ".sys.v#."
@@ -106,6 +108,19 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 	err := cmd.Run()
 	if c.opt.EnableLogging {
 		c.opt.Logger.Log(fmt.Sprintf("%+v", cmd))
+	}
+	if exiterr, ok := err.(*exec.ExitError); ok {
+		// The program has exited with an exit code != 0
+		// This works on both Unix and Windows. Although package
+		// syscall is generally platform dependent, WaitStatus is
+		// defined for both Unix and Windows and in both cases has
+		// an ExitStatus() method with the same signature.
+		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+			switch status.ExitStatus() {
+			case 2:
+				err = api.NewError(api.StorageNotFoundErrorCode)
+			}
+		}
 	}
 	return outBuf.String(), errBuf.String(), err
 }

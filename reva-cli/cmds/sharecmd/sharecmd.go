@@ -5,8 +5,8 @@ import (
 	"io"
 	"time"
 
-	"gitlab.com/labkode/reva/api"
-	"gitlab.com/labkode/reva/reva-cli/util"
+	"github.com/cernbox/reva/api"
+	"github.com/cernbox/reva/reva-cli/util"
 
 	"github.com/codegangsta/cli"
 	"github.com/ryanuber/columnize"
@@ -149,11 +149,14 @@ func inspectPublicLink(c *cli.Context) error {
 
 	req := &api.TokenReq{Token: token}
 	ctx := util.GetContextWithAuth()
-	link, err := client.InspectPublicLink(ctx, req)
+	linkRes, err := client.InspectPublicLink(ctx, req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
-
+	if linkRes.Status != api.StatusCode_OK {
+		return cli.NewExitError(linkRes.Status, 1)
+	}
+	link := linkRes.PublicLink
 	modified := time.Unix(int64(link.Mtime), 0).Format(time.RFC3339)
 	expires := time.Unix(int64(link.Expires), 0).Format(time.RFC3339)
 	fmt.Fprintf(c.App.Writer, "Token: %s\nProtected: %t\nReadOnly: %t\nModify: %s Timestamp: %d\nExpires: %s Timestamp: %d\nPath: %s\n", link.Token, link.Protected, link.ReadOnly, modified, link.Mtime, expires, link.Expires, link.Path)
@@ -186,10 +189,14 @@ func createPublicLink(c *cli.Context) error {
 	}
 
 	ctx := util.GetContextWithAuth()
-	link, err := client.CreatePublicLink(ctx, req)
+	linkRes, err := client.CreatePublicLink(ctx, req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
+	if linkRes.Status != api.StatusCode_OK {
+		return cli.NewExitError(linkRes.Status, 1)
+	}
+	link := linkRes.PublicLink
 
 	modified := time.Unix(int64(link.Mtime), 0).Format(time.RFC3339)
 	expires := time.Unix(int64(link.Expires), 0).Format(time.RFC3339)
@@ -223,20 +230,24 @@ func listPublicLinks(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	stream, err := client.ListPublicLinks(ctx, &api.Empty{})
+	stream, err := client.ListPublicLinks(ctx, &api.EmptyReq{})
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
 
 	lines := []string{"#Token|Protected|Expires|ReadOnly|Modified|Path"}
 	for {
-		link, err := stream.Recv()
+		linkRes, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			return cli.NewExitError(err, 1)
 		}
+		if linkRes.Status != api.StatusCode_OK {
+			return cli.NewExitError(linkRes.Status, 1)
+		}
+		link := linkRes.PublicLink
 		line := fmt.Sprintf("%s|%t|%d|%t|%d|%s", link.Token, link.Protected, link.Expires, link.ReadOnly, link.Mtime, link.Path)
 		lines = append(lines, line)
 	}
@@ -280,10 +291,14 @@ func updatePublicLink(c *cli.Context) error {
 	}
 
 	ctx := util.GetContextWithAuth()
-	link, err := client.UpdatePublicLink(ctx, req)
+	linkRes, err := client.UpdatePublicLink(ctx, req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
+	if linkRes.Status != api.StatusCode_OK {
+		return cli.NewExitError(linkRes.Status, 1)
+	}
+	link := linkRes.PublicLink
 
 	modified := time.Unix(int64(link.Mtime), 0).Format(time.RFC3339)
 	expires := time.Unix(int64(link.Expires), 0).Format(time.RFC3339)

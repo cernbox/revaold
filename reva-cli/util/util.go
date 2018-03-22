@@ -8,7 +8,7 @@ import (
 	"os/user"
 	"path"
 
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"

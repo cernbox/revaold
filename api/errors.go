@@ -32,26 +32,36 @@ const (
 	StorageNotSupportedErrorCode ErrorCode = "STORAGE_NOT_SUPPORTED"
 
 	UserNotFoundErrorCode ErrorCode = "USER_NOT_FOUND"
+
+	TokenInvalidErrorCode ErrorCode = "TOKEN_INVALID"
 )
 
-func NewError(code ErrorCode) Error {
-	return Error{Code: code}
+func NewError(code ErrorCode) AppError {
+	return AppError{Code: code}
 }
 
-type Error struct {
+type AppError struct {
 	Code    ErrorCode `json:"code"`
 	Message string    `json:"message"`
 }
 
-func (e Error) WithMessage(msg string) Error {
+func (e AppError) WithMessage(msg string) AppError {
 	e.Message = msg
 	return e
 }
 
-func (e Error) Error() string {
+func (e AppError) Error() string {
 	if e.Message != "" {
 		return fmt.Sprintf("%s: %s", e.Code, e.Message)
 	} else {
 		return fmt.Sprintf("%s", e.Code)
 	}
+}
+
+func IsErrorCode(err error, code ErrorCode) bool {
+	apiErr, ok := err.(AppError)
+	if !ok {
+		return false
+	}
+	return apiErr.Code == code
 }

@@ -1,7 +1,7 @@
 package previewsvc
 
 import (
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 )
 
 func New() api.PreviewServer {

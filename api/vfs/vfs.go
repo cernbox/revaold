@@ -8,7 +8,8 @@ import (
 	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
-	"gitlab.com/labkode/reva/api"
+	"github.com/satori/go.uuid"
+	"github.com/cernbox/reva/api"
 	"go.uber.org/zap"
 )
 
@@ -159,6 +160,11 @@ func (v *vfs) GetMetadata(ctx context.Context, path string) (*api.Metadata, erro
 		v.l.Error("", zap.Error(err))
 		return nil, err
 	}
+
+	if derefPath == "/" {
+		return v.inspectRootNode(ctx)
+	}
+
 	m, err := v.GetMount(derefPath)
 	if err != nil {
 		v.l.Error("", zap.Error(err))
@@ -168,6 +174,28 @@ func (v *vfs) GetMetadata(ctx context.Context, path string) (*api.Metadata, erro
 	if err != nil {
 		v.l.Error("", zap.Error(err))
 		return nil, err
+	}
+	return md, nil
+}
+
+func (v *vfs) inspectRootNode(ctx context.Context) (*api.Metadata, error) {
+	// TODO(labkode): generate the ETAG from concatenation of sorted children etag
+	// TODO(labkode): generated the mtime as most recent from childlren
+	// TODO(labkode): generate size as sum of sizes from children
+
+	/*
+		mds, err := v.listRootNode(ctx)
+		if err != nil {
+			return nil, err
+		}
+	*/
+
+	md := &api.Metadata{
+		Path:  "/",
+		Size:  0,
+		Etag:  uuid.NewV4().String(),
+		IsDir: true,
+		Id:    "root",
 	}
 	return md, nil
 }
@@ -232,11 +260,15 @@ func (v *vfs) Upload(ctx context.Context, path string, r io.ReadCloser) error {
 }
 
 func (v *vfs) Download(ctx context.Context, path string) (io.ReadCloser, error) {
+	l := ctx_zap.Extract(ctx)
+
 	derefPath, err := v.getDereferencedPath(ctx, path)
 	if err != nil {
 		v.l.Error("", zap.Error(err))
 		return nil, err
 	}
+
+	l.Debug("", zap.String("derefPath", derefPath))
 	m, err := v.GetMount(derefPath)
 	if err != nil {
 		v.l.Error("", zap.Error(err))
@@ -348,9 +380,13 @@ func (v *vfs) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry
 }
 
 func (v *vfs) RestoreRecycleEntry(ctx context.Context, restoreKey string) error {
-	err := api.NewError(api.StorageNotSupportedErrorCode)
-	v.l.Error("", zap.Error(err))
-	return err
+	m, err := v.GetMount(restoreKey)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return err
+	}
+
+	return m.RestoreRecycleEntry(ctx, restoreKey)
 }
 
 func validatePath(p string) error {

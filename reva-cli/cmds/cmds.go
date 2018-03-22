@@ -7,11 +7,11 @@ import (
 
 	"github.com/codegangsta/cli"
 
-	"gitlab.com/labkode/reva/api"
-	"gitlab.com/labkode/reva/reva-cli/cmds/authcmd"
-	"gitlab.com/labkode/reva/reva-cli/cmds/sharecmd"
-	"gitlab.com/labkode/reva/reva-cli/cmds/storagecmd"
-	"gitlab.com/labkode/reva/reva-cli/util"
+	"github.com/cernbox/reva/api"
+	"github.com/cernbox/reva/reva-cli/cmds/authcmd"
+	"github.com/cernbox/reva/reva-cli/cmds/sharecmd"
+	"github.com/cernbox/reva/reva-cli/cmds/storagecmd"
+	"github.com/cernbox/reva/reva-cli/util"
 
 	"golang.org/x/net/context"
 )
@@ -111,13 +111,16 @@ func login(c *cli.Context) {
 	}
 
 	req := &api.CreateTokenReq{ClientId: username, ClientSecret: password}
-	res, err := authClient.CreateToken(context.Background(), req)
+	tokenRes, err := authClient.CreateToken(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	token := res.Token
-	util.SetAccessToken(token)
+	if tokenRes.Status != api.StatusCode_OK {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	token := tokenRes.Token
+	util.SetAccessToken(token.Token)
 	fmt.Println("Access token saved in: ", util.AccessTokenFile)
 }

@@ -9,7 +9,7 @@ import (
 	"path"
 	"strings"
 
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 
 	"go.uber.org/zap"
 )

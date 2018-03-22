@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
-	"gitlab.com/labkode/reva/api"
+	"github.com/cernbox/reva/api"
 	"go.uber.org/zap"
 )
 
@@ -35,10 +35,14 @@ func (fs *linkStorage) getLink(ctx context.Context, name string) (*api.PublicLin
 	if err != nil {
 		return nil, "", err
 	}
+
+	var relativePath string
 	if len(items) > 2 {
-		return link, path.Join(items[2:]...), nil
+		relativePath = path.Join(items[2:]...)
 	}
-	return link, "", nil
+
+	fs.logger.Debug("resolve link path", zap.String("path", name), zap.String("relativepath", relativePath), zap.String("linkpath", link.Path), zap.String("linktoken", link.Token))
+	return link, relativePath, nil
 }
 
 func (fs *linkStorage) GetPathByID(ctx context.Context, id string) (string, error) {
@@ -87,7 +91,7 @@ func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata
 		return nil, err
 	}
 
-	md.Path = path.Join("/", link.Token, strings.Trim(md.Path, linkMetadata.Path))
+	md.Path = path.Join("/", link.Token, strings.TrimPrefix(md.Path, linkMetadata.Path))
 	md.Id = link.Token
 	return md, nil
 }
@@ -134,9 +138,11 @@ func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Meta
 		return nil, err
 	}
 	for _, md := range mds {
-		p := path.Join(link.Token, strings.Trim(md.Path, linkMetadata.Path))
+		originalPath := md.Path
+		p := path.Join(link.Token, strings.TrimPrefix(md.Path, linkMetadata.Path))
 		md.Path = path.Join("/", p)
 		md.Id = p
+		fs.logger.Debug("children entry", zap.String("childpath", md.Path), zap.String("originalchildmd.path", originalPath), zap.String("childmd.path", md.Path), zap.String("parentmd.path", linkMetadata.Path), zap.String("strings", strings.TrimPrefix(originalPath, linkMetadata.Path)))
 	}
 
 	return mds, nil

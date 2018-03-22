@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/cernbox/reva/api"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
-	"github.com/cernbox/reva/api"
 	"go.uber.org/zap"
 )
 

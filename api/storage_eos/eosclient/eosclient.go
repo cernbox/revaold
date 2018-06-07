@@ -16,6 +16,7 @@ import (
 
 	"github.com/cernbox/reva/api"
 	"github.com/satori/go.uuid"
+	"go.uber.org/zap"
 )
 
 const versionPrefix = ".sys.v#."
@@ -37,23 +38,12 @@ type Options struct {
 	// Defaults to os.TempDir()
 	CacheDirectory string
 
-	// Logger to log
-	// Defaults to stdout
-	Logger Logger
-
 	// Enables logging of the commands executed
 	// Defaults to false
 	EnableLogging bool
-}
 
-type Logger interface {
-	Log(msg string)
-}
-
-type defaultLogger struct{}
-
-func (l *defaultLogger) Log(msg string) {
-	fmt.Fprintln(os.Stdout, msg)
+	// Logger to use
+	Logger *zap.Logger
 }
 
 func (opt *Options) init() {
@@ -74,7 +64,8 @@ func (opt *Options) init() {
 	}
 
 	if opt.Logger == nil {
-		opt.Logger = new(defaultLogger)
+		l, _ := zap.NewProduction()
+		opt.Logger = l
 	}
 }
 
@@ -107,8 +98,9 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 	cmd.Stderr = errBuf
 	err := cmd.Run()
 	if c.opt.EnableLogging {
-		c.opt.Logger.Log(fmt.Sprintf("%+v", cmd))
+		c.opt.Logger.Info("eosclient", zap.String("cmd", fmt.Sprintf("%+v", cmd)))
 	}
+
 	if exiterr, ok := err.(*exec.ExitError); ok {
 		// The program has exited with an exit code != 0
 		// This works on both Unix and Windows. Although package

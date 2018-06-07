@@ -30,34 +30,39 @@ func ContextSetAccessToken(ctx context.Context, token string) context.Context {
 	return context.WithValue(ctx, tokenKey, token)
 }
 
-// MountOptions is an alias for mount options.
-type MountOption int
-
-const (
-	// MountOptionReadOnly means the mount is read only.
-	MountOptionReadOnly MountOption = iota
-
-	// MounOptionReadWrit means the mount is read/write.
-	MountOptionReadWrite
-
-	// MountOptionUserContext means that operation on the mount
-	// must have a user context associated.
-	// This is usually the case for home filesystems and for
-	// EOS impersonating the real user for accessing the data.
-	MountOptionUserContext
-)
+type MountOptions struct {
+	ReadOnly bool
+}
 
 // Mount contains the information about a mount.
 // Similar to "struct mntent" in /usr/include/mntent.h.
 // See also getent(8).
 // A Mount exposes two mount points, one path based and another namespace based.
 // A path-based mount point can be '/home', a namespaced mount-point can be 'home:1234'
-
 type Mount interface {
 	Storage
 	GetMountPoint() string
-	GetMountOptions() []MountOption
 	GetMountPointId() string
+	GetMountOptions() *MountOptions
+}
+
+type MountTable struct {
+	Mounts []*MountTableEntry `json:"mounts"`
+}
+
+type MountTableEntry struct {
+	MountPoint      string            `json:"mount_point"`
+	MountID         string            `json:"mount_id"`
+	MountOptions    *MountOptions     `json:"mount_options"`
+	StorageDriver   string            `json:"storage_driver"`
+	StorageOptions  interface{}       `json:"storage_options"`
+	StorageWrappers []*StorageWrapper `json:"storage_wrappers"`
+}
+
+type StorageWrapper struct {
+	Priority int         `json:"priority"`
+	Name     string      `json:"name"`
+	Options  interface{} `json:"options"`
 }
 
 // A VirtualStorage is similar to the

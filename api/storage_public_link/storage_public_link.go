@@ -1,4 +1,4 @@
-package linkfs
+package storage_public_link
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"github.com/cernbox/reva/api"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )
 

@@ -1,16 +1,17 @@
-package eosfs
+package storage_eos
 
 import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"github.com/cernbox/reva/api"
-	"github.com/cernbox/reva/api/eosfs/eosclient"
+	"github.com/cernbox/reva/api/storage_eos/eosclient"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )
 
@@ -29,37 +30,90 @@ type eosStorage struct {
 }
 
 type Options struct {
-	// The eos client to use
-	// Defaults to default client
-	EosClient *eosclient.Client
-
 	// Namespace for path operations
-	Namespace string
+	Namespace string `json:"namespace"`
 
 	Logger *zap.Logger
+
+	// Location of the eos binary.
+	// Default is /usr/bin/eos.
+	EosBinary string `json:"eos_binary"`
+
+	// Location of the xrdcopy binary.
+	// Default is /usr/bin/xrdcopy.
+	XrdcopyBinary string `json:"xrdcopy_binary"`
+
+	// URL of the Master EOS MGM.
+	// Default is root://eos-test.org
+	MasterURL string `json:"master_url"`
+
+	// URL of the Slave EOS MGM.
+	// Default is root://eos-test.org
+	SlaveURL string `json:"slave_url"`
+
+	// Location on the local fs where to store reads.
+	// Defaults to os.TempDir()
+	CacheDirectory string `json:"cache_directory"`
+
+	// Enables logging of the commands executed
+	// Defaults to false
+	EnableLogging bool `json:"enable_logging"`
 }
 
 func (opt *Options) init() {
-	if opt.EosClient == nil {
-		c, _ := eosclient.New(nil)
-		opt.EosClient = c
-	}
-	if opt.Logger == nil {
-		opt.Logger, _ = zap.NewProduction()
-	}
 	opt.Namespace = path.Clean(opt.Namespace)
 	if !strings.HasPrefix(opt.Namespace, "/") {
 		opt.Namespace = "/"
 	}
+
+	if opt.EosBinary == "" {
+		opt.EosBinary = "/usr/bin/eos"
+	}
+
+	if opt.XrdcopyBinary == "" {
+		opt.XrdcopyBinary = "/usr/bin/xrdcopy"
+	}
+
+	if opt.MasterURL == "" {
+		opt.MasterURL = "root://eos-example.org"
+	}
+
+	if opt.SlaveURL == "" {
+		opt.SlaveURL = opt.MasterURL
+	}
+
+	if opt.CacheDirectory == "" {
+		opt.CacheDirectory = os.TempDir()
+	}
+
+	if opt.Logger == nil {
+		l, _ := zap.NewProduction()
+		opt.Logger = l
+	}
 }
 
-func New(opt *Options) api.Storage {
+func New(opt *Options) (api.Storage, error) {
 	opt.init()
-	eosStorage := new(eosStorage)
-	eosStorage.c = opt.EosClient
-	eosStorage.mountpoint = opt.Namespace
-	eosStorage.logger = opt.Logger
-	return eosStorage
+
+	eosClientOpts := &eosclient.Options{
+		XrdcopyBinary:  opt.XrdcopyBinary,
+		URL:            opt.MasterURL,
+		EosBinary:      opt.EosBinary,
+		EnableLogging:  opt.EnableLogging,
+		CacheDirectory: opt.CacheDirectory,
+		Logger:         opt.Logger,
+	}
+	eosClient, err := eosclient.New(eosClientOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	eosStorage := &eosStorage{
+		c:          eosClient,
+		logger:     opt.Logger,
+		mountpoint: opt.Namespace,
+	}
+	return eosStorage, nil
 }
 
 func (fs *eosStorage) getInternalPath(ctx context.Context, p string) string {

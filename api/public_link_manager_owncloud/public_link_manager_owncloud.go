@@ -1,4 +1,4 @@
-package oclinkmanager
+package public_link_manager_owncloud
 
 import (
 	"context"
@@ -38,7 +38,7 @@ func checkPasswordHash(password, hash string) bool {
 	return err == nil
 }
 
-func New(dbUsername, dbPassword, dbHost string, dbPort uint64, dbName string, vfs api.VirtualStorage) (api.PublicLinkManager, error) {
+func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, vfs api.VirtualStorage) (api.PublicLinkManager, error) {
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbUsername, dbPassword, dbHost, dbPort, dbName))
 	if err != nil {
 		return nil, err

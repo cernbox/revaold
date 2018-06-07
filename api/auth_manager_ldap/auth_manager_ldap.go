@@ -1,4 +1,4 @@
-package authmanager
+package auth_manager_ldap
 
 import (
 	"context"

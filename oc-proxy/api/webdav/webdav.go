@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/cernbox/reva/api"
+	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -205,19 +205,19 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 }
 
 func (p *proxy) registerRoutes() {
-	p.router.HandleFunc("/owncloud/status.php", p.status).Methods("GET")
-	p.router.HandleFunc("/owncloud/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/owncloud/remote.php/webdav/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/status.php", p.status).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
 }
 
 func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
@@ -524,8 +524,8 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// remove api base and service base to get real path
-	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/owncloud/remote.php/webdav/"
-	toTrim := "/owncloud/remote.php/webdav/"
+	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/remote.php/webdav/"
+	toTrim := "/remote.php/webdav/"
 	destination = path.Join("/", path.Clean(strings.TrimPrefix(destinationURL.Path, toTrim)))
 
 	gCtx := GetContextWithAuth(ctx)
@@ -1367,9 +1367,9 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 
 	response := responseXML{}
 
-	response.Href = path.Join("/owncloud/remote.php/webdav", md.Path)
+	response.Href = path.Join("/remote.php/webdav", md.Path)
 	if md.IsDir {
-		response.Href = path.Join("/owncloud/remote.php/webdav", md.Path) + "/"
+		response.Href = path.Join("/remote.php/webdav", md.Path) + "/"
 	}
 
 	response.Propstat = propStatList

@@ -7,18 +7,23 @@ import (
 	"path"
 	"strings"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"github.com/cernbox/reva/api"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )
 
 // New will return a new mount with specific mount options.
-func New(s api.Storage, mountPoint string, options ...api.MountOption) api.Mount {
-	m := &mount{storage: s,
-		mountPoint:   strings.TrimSuffix(mountPoint, "/"),
-		mountOptions: options,
+func New(mountID, mountPoint string, opts *api.MountOptions, s api.Storage) api.Mount {
+	mountPoint = path.Clean(mountPoint)
+	if mountPoint != "/" {
+		mountPoint = strings.TrimSuffix(mountPoint, "/")
 	}
-	m.mountPointId = strings.TrimPrefix(mountPoint, "/") + ":"
+
+	m := &mount{storage: s,
+		mountPoint:   mountPoint,
+		mountOptions: opts,
+	}
+	m.mountPointId = mountID + ":"
 	return m
 }
 
@@ -26,22 +31,17 @@ type mount struct {
 	storage      api.Storage
 	mountPoint   string
 	mountPointId string
-	mountOptions []api.MountOption
+	mountOptions *api.MountOptions
 	logger       *zap.Logger
 }
 
 func (m *mount) isReadOnly() bool {
-	for _, m := range m.mountOptions {
-		if m == api.MountOptionReadOnly {
-			return true
-		}
-	}
-	return false
+	return m.mountOptions.ReadOnly
 }
 
 func (m *mount) GetMountPoint() string              { return m.mountPoint }
 func (m *mount) GetMountPointId() string            { return m.mountPointId }
-func (m *mount) GetMountOptions() []api.MountOption { return m.mountOptions }
+func (m *mount) GetMountOptions() *api.MountOptions { return m.mountOptions }
 
 func (m *mount) GetPathByID(ctx context.Context, id string) (string, error) {
 	id, err := m.getInternalIDPath(ctx, id)

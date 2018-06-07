@@ -1,4 +1,4 @@
-package noauthmanager
+package auth_manager_nop
 
 import (
 	"context"
@@ -17,6 +17,6 @@ func New() api.AuthManager {
 }
 
 func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret string) (*api.User, error) {
-	clientID = "admin"
+	clientID = "gonzalhu"
 	return &api.User{AccountId: clientID, Groups: []string{}}, nil
 }

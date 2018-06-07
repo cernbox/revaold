@@ -1,4 +1,4 @@
-package localfs
+package storage_local
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 
 type Options struct {
 	// Namespace for path operations
-	Namespace string
+	Namespace string `json:"namespace"`
 
 	Logger *zap.Logger
 }
@@ -59,19 +59,13 @@ type localStorage struct {
 	logger    *zap.Logger
 }
 
-func (fs *localStorage) convertToFileInfo(osFileInfo os.FileInfo) *api.Metadata {
-	fi := &api.Metadata{}
-	fi.IsDir = osFileInfo.IsDir()
-	fi.Path = fs.removeNamespace(path.Join("/", path.Clean(osFileInfo.Name())))
-	fi.Size = uint64(osFileInfo.Size())
-	return fi
-}
-
 func (fs *localStorage) convertToFileInfoWithNamespace(osFileInfo os.FileInfo, np string) *api.Metadata {
 	fi := &api.Metadata{}
 	fi.IsDir = osFileInfo.IsDir()
 	fi.Path = fs.removeNamespace(path.Join("/", np))
 	fi.Size = uint64(osFileInfo.Size())
+	fi.Id = fi.Path
+	fi.Etag = fmt.Sprintf("%d", osFileInfo.ModTime().Unix())
 	return fi
 }
 

@@ -1,4 +1,4 @@
-package vfs
+package virtual_storage
 
 import (
 	"context"
@@ -36,11 +36,14 @@ func (v *vfs) AddMount(ctx context.Context, mount api.Mount) error {
 		return err
 	}
 
-	if mount.GetMountPoint() == "/" {
-		err := api.NewError(api.PathInvalidError).WithMessage("mount point cannot be /")
-		v.l.Error("", zap.Error(err))
-		return err
-	}
+	/*
+		TODO(labkode): double check
+			if mount.GetMountPoint() == "/" {
+				err := api.NewError(api.PathInvalidError).WithMessage("mount point cannot be /")
+				v.l.Error("", zap.Error(err))
+				return err
+			}
+	*/
 
 	// TODO(labkode): add check for duplicate mounts
 	v.mounts = append(v.mounts, mount)
@@ -161,9 +164,11 @@ func (v *vfs) GetMetadata(ctx context.Context, path string) (*api.Metadata, erro
 		return nil, err
 	}
 
-	if derefPath == "/" {
-		return v.inspectRootNode(ctx)
-	}
+	/*
+		if derefPath == "/" {
+			return v.inspectRootNode(ctx)
+		}
+	*/
 
 	m, err := v.GetMount(derefPath)
 	if err != nil {
@@ -224,9 +229,11 @@ func (v *vfs) ListFolder(ctx context.Context, p string) ([]*api.Metadata, error)
 		v.l.Error("", zap.Error(err))
 		return nil, err
 	}
-	if derefPath == "/" {
-		return v.listRootNode(ctx)
-	}
+	/*
+		if derefPath == "/" {
+			return v.listRootNode(ctx)
+		}
+	*/
 
 	m, err := v.GetMount(derefPath)
 	if err != nil {

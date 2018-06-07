@@ -1,4 +1,4 @@
-package eosfs
+package storage_eos
 
 import (
 	"bytes"

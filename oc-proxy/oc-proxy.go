@@ -23,19 +23,19 @@ func init() {
 	viper.SetDefault("temporaryfolder", "")
 	viper.SetDefault("maxuploadfilesize", 1024*1024*1024*8) // 8GiB
 
-	viper.SetDefault("signkey", "defaults are evil")
+	viper.SetDefault("signkey", "secreto")
 	viper.SetDefault("applog", "stderr")
 	viper.SetDefault("httplog", "stderr")
 
 	viper.SetDefault("revahost", "localhost")
-	viper.SetDefault("revaport", 1093)
+	viper.SetDefault("revaport", 9999)
 
 	viper.SetConfigName("oc-proxy")
 	viper.AddConfigPath("./")
 	viper.AddConfigPath("/etc/oc-proxy")
 
 	flag.Int("port", 1099, "Listen port for HTTP(S) connections")
-	flag.String("signkey", "defaults are evil", "Key to validate JWT authentication tokens")
+	flag.String("signkey", "secreto", "Key to validate JWT authentication tokens")
 	flag.String("applog", "stderr", "File where to log application data")
 	flag.String("httplog", "stderr", "File where to log http requests")
 	flag.String("config", "", "Configuration file to use")
@@ -44,7 +44,7 @@ func init() {
 	flag.Int("maxuploadfilesize", 1024*1024*1024*8, "Max upload file size")
 
 	flag.String("revahost", "localhost", "Hostname of the REVA server")
-	flag.Int("revaport", 1092, "Port of the REVA server")
+	flag.Int("revaport", 1099, "Port of the REVA server")
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
@@ -105,7 +105,7 @@ func main() {
 	loggedRouter := handlers.LoggingHandler(out, router)
 
 	logger.Info("oc-proxy started", zap.Int("port", viper.GetInt("port")))
-	err = http.ListenAndServe(fmt.Sprintf(":%d", viper.GetInt("port")), loggedRouter)
+	err = http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", viper.GetInt("port")), loggedRouter)
 	if err != nil {
 		logger.Error("", zap.Error(err))
 	}

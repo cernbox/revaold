@@ -1,4 +1,4 @@
-package linkmanager
+package public_link_manager_memory
 
 import (
 	"context"

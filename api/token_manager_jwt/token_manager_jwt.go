@@ -1,4 +1,4 @@
-package tokenmanager
+package token_manager_jwt
 
 import (
 	"context"

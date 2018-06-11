@@ -207,6 +207,21 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
+
+	// user prefixed webdav routes
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
+
+	// user-relative routes
 	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.get)).Methods("GET")
 	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
 	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
@@ -290,9 +305,9 @@ func (p *proxy) capabilities(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(capabilities))
 }
 
-func (p *proxy) detectMimeType(path string) string {
-	base := filepath.Base(path)
-	return mime.TypeByExtension(base)
+func (p *proxy) detectMimeType(pa string) string {
+	ext := path.Ext(pa)
+	return mime.TypeByExtension(ext)
 }
 
 func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
@@ -524,8 +539,8 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// remove api base and service base to get real path
-	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/remote.php/webdav/"
-	toTrim := "/remote.php/webdav/"
+	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/remote.php/dav/files/"
+	toTrim := "/remote.php/dav/files/"
 	destination = path.Join("/", path.Clean(strings.TrimPrefix(destinationURL.Path, toTrim)))
 
 	gCtx := GetContextWithAuth(ctx)
@@ -608,7 +623,6 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 	}
 	if mdRes.Status != api.StatusCode_OK {
 		if mdRes.Status != api.StatusCode_STORAGE_NOT_FOUND {
-			p.logger.Info("HODER")
 			p.writeError(mdRes.Status, w, r)
 			return
 		}
@@ -629,6 +643,8 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 		serverETag := md.Etag
 		if clientETag != "" {
 			if err := p.handleIfMatchHeader(clientETag, serverETag, w, r); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusPreconditionRequired)
 				return
 			}
 		}
@@ -708,7 +724,7 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if emptyRes.Status == api.StatusCode_OK {
+	if emptyRes.Status != api.StatusCode_OK {
 		p.writeError(emptyRes.Status, w, r)
 		return
 	}
@@ -1319,7 +1335,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 	if md.IsDir {
 		getContentType = propertyXML{
 			xml.Name{Space: "", Local: "d:getcontenttype"},
-			"", []byte("http/unix-directory")}
+			"", []byte("httpd/unix-directory")}
 
 	} else {
 		getContentType = propertyXML{
@@ -1341,11 +1357,11 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 
 	if md.IsDir {
 		getResourceType.InnerXML = []byte("<d:collection/>")
-		getContentType.InnerXML = []byte("http/unix-directory")
+		getContentType.InnerXML = []byte("httpd/unix-directory")
 		ocPermissions.InnerXML = []byte("RDNVCK")
 	}
 
-	ocID := propertyXML{xml.Name{Space: "", Local: "oc:id"}, "",
+	ocID := propertyXML{xml.Name{Space: "", Local: "oc:fileid"}, "",
 		[]byte(md.Id)}
 
 	ocDownloadURL := propertyXML{xml.Name{Space: "", Local: "oc:downloadURL"},
@@ -1355,7 +1371,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 		"", []byte("")}
 
 	propList = append(propList, getResourceType, getContentLegnth, getContentType, getLastModified, // general WebDAV properties
-		getETag, quotaAvailableBytes, quotaUsedBytes, ocID, ocDownloadURL, ocDC) // properties needed by ownCloud
+		getETag, quotaAvailableBytes, quotaUsedBytes, ocID, ocDownloadURL, ocDC, ocPermissions) // properties needed by ownCloud
 
 	// PropStat, only HTTP/1.1 200 is sent.
 	propStatList := []propstatXML{}
@@ -1367,9 +1383,11 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 
 	response := responseXML{}
 
-	response.Href = path.Join("/remote.php/webdav", md.Path)
+	// TODO(labkode): harden check for user
+	user, _ := api.ContextGetUser(ctx)
+	response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
 	if md.IsDir {
-		response.Href = path.Join("/remote.php/webdav", md.Path) + "/"
+		response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path) + "/"
 	}
 
 	response.Propstat = propStatList

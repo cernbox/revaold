@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cernbox/reva/oc-proxy/api/ocs"
 	"github.com/cernbox/reva/oc-proxy/api/webdav"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -79,6 +80,18 @@ func main() {
 	}
 
 	_, err = webdav.New(opts)
+	if err != nil {
+		logger.Error("", zap.Error(err))
+		panic(err)
+	}
+
+	ocsOpts := &ocs.Options{
+		Logger:       logger,
+		REVAHostname: viper.GetString("revahostname"),
+		REVAPort:     viper.GetInt("revaport"),
+		Router:       router,
+	}
+	_, err = ocs.New(ocsOpts)
 	if err != nil {
 		logger.Error("", zap.Error(err))
 		panic(err)

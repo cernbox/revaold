@@ -30,10 +30,9 @@ service Storage {
 service Share {
   rpc CreatePublicLink(NewLinkReq) returns (PublicLinkResponse) {}
   rpc UpdatePublicLink(UpdateLinkReq) returns  (PublicLinkResponse) {}
-  rpc InspectPublicLink(TokenReq) returns (PublicLinkResponse) {}
-  rpc RevokePublicLink(TokenReq) returns  (EmptyResponse) {}
+  rpc InspectPublicLink(ShareIDReq) returns (PublicLinkResponse) {}
+  rpc RevokePublicLink(ShareIDReq) returns  (EmptyResponse) {}
   rpc ListPublicLinks(EmptyReq) returns (stream PublicLinkResponse) {}
-
   rpc AddFolderShare(NewFolderShareReq) returns (FolderShareResponse) {}
   rpc UpdateFolderShare(UpdateFolderShareReq) returns (EmptyResponse) {}
   rpc ListFolderShares(ListFolderSharesReq) returns (stream FolderShareResponse) {}
@@ -217,7 +216,7 @@ message NewLinkReq {
 }
 
 message UpdateLinkReq {
-  string token = 1;
+  string id = 1;
   bool update_password = 2;
   string password = 3;
   bool update_expiration = 4;
@@ -232,16 +231,27 @@ message PublicLinkResponse {
 }
 
 message PublicLink {
-  string token = 1;
-  string path = 2;
-  bool protected = 3;
+  string id = 1;
+  string token = 2;
+  string path = 3;
+  bool protected = 4;
   uint64 expires = 5;
   bool read_only = 6;
-  uint64 mtime = 8;
+  uint64 mtime = 7;
+  enum ItemType {
+    FILE = 0;
+    FOLDER = 1;
+  }
+  ItemType item_type = 8;
 }
 
 message TokenReq {
   string token = 1;
+
+}
+
+message ShareIDReq{
+  string id = 1;
 
 }
 

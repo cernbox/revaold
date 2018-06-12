@@ -62,9 +62,9 @@ func (s *svc) CreatePublicLink(ctx context.Context, req *api.NewLinkReq) (*api.P
 	return publicLinkRes, nil
 }
 
-func (s *svc) InspectPublicLink(ctx context.Context, req *api.TokenReq) (*api.PublicLinkResponse, error) {
+func (s *svc) InspectPublicLink(ctx context.Context, req *api.ShareIDReq) (*api.PublicLinkResponse, error) {
 	l := ctx_zap.Extract(ctx)
-	publicLink, err := s.linkManager.InspectPublicLink(ctx, req.Token)
+	publicLink, err := s.linkManager.InspectPublicLink(ctx, req.Id)
 	if err != nil {
 		l.Error("error inspecting public link", zap.Error(err))
 		return nil, err
@@ -73,9 +73,9 @@ func (s *svc) InspectPublicLink(ctx context.Context, req *api.TokenReq) (*api.Pu
 	return publicLinkRes, nil
 }
 
-func (s *svc) RevokePublicLink(ctx context.Context, req *api.TokenReq) (*api.EmptyResponse, error) {
+func (s *svc) RevokePublicLink(ctx context.Context, req *api.ShareIDReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
-	err := s.linkManager.RevokePublicLink(ctx, req.Token)
+	err := s.linkManager.RevokePublicLink(ctx, req.Id)
 	if err != nil {
 		l.Error("error revoking public link", zap.Error(err))
 		return nil, err
@@ -94,7 +94,7 @@ func (s *svc) UpdatePublicLink(ctx context.Context, req *api.UpdateLinkReq) (*ap
 		UpdateReadOnly:   req.UpdateReadOnly,
 	}
 
-	publicLink, err := s.linkManager.UpdatePublicLink(ctx, req.Token, opts)
+	publicLink, err := s.linkManager.UpdatePublicLink(ctx, req.Id, opts)
 	if err != nil {
 		l.Error("error updating public link", zap.Error(err))
 		return nil, err

@@ -39,6 +39,7 @@ func checkPasswordHash(password, hash string) bool {
 }
 
 func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, vfs api.VirtualStorage) (api.PublicLinkManager, error) {
+	fmt.Println(dbUsername)
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbUsername, dbPassword, dbHost, dbPort, dbName))
 	if err != nil {
 		return nil, err
@@ -119,7 +120,7 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 	}
 	l.Info("created oc share", zap.Int64("share_id", lastId))
 
-	pb, err := lm.InspectPublicLink(ctx, token)
+	pb, err := lm.InspectPublicLink(ctx, fmt.Sprintf("%d", lastId))
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
@@ -128,7 +129,7 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 }
 
 // TODO(labkode): handle nil opt
-func (lm *linkManager) UpdatePublicLink(ctx context.Context, token string, opt *api.PublicLinkOptions) (*api.PublicLink, error) {
+func (lm *linkManager) UpdatePublicLink(ctx context.Context, id string, opt *api.PublicLinkOptions) (*api.PublicLink, error) {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
 	if err != nil {
@@ -136,9 +137,9 @@ func (lm *linkManager) UpdatePublicLink(ctx context.Context, token string, opt *
 		return nil, err
 	}
 
-	pb, err := lm.InspectPublicLink(ctx, token)
+	pb, err := lm.InspectPublicLink(ctx, id)
 	if err != nil {
-		l.Error("", zap.Error(err))
+		l.Error("error getting link before update", zap.Error(err))
 		return nil, err
 	}
 
@@ -184,8 +185,8 @@ func (lm *linkManager) UpdatePublicLink(ctx context.Context, token string, opt *
 		stmtValues = append(stmtValues, v)
 	}
 
-	stmtString += strings.Join(stmtTail, ",") + " where uid_owner=? and token=?"
-	stmtValues = append(stmtValues, u.AccountId, token)
+	stmtString += strings.Join(stmtTail, ",") + " where uid_owner=? and id=?"
+	stmtValues = append(stmtValues, u.AccountId, id)
 
 	stmt, err := lm.db.Prepare(stmtString)
 	if err != nil {
@@ -200,7 +201,7 @@ func (lm *linkManager) UpdatePublicLink(ctx context.Context, token string, opt *
 	}
 	l.Info("updated oc share")
 
-	pb, err = lm.InspectPublicLink(ctx, token)
+	pb, err = lm.InspectPublicLink(ctx, id)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
@@ -208,16 +209,17 @@ func (lm *linkManager) UpdatePublicLink(ctx context.Context, token string, opt *
 	return pb, nil
 }
 
-func (lm *linkManager) InspectPublicLink(ctx context.Context, token string) (*api.PublicLink, error) {
+func (lm *linkManager) InspectPublicLink(ctx context.Context, id string) (*api.PublicLink, error) {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	dbShare, err := lm.getDBShare(ctx, u.AccountId, token)
+
+	dbShare, err := lm.getDBShare(ctx, u.AccountId, id)
 	if err != nil {
-		l.Error("cannot get db share", zap.Error(err), zap.String("token", token))
+		l.Error("cannot get db share", zap.Error(err), zap.String("id", id))
 		return nil, err
 	}
 	pb, err := lm.convertToPublicLink(ctx, dbShare)
@@ -225,6 +227,7 @@ func (lm *linkManager) InspectPublicLink(ctx context.Context, token string) (*ap
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
+	// TODO(labkode): check that this works after the migration.
 	pb.Path = "home:" + pb.Path // hardcoded mount
 	return pb, nil
 }
@@ -255,7 +258,7 @@ func (lm *linkManager) ListPublicLinks(ctx context.Context) ([]*api.PublicLink, 
 	return publicLinks, nil
 }
 
-func (lm *linkManager) RevokePublicLink(ctx context.Context, token string) error {
+func (lm *linkManager) RevokePublicLink(ctx context.Context, id string) error {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
 	if err != nil {
@@ -263,13 +266,13 @@ func (lm *linkManager) RevokePublicLink(ctx context.Context, token string) error
 		return err
 	}
 
-	stmt, err := lm.db.Prepare("delete from oc_share where uid_owner=? and token=?")
+	stmt, err := lm.db.Prepare("delete from oc_share where uid_owner=? and id=?")
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return err
 	}
 
-	res, err := stmt.Exec(u.AccountId, token)
+	res, err := stmt.Exec(u.AccountId, id)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return err
@@ -283,7 +286,7 @@ func (lm *linkManager) RevokePublicLink(ctx context.Context, token string) error
 
 	if rowCnt == 0 {
 		err := api.NewError(api.PublicLinkNotFoundErrorCode)
-		l.Error("", zap.Error(err), zap.String("token", token))
+		l.Error("", zap.Error(err), zap.String("id", id))
 		return err
 	}
 	return nil
@@ -311,33 +314,45 @@ type ocShare struct {
 */
 
 type dbShare struct {
+	ID          int
 	ItemSource  string
 	ShareWith   string
 	Token       string
 	Expiration  string
 	STime       int
+	ItemType    string
 	Permissions int
 }
 
-func (lm *linkManager) getDBShare(ctx context.Context, accountID, token string) (*dbShare, error) {
+func (lm *linkManager) getDBShare(ctx context.Context, accountID, id string) (*dbShare, error) {
+	l := ctx_zap.Extract(ctx)
+	intID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		l.Error("cannot parse id to int64", zap.Error(err))
+		return nil, err
+	}
+
 	var (
 		itemSource  string
 		shareWith   string
 		expiration  string
 		stime       int
 		permissions int
+		itemType    string
+		token       string
 	)
 
-	query := "select coalesce(share_with, '') as share_with, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions from oc_share where share_type=? and uid_owner=? and token=?"
-	if err := lm.db.QueryRow(query, 3, accountID, token).Scan(&shareWith, &itemSource, &token, &expiration, &stime, &permissions); err != nil {
+	query := "select coalesce(share_with, '') as share_with, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and uid_owner=? and id=?"
+	if err := lm.db.QueryRow(query, 3, accountID, id).Scan(&shareWith, &itemSource, &token, &expiration, &stime, &permissions, &itemType); err != nil {
+		// TODO(labkode): return not found error code
 		return nil, err
 	}
-	dbShare := &dbShare{ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions}
+	dbShare := &dbShare{ID: int(intID), ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
 	return dbShare, nil
 
 }
 func (lm *linkManager) getDBShares(ctx context.Context, accountID string) ([]*dbShare, error) {
-	query := "select coalesce(share_with, '') as share_with, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime from oc_share where share_type=? and uid_owner=?"
+	query := "select id, coalesce(share_with, '') as share_with, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and uid_owner=?"
 	rows, err := lm.db.Query(query, 3, accountID)
 	if err != nil {
 		return nil, err
@@ -345,20 +360,23 @@ func (lm *linkManager) getDBShares(ctx context.Context, accountID string) ([]*db
 	defer rows.Close()
 
 	var (
-		itemSource string
-		shareWith  string
-		token      string
-		expiration string
-		stime      int
+		id          int
+		itemSource  string
+		shareWith   string
+		token       string
+		expiration  string
+		stime       int
+		permissions int
+		itemType    string
 	)
 
 	dbShares := []*dbShare{}
 	for rows.Next() {
-		err := rows.Scan(&shareWith, &itemSource, &token, &expiration, &stime)
+		err := rows.Scan(&id, &shareWith, &itemSource, &token, &expiration, &stime, &permissions, &itemType)
 		if err != nil {
 			return nil, err
 		}
-		dbShare := &dbShare{ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime}
+		dbShare := &dbShare{ID: id, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
 		dbShares = append(dbShares, dbShare)
 
 	}
@@ -380,13 +398,22 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		expires = uint64(t.Unix())
 	}
 
+	var itemType api.PublicLink_ItemType
+	if dbShare.ItemType == "folder" {
+		itemType = api.PublicLink_FOLDER
+	} else {
+
+		itemType = api.PublicLink_FILE
+	}
 	publicLink := &api.PublicLink{
+		Id:        fmt.Sprintf("%d", dbShare.ID),
 		Token:     dbShare.Token,
 		Mtime:     uint64(dbShare.STime),
 		Protected: dbShare.ShareWith != "",
 		Path:      dbShare.ItemSource,
 		Expires:   expires,
 		ReadOnly:  dbShare.Permissions == 1,
+		ItemType:  itemType,
 	}
 	return publicLink, nil
 

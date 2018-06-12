@@ -9,8 +9,13 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"io"
+	"io/ioutil"
+	"mime"
 	"net/http"
 	"path"
+	"strconv"
+	"time"
 )
 
 type ShareType int
@@ -21,10 +26,10 @@ type ShareState int
 const (
 	ShareTypeUser       ShareType = 0
 	ShareTypeGroup                = 1
-	ShareTypePublicLink           = 2
+	ShareTypePublicLink           = 3
 
-	PermissionRead  Permission = 1
-	PermissionWrite Permission = 15
+	PermissionRead      Permission = 1
+	PermissionReadWrite Permission = 15
 
 	ItemTypeFile   ItemType = "file"
 	ItemTypeFolder ItemType = "folder"
@@ -35,9 +40,11 @@ const (
 )
 
 type ResponseMeta struct {
-	Status     string `json:"status"`
-	StatusCode int    `json:"statuscode"`
-	Message    string `json:"message"`
+	Status       string `json:"status"`
+	StatusCode   int    `json:"statuscode"`
+	Message      string `json:"message"`
+	TotalItems   string `json:"totalitems"`
+	ItemsPerPage string `json:"itemsperpage"`
 }
 
 type OCSPayload struct {
@@ -47,6 +54,58 @@ type OCSPayload struct {
 
 type OCSResponse struct {
 	OCS *OCSPayload `json:"ocs"`
+}
+
+type JSONInt struct {
+	Value int
+	Valid bool
+	Set   bool
+}
+
+type JSONString struct {
+	Value string
+	Valid bool
+	Set   bool
+}
+
+func (i *JSONString) UnmarshalJSON(data []byte) error {
+	// If this method was called, the value was set.
+	i.Set = true
+
+	if string(data) == "null" {
+		// The key was set to null
+		i.Valid = false
+		return nil
+	}
+
+	// The key isn't set to null
+	var temp string
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	i.Value = temp
+	i.Valid = true
+	return nil
+}
+
+func (i *JSONInt) UnmarshalJSON(data []byte) error {
+	// If this method was called, the value was set.
+	i.Set = true
+
+	if string(data) == "null" {
+		// The key was set to null
+		i.Valid = false
+		return nil
+	}
+
+	// The key isn't set to null
+	var temp int
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	i.Value = temp
+	i.Valid = true
+	return nil
 }
 
 /*
@@ -99,6 +158,18 @@ type OCSShare struct {
 	Name                 string     `json:"name"`
 	URL                  string     `json:"url"`
 	State                ShareState `json:"state"`
+	Expiration           string     `json:"expiration,omitempty"`
+}
+
+type NewShareOCSRequest struct {
+	Path         string     `json:"path"`
+	Name         string     `json:"name"`
+	ShareType    ShareType  `json:"shareType"`
+	ShareWith    string     `json:"shareWith"`
+	PublicUpload bool       `json:"publicUpload"`
+	Password     JSONString `json:"password"`
+	Permissions  Permission `json:"permissions"`
+	ExpireDate   JSONString `json:"expireDate"`
 }
 
 type Options struct {
@@ -144,6 +215,14 @@ type proxy struct {
 	revaHost   string
 	grpcConn   *grpc.ClientConn
 	logger     *zap.Logger
+}
+
+func (p *proxy) getStorageClient() api.StorageClient {
+	return api.NewStorageClient(p.grpcConn)
+}
+
+func (p *proxy) getShareClient() api.ShareClient {
+	return api.NewShareClient(p.grpcConn)
 }
 
 func (p *proxy) getAuthClient() api.AuthClient {
@@ -251,14 +330,15 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 func (p *proxy) registerRoutes() {
 	// requests targeting a file/folder
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.createShare)).Methods("POST")
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
 
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
@@ -266,70 +346,430 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.acceptShare)).Methods("POST")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.rejectShare)).Methods("DELETE")
-
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
 }
 
-func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
-	sharedWithMe := r.URL.Query().Get("shared_with_me")
-	if sharedWithMe == "true" {
-		p.getReceivedShares(w, r)
+/*
+{
+   "ocs":{
+      "meta":{
+         "status":"ok",
+         "statuscode":100,
+         "message":"OK",
+         "totalitems":"",
+         "itemsperpage":""
+      },
+      "data":{
+         "exact":{
+            "users":[
+
+            ],
+            "groups":[
+
+            ],
+            "remotes":[
+
+            ]
+         },
+         "users":[
+            {
+               "label":"Hugo Gonzalez Labrador (gonzalhu)",
+               "value":{
+                  "shareType":0,
+                  "shareWith":"gonzalhu"
+               }
+            }
+         ],
+         "groups":[
+            {
+               "label":"cernbox-project-labradorprojecttest-admins",
+               "value":{
+                  "shareType":1,
+                  "shareWith":"cernbox-project-labradorprojecttest-admins"
+               }
+            },
+            {
+               "label":"cernbox-project-labradorprojecttest-writers",
+               "value":{
+                  "shareType":1,
+                  "shareWith":"cernbox-project-labradorprojecttest-writers"
+               }
+            },
+            {
+               "label":"cernbox-project-labradorprojecttest-readers",
+               "value":{
+                  "shareType":1,
+                  "shareWith":"cernbox-project-labradorprojecttest-readers"
+               }
+            }
+         ],
+         "remotes":[
+
+         ]
+      }
+   }
+}
+*/
+
+type OCSShareeData struct {
+	Exact   *OCSShareeExact   `json:"exact"`
+	Users   []*OCSShareeEntry `json:"users"`
+	Groups  []*OCSShareeEntry `json:"groups"`
+	Remotes []*OCSShareeEntry `json:"remotes"`
+}
+type OCSShareeExact struct {
+	Users   []*OCSShareeEntry `json:"users"`
+	Groups  []*OCSShareeEntry `json:"groups"`
+	Remotes []*OCSShareeEntry `json:"remotes"`
+}
+
+type OCSShareeEntry struct {
+	Label string               `json:"label"`
+	Value *OCSShareeEntryValue `json:"value"`
+}
+
+type OCSShareeEntryValue struct {
+	ShareType ShareType `json:"shareType"`
+	ShareWith string    `json:"shareWith"`
+}
+
+func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
+	entries := []*OCSShareeEntry{
+		&OCSShareeEntry{
+			Label: "labradorsvc",
+			Value: &OCSShareeEntryValue{ShareType: ShareTypeUser, ShareWith: "labradorsvc"},
+		},
+	}
+	exact := &OCSShareeExact{Users: []*OCSShareeEntry{}, Groups: []*OCSShareeEntry{}, Remotes: []*OCSShareeEntry{}}
+	data := &OCSShareeData{Exact: exact, Users: entries, Groups: []*OCSShareeEntry{}, Remotes: []*OCSShareeEntry{}}
+
+	meta := &ResponseMeta{Status: "ok", StatusCode: 100, Message: "OK"}
+	payload := &OCSPayload{Meta: meta, Data: data}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	path := r.URL.Query().Get("path")
-	w.Write([]byte(sharedWithMe))
-	w.Write([]byte(path))
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+
 }
 
-func (p *proxy) getReceivedShares(w http.ResponseWriter, r *http.Request) {
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-	shares := []*OCSShare{
-		&OCSShare{
-			ID:               "244",
-			Path:             "/A new Vespa.pdf",
-			Permissions:      PermissionRead,
-			MimeType:         "application/pdf",
-			ShareType:        ShareTypeUser,
-			DisplayNameOwner: "Labrador",
-			UIDOwner:         "labradorsvc",
-			ItemSource:       "home:1234",
-			FileSource:       "home:1234",
-			FileTarget:       "/A new Vespa.pdf",
-			State:            ShareStateAccepted,
-			ItemType:         ItemTypeFile,
-		},
-		&OCSShare{
-			ID:               "245",
-			Path:             "/Red trail",
-			Permissions:      PermissionRead,
-			MimeType:         "application/json",
-			ShareType:        ShareTypeGroup,
-			DisplayNameOwner: "cernbox-admins",
-			UIDOwner:         "lmascett",
-			ItemSource:       "home:1235",
-			FileSource:       "home:1235",
-			FileTarget:       "/Red trail",
-			State:            ShareStatePending,
-			ItemType:         ItemTypeFolder,
-		},
-		&OCSShare{
-			ID:               "246",
-			Path:             "/Bad stuff",
-			Permissions:      PermissionRead,
-			MimeType:         "httpd/unix-directory",
-			ShareType:        ShareTypeGroup,
-			DisplayNameOwner: "cernbox-admins",
-			UIDOwner:         "lmascett",
-			ItemSource:       "home:1236",
-			FileSource:       "home:1236",
-			FileTarget:       "/Bad stuff",
-			State:            ShareStateAccepted,
-			ItemType:         ItemTypeFolder,
-		},
+func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	newShare := &NewShareOCSRequest{}
+
+	if r.Header.Get("Content-Type") == "application/json" {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		err = json.Unmarshal(body, newShare)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else { // assume x-www-form-urlencoded
+		err := r.ParseForm()
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+
+		shareTypeString := r.Form.Get("shareType")
+		shareWith := r.Form.Get("shareWith")
+		permissionsString := r.Form.Get("permissions")
+		path := r.Form.Get("path")
+
+		var shareType ShareType
+		var permissions Permission
+		if shareTypeString == "0" {
+			shareType = ShareTypeUser
+		} else if shareTypeString == "1" {
+			shareType = ShareTypeGroup
+		}
+
+		perm, err := strconv.ParseInt(permissionsString, 10, 64)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		permissions = Permission(perm)
+
+		newShare.Path = path
+		newShare.ShareWith = shareWith
+		newShare.ShareType = shareType
+		newShare.Permissions = permissions
 	}
+
+	// get public link shares
+	gCtx := GetContextWithAuth(ctx)
+	var readOnly bool
+	if newShare.Permissions == PermissionRead {
+		readOnly = true
+	}
+
+	var expiration int64
+	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
+		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
+		if err != nil {
+			p.logger.Error("expire data format is not valid", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		expiration = t.Unix()
+	}
+
+	newLinkReq := &api.NewLinkReq{
+		Path:     newShare.Path,
+		ReadOnly: readOnly,
+		Password: newShare.Password.Value,
+		Expires:  uint64(expiration),
+	}
+	publicLinkRes, err := p.getShareClient().CreatePublicLink(gCtx, newLinkReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if publicLinkRes.Status != api.StatusCode_OK {
+		p.writeError(publicLinkRes.Status, w, r)
+		return
+	}
+
+	publicLink := publicLinkRes.PublicLink
+	ocsShare, err := p.publicLinkToOCSShare(ctx, publicLink)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	payload := &OCSPayload{Meta: meta, Data: ocsShare}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+}
+
+func (p *proxy) getRemoteShares(w http.ResponseWriter, r *http.Request) {
+	shares := []*OCSShare{}
+	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
+	payload := &OCSPayload{Meta: meta, Data: shares}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+
+}
+func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	path := r.URL.Query().Get("path")
+	sharedWithMe := r.URL.Query().Get("shared_with_me")
+
+	if sharedWithMe == "true" {
+		p.getReceivedShares(w, r, path)
+		return
+	}
+
+	// get public link shares
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getShareClient().ListPublicLinks(gCtx, &api.EmptyReq{})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	publicLinks := []*api.PublicLink{}
+	for {
+		plr, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if plr.Status != api.StatusCode_OK {
+			p.writeError(plr.Status, w, r)
+			return
+		}
+		publicLinks = append(publicLinks, plr.PublicLink)
+
+	}
+
+	ocsShares := []*OCSShare{}
+	for _, pl := range publicLinks {
+		ocsShare, err := p.publicLinkToOCSShare(ctx, pl)
+		if err != nil {
+			p.logger.Error("cannot convert public link to ocs share", zap.Error(err))
+			continue
+		}
+		fmt.Println(ocsShare)
+		ocsShares = append(ocsShares, ocsShare)
+	}
+
+	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	payload := &OCSPayload{Meta: meta, Data: ocsShares}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+}
+
+func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *api.PublicLink) (*OCSShare, error) {
+	// TODO(labkode): harden check
+	user, _ := api.ContextGetUser(ctx)
+	owner := user.AccountId
+	gCtx := GetContextWithAuth(ctx)
+
+	mdRes, err := p.getStorageClient().Inspect(gCtx, &api.PathReq{Path: pl.Path})
+	if err != nil {
+		return nil, err
+	}
+	if mdRes.Status != api.StatusCode_OK {
+		return nil, api.NewError(api.StorageNotFoundErrorCode).WithMessage(fmt.Sprintf("link points to non accesible path status:%d link:%+v", mdRes.Status, pl))
+	}
+
+	var itemType ItemType
+	if pl.ItemType == api.PublicLink_FOLDER {
+		itemType = ItemTypeFolder
+	} else {
+		itemType = ItemTypeFile
+	}
+
+	var mimeType string
+	if pl.ItemType == api.PublicLink_FOLDER {
+		mimeType = "httpd/unix-directory"
+	} else {
+		mimeType = mime.TypeByExtension(path.Ext(pl.Path))
+	}
+	var permissions Permission
+	if pl.ReadOnly {
+		permissions = PermissionRead
+	} else {
+		permissions = PermissionReadWrite
+	}
+
+	var shareWith string
+	if pl.Protected {
+		shareWith = "X"
+	}
+
+	var expiration string
+	if pl.Expires > 0 {
+		t := time.Unix(int64(pl.Expires), 0)
+		expiration = t.Format("2006-01-02 03:04:05")
+	}
+
+	ocsShare := &OCSShare{
+		ShareType:            ShareTypePublicLink,
+		ID:                   pl.Id,
+		Token:                pl.Token,
+		DisplayNameFileOwner: owner,
+		DisplayNameOwner:     owner,
+		FileSource:           pl.Path,
+		FileTarget:           pl.Path,
+		ItemSource:           pl.Path,
+		ItemType:             itemType,
+		MimeType:             mimeType,
+		Name:                 pl.Token,
+		Path:                 mdRes.Metadata.Path,
+		Permissions:          permissions,
+		ShareTime:            int(pl.Mtime),
+		State:                ShareStateAccepted,
+		UIDFileOwner:         owner,
+		UIDOwner:             owner,
+		ShareWith:            shareWith,
+		ShareWithDisplayName: shareWith,
+		Expiration:           expiration,
+	}
+	return ocsShare, nil
+}
+
+func (p *proxy) getReceivedShares(w http.ResponseWriter, r *http.Request, path string) {
+	shares := []*OCSShare{}
+	if path == "" {
+		shares = []*OCSShare{
+			&OCSShare{
+				ID:               "244",
+				Path:             "/A new Vespa.pdf",
+				Permissions:      PermissionRead,
+				MimeType:         "application/pdf",
+				ShareType:        ShareTypeUser,
+				DisplayNameOwner: "Labrador",
+				UIDOwner:         "labradorsvc",
+				ItemSource:       "home:1234",
+				FileSource:       "home:1234",
+				FileTarget:       "/A new Vespa.pdf",
+				State:            ShareStateAccepted,
+				ItemType:         ItemTypeFile,
+			},
+			&OCSShare{
+				ID:               "245",
+				Path:             "/Red trail",
+				Permissions:      PermissionRead,
+				MimeType:         "application/json",
+				ShareType:        ShareTypeGroup,
+				DisplayNameOwner: "cernbox-admins",
+				UIDOwner:         "lmascett",
+				ItemSource:       "home:1235",
+				FileSource:       "home:1235",
+				FileTarget:       "/Red trail",
+				State:            ShareStatePending,
+				ItemType:         ItemTypeFolder,
+			},
+			&OCSShare{
+				ID:               "246",
+				Path:             "/Bad stuff",
+				Permissions:      PermissionRead,
+				MimeType:         "httpd/unix-directory",
+				ShareType:        ShareTypeGroup,
+				DisplayNameOwner: "cernbox-admins",
+				UIDOwner:         "lmascett",
+				ItemSource:       "home:1236",
+				FileSource:       "home:1236",
+				FileTarget:       "/Bad stuff",
+				State:            ShareStateAccepted,
+				ItemType:         ItemTypeFolder,
+			},
+		}
+	}
+	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
 	payload := &OCSPayload{Meta: meta, Data: shares}
 	ocsRes := &OCSResponse{OCS: payload}
 	encoded, err := json.Marshal(ocsRes)
@@ -347,13 +787,109 @@ func (p *proxy) getShare(w http.ResponseWriter, r *http.Request) {
 	sharedWithMe := r.Header.Get("shared_with_me")
 	w.Write([]byte(sharedWithMe))
 }
+
 func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
-	sharedWithMe := r.Header.Get("shared_with_me")
-	w.Write([]byte(sharedWithMe))
+	ctx := r.Context()
+	gCtx := GetContextWithAuth(ctx)
+	shareID := mux.Vars(r)["share_id"]
+	res, err := p.getShareClient().RevokePublicLink(gCtx, &api.ShareIDReq{Id: shareID})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.Status != api.StatusCode_OK {
+		p.writeError(res.Status, w, r)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
+
 func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
-	sharedWithMe := r.Header.Get("shared_with_me")
-	w.Write([]byte(sharedWithMe))
+	ctx := r.Context()
+	shareID := mux.Vars(r)["share_id"]
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	newShare := &NewShareOCSRequest{}
+	err = json.Unmarshal(body, newShare)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	updateExpiration := false
+	updatePassword := false
+	var expiration int64
+	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
+		updateExpiration = true
+		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
+		if err != nil {
+			p.logger.Error("expire data format is not valid", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		expiration = t.Unix()
+	}
+
+	if newShare.Password.Set {
+		updatePassword = true
+	}
+
+	var readOnly bool
+	if newShare.Permissions == PermissionRead {
+		readOnly = true
+	}
+
+	updateLinkReq := &api.UpdateLinkReq{
+		UpdateExpiration: updateExpiration,
+		UpdatePassword:   updatePassword,
+		UpdateReadOnly:   true,
+		ReadOnly:         readOnly,
+		Password:         newShare.Password.Value,
+		Expiration:       uint64(expiration),
+		Id:               shareID,
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	publicLinkRes, err := p.getShareClient().UpdatePublicLink(gCtx, updateLinkReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if publicLinkRes.Status != api.StatusCode_OK {
+		p.writeError(publicLinkRes.Status, w, r)
+		return
+	}
+
+	publicLink := publicLinkRes.PublicLink
+	ocsShare, err := p.publicLinkToOCSShare(ctx, publicLink)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	payload := &OCSPayload{Meta: meta, Data: ocsShare}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
 }
 
 func (p *proxy) acceptShare(w http.ResponseWriter, r *http.Request) {

@@ -103,8 +103,8 @@ type PublicLinkOptions struct {
 
 type PublicLinkManager interface {
 	CreatePublicLink(ctx context.Context, path string, opt *PublicLinkOptions) (*PublicLink, error)
-	UpdatePublicLink(ctx context.Context, token string, opt *PublicLinkOptions) (*PublicLink, error)
-	InspectPublicLink(ctx context.Context, token string) (*PublicLink, error)
+	UpdatePublicLink(ctx context.Context, id string, opt *PublicLinkOptions) (*PublicLink, error)
+	InspectPublicLink(ctx context.Context, id string) (*PublicLink, error)
 	ListPublicLinks(ctx context.Context) ([]*PublicLink, error)
 	RevokePublicLink(ctx context.Context, token string) error
 }

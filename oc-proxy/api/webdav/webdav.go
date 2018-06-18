@@ -209,30 +209,30 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
 
 	// user prefixed webdav routes
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
 
 	// user-relative routes
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
 }
 
 func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
@@ -539,8 +539,8 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// remove api base and service base to get real path
-	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/remote.php/dav/files/"
-	toTrim := "/remote.php/dav/files/"
+	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/cernbox/remote.php/dav/files/"
+	toTrim := "/cernbox/remote.php/dav/files/"
 	destination = path.Join("/", path.Clean(strings.TrimPrefix(destinationURL.Path, toTrim)))
 
 	gCtx := GetContextWithAuth(ctx)
@@ -1385,9 +1385,9 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 
 	// TODO(labkode): harden check for user
 	user, _ := api.ContextGetUser(ctx)
-	response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+	response.Href = path.Join("/cernbox/remote.php/dav/files", user.AccountId, md.Path)
 	if md.IsDir {
-		response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path) + "/"
+		response.Href = path.Join("/cernbox/remote.php/dav/files", user.AccountId, md.Path) + "/"
 	}
 
 	response.Propstat = propStatList

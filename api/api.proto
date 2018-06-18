@@ -122,6 +122,7 @@ message Metadata {
   string etag = 6;
   string checksum = 7;
   string deref_path = 8;
+  bytes sys = 9; // sys is for storing arbitrary data
 }
 
 message PathReq {

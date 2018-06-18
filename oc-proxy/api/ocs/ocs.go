@@ -1,8 +1,11 @@
 package ocs
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/cernbox/reva/api"
 	"github.com/gorilla/mux"
@@ -14,6 +17,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -329,28 +333,32 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 
 func (p *proxy) registerRoutes() {
 	// requests targeting a file/folder
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.createShare)).Methods("POST")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.createShare)).Methods("POST")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
 
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.acceptShare)).Methods("POST")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.rejectShare)).Methods("DELETE")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.acceptShare)).Methods("POST")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.rejectShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
+
+	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/loadfile", p.basicAuth(p.loadFile)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.basicAuth(p.saveFile)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.basicAuth(p.downloadArchive)).Methods("GET")
 }
 
 /*
@@ -435,6 +443,433 @@ type OCSShareeEntry struct {
 type OCSShareeEntryValue struct {
 	ShareType ShareType `json:"shareType"`
 	ShareWith string    `json:"shareWith"`
+}
+
+type LoadFileResponse struct {
+	FileContents string `json:"filecontents"`
+	Writable     bool   `json:"writeable"`
+	Mime         string `json:"mime"`
+	MTime        int    `json:"mtime"`
+}
+
+type SaveFileResponse struct {
+	Size  int `json:"size"`
+	Mtime int `json:"mtime"`
+}
+
+type WalkFunc func(path string, md *api.Metadata, err error) error
+
+var SkipDir = errors.New("skip this directory")
+
+func (p *proxy) Walk(ctx context.Context, root string, walkFn WalkFunc) error {
+	md, err := p.getMetadata(ctx, root)
+	if err != nil {
+		err = walkFn(root, nil, err)
+	} else {
+		err = p.walkRecursive(ctx, root, md, walkFn)
+	}
+
+	if err == SkipDir {
+		return nil
+	}
+	return err
+}
+
+// readDirNames reads the directory named by dirname and returns
+// a sorted list of directory entries.
+func (p *proxy) readDirNames(ctx context.Context, dirname string) ([]string, error) {
+	names := []string{}
+
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getStorageClient().ListFolder(gCtx, &api.PathReq{Path: dirname})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		return names, err
+	}
+
+	for {
+		mdRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			return names, err
+		}
+		if mdRes.Status != api.StatusCode_OK {
+			p.logger.Error("", zap.Int("status", int(mdRes.Status)))
+			return names, err
+		}
+		names = append(names, mdRes.Metadata.Path)
+	}
+
+	sort.Strings(names)
+	return names, nil
+}
+
+// walk recursively descends path, calling walkFn.
+func (p *proxy) walkRecursive(ctx context.Context, path string, md *api.Metadata, walkFn WalkFunc) error {
+	if !md.IsDir {
+		return walkFn(path, md, nil)
+	}
+
+	names, err := p.readDirNames(ctx, path)
+	err1 := walkFn(path, md, err)
+	// If err != nil, walk can't walk into this directory.
+	// err1 != nil means walkFn want walk to skip this directory or stop walking.
+	// Therefore, if one of err and err1 isn't nil, walk will return.
+	if err != nil || err1 != nil {
+		// The caller's behavior is controlled by the return value, which is decided
+		// by walkFn. walkFn may ignore err and return nil.
+		// If walkFn returns SkipDir, it will be handled by the caller.
+		// So walk should return whatever walkFn returns.
+		return err1
+	}
+
+	for _, filename := range names {
+		//filename := Join(path, name)
+
+		//fileInfo, err := lstat(filename)
+		md, err := p.getMetadata(ctx, filename)
+		if err != nil {
+			if err := walkFn(filename, md, err); err != nil && err != SkipDir {
+				return err
+			}
+		} else {
+			err = p.walkRecursive(ctx, filename, md, walkFn)
+			if err != nil {
+				if !md.IsDir || err != SkipDir {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (p *proxy) getMetadata(ctx context.Context, path string) (*api.Metadata, error) {
+	gCtx := GetContextWithAuth(ctx)
+	mdRes, err := p.getStorageClient().Inspect(gCtx, &api.PathReq{Path: path})
+	if err != nil {
+		p.logger.Error("", zap.Error(err), zap.String("path", path))
+		return nil, err
+	}
+	if mdRes.Status != api.StatusCode_OK {
+		p.logger.Error("", zap.Int("status", int(mdRes.Status)), zap.String("path", path))
+		// TODO(labkode): set better error code
+		return nil, api.NewError(api.StorageNotSupportedErrorCode).WithMessage(fmt.Sprintf("status: %d", mdRes.Status))
+	}
+	return mdRes.Metadata, nil
+}
+
+/*
+GET http://labradorbox.cern.ch/cernbox/index.php/apps/files/ajax/download.php?dir=/&files[]=welcome.txt&files[]=signed contract.pdf&files[]=peter.txt&downloadStartSecret=k9ubkisonib HTTP/1.1
+Creates a TAR archive
+*/
+func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	dir := r.URL.Query().Get("dir")
+	files := []string{}
+	if r.URL.Query().Get("files") != "" {
+		fullPath := path.Join(dir, r.URL.Query().Get("files"))
+		files = append(files, fullPath)
+	} else {
+		fileList := r.URL.Query()["files[]"]
+		for _, fn := range fileList {
+			fullPath := path.Join(dir, fn)
+			files = append(files, fullPath)
+
+		}
+	}
+
+	// TODO(labkode): add request ID to the archive name so we can trace back archive.
+	archiveName := "download.tar"
+	if len(files) == 1 {
+		archiveName = path.Base(files[0]) + ".tar"
+	}
+
+	p.logger.Debug("archive name: " + archiveName)
+
+	// TODO(labkode): check for size because once the data is being written to the client we cannot override the headers.
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", archiveName))
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.WriteHeader(http.StatusOK)
+
+	gCtx := GetContextWithAuth(ctx)
+
+	tw := tar.NewWriter(w)
+	defer tw.Close()
+	for _, fn := range files {
+		err := p.Walk(ctx, fn, func(path string, md *api.Metadata, err error) error {
+			if err != nil {
+				return err
+			}
+
+			p.logger.Debug("walking", zap.String("filename", path))
+			hdr := &tar.Header{
+				Name:    md.Path,
+				Mode:    0600,
+				Size:    int64(md.Size),
+				ModTime: time.Unix(int64(md.Mtime), 0),
+			}
+
+			if md.IsDir {
+				hdr.Typeflag = tar.TypeDir
+				hdr.Mode = 0755
+			}
+
+			if err := tw.WriteHeader(hdr); err != nil {
+				p.logger.Error("", zap.Error(err), zap.String("fn", fn))
+				return err
+			}
+
+			// if file, write file contents into the tar archive
+			if !md.IsDir {
+
+				stream, err := p.getStorageClient().ReadFile(gCtx, &api.PathReq{Path: md.Path})
+				if err != nil {
+					p.logger.Error("", zap.Error(err))
+					return err
+				}
+
+				for {
+					dcRes, err := stream.Recv()
+					if err == io.EOF {
+						return nil
+					}
+					if err != nil {
+						p.logger.Error("", zap.Error(err))
+						return err
+					}
+					if dcRes.Status != api.StatusCode_OK {
+						p.logger.Error("", zap.Int("status", int(dcRes.Status)))
+						return api.NewError(api.StorageNotSupportedErrorCode)
+					}
+
+					dc := dcRes.DataChunk
+
+					if dc != nil {
+						if dc.Length > 0 {
+							if _, err := tw.Write(dc.Data); err != nil {
+								p.logger.Error("", zap.Error(err))
+								return err
+							}
+						}
+					}
+				}
+
+			} else {
+				return nil
+
+			}
+		})
+
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+		}
+	}
+
+}
+
+/* This is x-www-form-urlencoded request
+
+filecontents: Welcome to your ownCloud account!
+path: /welcome.txt
+mtime: 1528881571
+
+*/
+func (p *proxy) saveFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	fileContents := r.Form.Get("filecontents")
+	//mtime := r.Form.Get("mtime")
+	path := r.Form.Get("path")
+
+	md, err := p.getMetadata(ctx, path)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// TODO(labkode): check that sent mtime is bigger than stored one, else means a conflict and we do not override :)
+
+	gCtx := GetContextWithAuth(ctx)
+	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &api.EmptyReq{})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if txInfoRes.Status != api.StatusCode_OK {
+		p.writeError(txInfoRes.Status, w, r)
+		return
+	}
+
+	txInfo := txInfoRes.TxInfo
+
+	stream, err := p.getStorageClient().WriteChunk(gCtx)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// TODO(labkode); adjust buffer size to maximun opening file fize
+	buffer := make([]byte, 1024*1024*3)
+	offset := uint64(0)
+	numChunks := uint64(0)
+
+	reader := bytes.NewReader([]byte(fileContents))
+	for {
+		n, err := reader.Read(buffer)
+		if n > 0 {
+			dc := &api.TxChunk{
+				TxId:   txInfo.TxId,
+				Length: uint64(n),
+				Data:   buffer,
+				Offset: offset,
+			}
+			if err := stream.Send(dc); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			numChunks++
+			offset += uint64(n)
+
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writeSummaryRes, err := stream.CloseAndRecv()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if writeSummaryRes.Status != api.StatusCode_OK {
+		p.writeError(writeSummaryRes.Status, w, r)
+		return
+	}
+
+	// all the chunks have been sent, we need to close the tx
+	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &api.TxEnd{Path: path, TxId: txInfo.TxId})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if emptyRes.Status != api.StatusCode_OK {
+		p.writeError(emptyRes.Status, w, r)
+		return
+	}
+
+	md, err = p.getMetadata(ctx, path)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res := &SaveFileResponse{Mtime: int(md.Mtime), Size: int(md.Size)}
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+}
+
+/*
+{"filecontents":"","writeable":true,"mime":"text\/plain","mtime":1528905319}
+*/
+func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	dir := r.URL.Query().Get("dir")
+	filename := r.URL.Query().Get("filename")
+	fullPath := path.Join(dir, filename)
+
+	md, err := p.getMetadata(ctx, fullPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	pathReq := &api.PathReq{Path: fullPath}
+
+	stream, err := p.getStorageClient().ReadFile(gCtx, pathReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// TODO(labkode): stop loading huge files, set max to 1mib?
+
+	fileContents := []byte{}
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				fileContents = append(fileContents, dc.Data...)
+			}
+		}
+	}
+
+	// TODO(labkode): specify permission at the metadta response
+	mime := p.detectMimeType(fullPath)
+	res := &LoadFileResponse{
+		FileContents: string(fileContents),
+		MTime:        int(md.Mtime),
+		Mime:         mime,
+		Writable:     true,
+	}
+
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
 }
 
 func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
@@ -655,14 +1090,10 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *api.PublicLink) (*
 	// TODO(labkode): harden check
 	user, _ := api.ContextGetUser(ctx)
 	owner := user.AccountId
-	gCtx := GetContextWithAuth(ctx)
 
-	mdRes, err := p.getStorageClient().Inspect(gCtx, &api.PathReq{Path: pl.Path})
+	md, err := p.getMetadata(ctx, pl.Path)
 	if err != nil {
 		return nil, err
-	}
-	if mdRes.Status != api.StatusCode_OK {
-		return nil, api.NewError(api.StorageNotFoundErrorCode).WithMessage(fmt.Sprintf("link points to non accesible path status:%d link:%+v", mdRes.Status, pl))
 	}
 
 	var itemType ItemType
@@ -708,7 +1139,7 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *api.PublicLink) (*
 		ItemType:             itemType,
 		MimeType:             mimeType,
 		Name:                 pl.Token,
-		Path:                 mdRes.Metadata.Path,
+		Path:                 md.Path,
 		Permissions:          permissions,
 		ShareTime:            int(pl.Mtime),
 		State:                ShareStateAccepted,
@@ -927,4 +1358,9 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 	token, _ := api.ContextGetAccessToken(ctx)
 	header := metadata.New(map[string]string{"authorization": "bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)
+}
+
+func (p *proxy) detectMimeType(pa string) string {
+	ext := path.Ext(pa)
+	return mime.TypeByExtension(ext)
 }

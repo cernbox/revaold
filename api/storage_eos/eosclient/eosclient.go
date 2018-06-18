@@ -470,9 +470,9 @@ func mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 }
 
 type FileInfo struct {
-	File     string
-	Inode    uint64
-	FID      uint64
+	File     string `json:"eos_file"`
+	Inode    uint64 `json:"inode"`
+	FID      uint64 `json:"fid"`
 	ETag     string
 	TreeSize uint64
 	MTime    uint64

@@ -123,6 +123,10 @@ message Metadata {
   string checksum = 7;
   string deref_path = 8;
   bytes sys = 9; // sys is for storing arbitrary data
+
+  // EOS filesytem extended metadata records
+  string eos_file = 10;
+  string eos_instance = 11;
 }
 
 message PathReq {

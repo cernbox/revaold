@@ -540,7 +540,7 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 
 	// remove api base and service base to get real path
 	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/cernbox/remote.php/dav/files/"
-	toTrim := "/cernbox/remote.php/dav/files/"
+	toTrim := "/cernbox/remote.php/dav/files/gonzalhu/"
 	destination = path.Join("/", path.Clean(strings.TrimPrefix(destinationURL.Path, toTrim)))
 
 	gCtx := GetContextWithAuth(ctx)

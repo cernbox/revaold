@@ -358,7 +358,10 @@ func (p *proxy) registerRoutes() {
 
 	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/loadfile", p.basicAuth(p.loadFile)).Methods("GET")
 	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.basicAuth(p.saveFile)).Methods("PUT")
+
 	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.basicAuth(p.downloadArchive)).Methods("GET")
+
+	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.basicAuth(p.getEOSInfo)).Methods("POST")
 }
 
 /*
@@ -669,6 +672,46 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 			p.logger.Error("", zap.Error(err))
 		}
 	}
+
+}
+
+/*
+{
+   "eos-instance":"root:\/\/eosuser-internal.cern.ch",
+   "eos-file":"\/eos\/user\/g\/gonzalhu\/University"
+}
+*/
+func (p *proxy) getEOSInfo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	path := r.Form.Get("path")
+	md, err := p.getMetadata(ctx, path)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	data := &struct {
+		EosInstance string `json:"eos-instance"`
+		EosFile     string `json:"eos-file"`
+	}{EosInstance: md.EosInstance, EosFile: md.EosFile}
+
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
 
 }
 

@@ -128,7 +128,7 @@ func (c *Client) GetFileInfoByInode(ctx context.Context, username string, inode 
 	if err != nil {
 		return nil, err
 	}
-	return parseFileInfo(stdout)
+	return c.parseFileInfo(stdout)
 }
 
 // GetFileInfoByPath returns the FilInfo at the given path
@@ -142,7 +142,7 @@ func (c *Client) GetFileInfoByPath(ctx context.Context, username, path string) (
 	if err != nil {
 		return nil, err
 	}
-	return parseFileInfo(stdout)
+	return c.parseFileInfo(stdout)
 }
 
 // CreateDir creates a directory at the given path
@@ -190,7 +190,7 @@ func (c *Client) List(ctx context.Context, username, path string) ([]*FileInfo, 
 	if err != nil {
 		return nil, err
 	}
-	return parseFind(path, stdout)
+	return c.parseFind(path, stdout)
 }
 
 // Read reads a file from the mgm
@@ -358,14 +358,14 @@ func getMap(partsBySpace []string) map[string]string {
 	return kv
 }
 
-func parseFind(dirPath, raw string) ([]*FileInfo, error) {
+func (c *Client) parseFind(dirPath, raw string) ([]*FileInfo, error) {
 	finfos := []*FileInfo{}
 	rawLines := strings.Split(raw, "\n")
 	for _, rl := range rawLines {
 		if rl == "" {
 			continue
 		}
-		fi, err := parseFileInfo(rl)
+		fi, err := c.parseFileInfo(rl)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +380,7 @@ func parseFind(dirPath, raw string) ([]*FileInfo, error) {
 	return finfos, nil
 }
 
-func parseFileInfo(raw string) (*FileInfo, error) {
+func (c *Client) parseFileInfo(raw string) (*FileInfo, error) {
 	kv := make(map[string]string)
 	partsBySpace := strings.Split(raw, " ") // we have [keylength.file=14 file=/eos/pps/proc/ container=3 ...}
 	var previousXAttr = ""
@@ -408,7 +408,7 @@ func parseFileInfo(raw string) (*FileInfo, error) {
 	startIndex := int64(14) + int64(len(fileLength)) + 7
 	kv["file"] = raw[startIndex : startIndex+fileLengthInt64]
 
-	fi, err := mapToFileInfo(kv)
+	fi, err := c.mapToFileInfo(kv)
 	if err != nil {
 		return nil, err
 	}
@@ -418,7 +418,7 @@ func parseFileInfo(raw string) (*FileInfo, error) {
 // mapToFileInfo converts the dictionary to an usable structure.
 // The kv has format:
 // map[sys.forced.space:default files:0 mode:42555 ino:5 sys.forced.blocksize:4k sys.forced.layout:replica uid:0 fid:5 sys.forced.blockchecksum:crc32c sys.recycle:/eos/backup/proc/recycle/ fxid:00000005 pid:1 etag:5:0.000 keylength.file:4 file:/eos treesize:1931593933849913 container:3 gid:0 mtime:1498571294.108614409 ctime:1460121992.294326762 pxid:00000001 sys.forced.checksum:adler sys.forced.nstripes:2]
-func mapToFileInfo(kv map[string]string) (*FileInfo, error) {
+func (c *Client) mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 	inode, err := strconv.ParseUint(kv["ino"], 10, 64)
 	if err != nil {
 		return nil, err
@@ -465,6 +465,7 @@ func mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 		TreeSize: treeSize,
 		MTime:    mtime,
 		IsDir:    isDir,
+		Instance: c.opt.URL,
 	}
 	return fi, nil
 }
@@ -478,6 +479,7 @@ type FileInfo struct {
 	MTime    uint64
 	Size     uint64
 	IsDir    bool
+	Instance string
 }
 
 type DeletedEntry struct {

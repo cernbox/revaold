@@ -335,5 +335,7 @@ func (fs *eosStorage) convertToMetadata(eosFileInfo *eosclient.FileInfo) *api.Me
 	} else {
 		finfo.Size = eosFileInfo.Size
 	}
+	finfo.EosFile = eosFileInfo.File
+	finfo.EosInstance = eosFileInfo.Instance
 	return finfo
 }

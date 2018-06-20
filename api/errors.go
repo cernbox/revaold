@@ -34,6 +34,8 @@ const (
 	UserNotFoundErrorCode ErrorCode = "USER_NOT_FOUND"
 
 	TokenInvalidErrorCode ErrorCode = "TOKEN_INVALID"
+
+	UnknownError ErrorCode = "UNKNOWN"
 )
 
 func NewError(code ErrorCode) AppError {

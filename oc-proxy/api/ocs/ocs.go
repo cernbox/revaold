@@ -19,6 +19,7 @@ import (
 	"path"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -362,6 +363,9 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.basicAuth(p.downloadArchive)).Methods("GET")
 
 	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.basicAuth(p.getEOSInfo)).Methods("POST")
+
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.basicAuth(p.listTrashbin)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.basicAuth(p.restoreTrashbin)).Methods("POST")
 }
 
 /*
@@ -715,6 +719,311 @@ func (p *proxy) getEOSInfo(w http.ResponseWriter, r *http.Request) {
 
 }
 
+/*
+{
+   "data":{
+      "permissions":0,
+      "directory":"\/",
+      "files":[
+         {
+            "eos.recycle":"ls",
+            "eos.recycle-bin":"\/eos\/uat\/proc\/recycle\/",
+            "eos.uid":"gonzalhu",
+            "eos.gid":"it",
+            "eos.size":"0",
+            "eos.deletion-time":1529487461000,
+            "eos.type":"recursive-dir",
+            "eos.keylength.restore-path":"72",
+            "eos.restore-path":"\/eos\/scratch\/user\/g\/gonzalhu\/Images\/Ourense\/Pozas\/Ceo\/.sys.v#.hello.txt\/",
+            "eos.restore-key":"00000000005d2688",
+            "path":"files\/Images\/Ourense\/Pozas\/Ceo\/.sys.v#.hello.txt",
+            "name":".sys.v#.hello.txt",
+            "mtime":1529487461000,
+            "id":0,
+            "permissions":1,
+            "mimetype":"httpd\/unix-directory"
+         },
+         {
+            "eos.recycle":"ls",
+            "eos.recycle-bin":"\/eos\/uat\/proc\/recycle\/",
+            "eos.uid":"gonzalhu",
+            "eos.gid":"it",
+            "eos.size":"283115530",
+            "eos.deletion-time":1529487461000,
+            "eos.type":"recursive-dir",
+            "eos.keylength.restore-path":"35",
+            "eos.restore-path":"\/eos\/scratch\/user\/g\/gonzalhu\/Images",
+            "eos.restore-key":"00000000005d1432",
+            "path":"files\/Images",
+            "name":"Images",
+            "mtime":1529487461000,
+            "id":1,
+            "permissions":1,
+            "mimetype":"httpd\/unix-directory"
+         }
+      ]
+   },
+   "status":"success"
+}
+*/
+type trashbinEntry struct {
+	EosRestoreKey  string `json:"eos.restore-key"`
+	EosRestorePath string `json:"eos.restore-path"`
+	ID             string `json:"id"`
+	Mimetype       string `json:"mimetype"`
+	Mtime          int    `json:"mtime"`
+	Name           string `json:"name"`
+	Path           string `json:"path"`
+	Permissions    int    `json:"permissions"`
+	Size           int    `json:"size"`
+}
+
+type listTrashbinRes struct {
+	Data   *listTrashbinData `json:"data"`
+	Status string            `json:"status"`
+}
+
+type listTrashbinData struct {
+	Directory   string           `json:"directory"`
+	Files       []*trashbinEntry `json:"files"`
+	Permissions int              `json:"permissions"`
+}
+
+func (p *proxy) listTrashbin(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &api.PathReq{Path: "/"})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	entries := []*api.RecycleEntry{}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if res.Status != api.StatusCode_OK {
+			err := api.NewError(api.UnknownError)
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		entries = append(entries, res.RecycleEntry)
+	}
+
+	trashbinEntries := []*trashbinEntry{}
+	for _, e := range entries {
+		te := &trashbinEntry{
+			ID:          e.RestoreKey,
+			Path:        e.RestorePath,
+			Permissions: 0,
+			Name:        path.Base(e.RestorePath),
+			Mimetype:    p.detectMimeType(e.IsDir, e.RestorePath),
+			Mtime:       int(e.DelMtime) * 1000, // oc expects 13 digit
+			Size:        int(e.Size),
+			// TODO(labkode): refactor trashbin app to not rely on these attributes.
+			EosRestoreKey:  e.RestoreKey,
+			EosRestorePath: e.RestorePath,
+		}
+		trashbinEntries = append(trashbinEntries, te)
+	}
+
+	payload := &listTrashbinRes{
+		Status: "success",
+		Data:   &listTrashbinData{Directory: "/", Files: trashbinEntries, Permissions: 0},
+	}
+
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+
+}
+
+func (p *proxy) restoreTrashbin(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	restoreAllFiles := r.Form.Get("allfiles") == "true"
+	if restoreAllFiles {
+		p.restoreAllFiles(w, r)
+		return
+	}
+
+	/*
+		files is this string, not a real array, so we can treat it as json and marshal into struct
+		["Questions.md.home:0000000004bc4f35","Desktop.home:00000000005d3118"]
+	*/
+	filesAsString := r.Form.Get("files")
+	files := []string{}
+	err = json.Unmarshal([]byte(filesAsString), &files)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now().Unix()
+	restoredEntries := []*restoredEntry{}
+	failedEntries := []*restoredEntry{}
+	for _, f := range files {
+		tokens := strings.Split(f, ".")
+		// the token after the last . is the restore key
+		if len(tokens) == 0 {
+			err := api.NewError(api.UnknownError).WithMessage(fmt.Sprintf("restore key is invalid. tokens: %+v", tokens))
+			p.logger.Error("", zap.Error(err))
+			failedEntries = append(failedEntries, &restoredEntry{Filename: f, Timestamp: now})
+			continue
+
+		} else {
+			restoreKey := tokens[len(tokens)-1]
+			if err := p.restoreRecycleEntry(ctx, restoreKey); err != nil {
+				p.logger.Error("", zap.Error(err))
+				failedEntries = append(failedEntries, &restoredEntry{Filename: f, Timestamp: now})
+				continue
+			} else {
+				restoredEntries = append(restoredEntries, &restoredEntry{Filename: f, Timestamp: now})
+			}
+
+		}
+	}
+
+	res := &restoreResponse{Status: "success", Data: &restoreData{Success: restoredEntries}}
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+
+}
+
+func (p *proxy) getRecycleEntries(ctx context.Context) ([]*api.RecycleEntry, error) {
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &api.PathReq{Path: "/"})
+	if err != nil {
+		return nil, err
+	}
+
+	entries := []*api.RecycleEntry{}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Status != api.StatusCode_OK {
+			err := api.NewError(api.UnknownError)
+			return nil, err
+		}
+		entries = append(entries, res.RecycleEntry)
+	}
+	return entries, nil
+}
+
+/*
+{
+  "data": {
+    "success": [
+      {
+        "filename": "gantt.png.00000000620dbf7b",
+        "timestamp": 1529498980
+      }
+    ]
+  },
+  "status": "success"
+*/
+type restoreResponse struct {
+	Status string       `json:"status"`
+	Data   *restoreData `json:"data"`
+}
+
+type restoreData struct {
+	Success []*restoredEntry `json:"success"`
+}
+
+type restoredEntry struct {
+	Filename  string `json:"filename"`
+	Timestamp int64  `json:"timestamp"`
+}
+
+func (p *proxy) restoreAllFiles(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	entries, err := p.getRecycleEntries(ctx)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now().Unix()
+	restoredEntries := []*restoredEntry{}
+	failedEntries := []*restoredEntry{}
+	for _, e := range entries {
+		entry := &restoredEntry{Filename: e.RestorePath, Timestamp: now}
+		err := p.restoreRecycleEntry(ctx, e.RestoreKey)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			// dont' abort request and restore as many files as we can
+			failedEntries = append(failedEntries, entry)
+			continue
+		}
+		restoredEntries = append(restoredEntries, entry)
+	}
+
+	res := &restoreResponse{Status: "success", Data: &restoreData{Success: restoredEntries}}
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+}
+
+func (p *proxy) restoreRecycleEntry(ctx context.Context, restoreKey string) error {
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getStorageClient().RestoreRecycleEntry(gCtx, &api.RecycleEntryReq{RestoreKey: restoreKey})
+	if err != nil {
+		return err
+	}
+
+	if res.Status != api.StatusCode_OK {
+		return api.NewError(api.UnknownError).WithMessage(fmt.Sprintf("status: %d", res.Status))
+
+	}
+	return nil
+}
+
 /* This is x-www-form-urlencoded request
 
 filecontents: Welcome to your ownCloud account!
@@ -895,8 +1204,8 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// TODO(labkode): specify permission at the metadta response
-	mime := p.detectMimeType(fullPath)
+	// TODO(labkode): specify permission at the metadata response
+	mime := p.detectMimeType(md.IsDir, fullPath)
 	res := &LoadFileResponse{
 		FileContents: string(fileContents),
 		MTime:        int(md.Mtime),
@@ -1403,7 +1712,10 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 	return metadata.NewOutgoingContext(context.Background(), header)
 }
 
-func (p *proxy) detectMimeType(pa string) string {
+func (p *proxy) detectMimeType(isDir bool, pa string) string {
+	if isDir {
+		return "httpd/unix-directory"
+	}
 	ext := path.Ext(pa)
 	return mime.TypeByExtension(ext)
 }

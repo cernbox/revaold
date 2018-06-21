@@ -137,8 +137,8 @@ var UpdatePublicLinkCommand = cli.Command{
 }
 
 func inspectPublicLink(c *cli.Context) error {
-	token := c.Args().First()
-	if token == "" {
+	id := c.Args().First()
+	if id == "" {
 		return cli.NewExitError(c.Command.ArgsUsage, 1)
 	}
 
@@ -147,7 +147,7 @@ func inspectPublicLink(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	req := &api.TokenReq{Token: token}
+	req := &api.ShareIDReq{Id: id}
 	ctx := util.GetContextWithAuth()
 	linkRes, err := client.InspectPublicLink(ctx, req)
 	if err != nil {
@@ -205,8 +205,8 @@ func createPublicLink(c *cli.Context) error {
 }
 
 func revokePublicLink(c *cli.Context) error {
-	token := c.Args().First()
-	if token == "" {
+	id := c.Args().First()
+	if id == "" {
 		return cli.NewExitError(c.Command.ArgsUsage, 1)
 	}
 
@@ -216,7 +216,7 @@ func revokePublicLink(c *cli.Context) error {
 	}
 
 	ctx := util.GetContextWithAuth()
-	_, err = client.RevokePublicLink(ctx, &api.TokenReq{Token: token})
+	_, err = client.RevokePublicLink(ctx, &api.ShareIDReq{Id: id})
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -256,8 +256,8 @@ func listPublicLinks(c *cli.Context) error {
 }
 
 func updatePublicLink(c *cli.Context) error {
-	token := c.Args().First()
-	if token == "" {
+	id := c.Args().First()
+	if id == "" {
 		return cli.NewExitError(c.Command.ArgsUsage, 1)
 	}
 
@@ -266,7 +266,7 @@ func updatePublicLink(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	req := &api.UpdateLinkReq{Token: token}
+	req := &api.UpdateLinkReq{Id: id}
 
 	if c.Bool("set-expiration") {
 		req.UpdateExpiration = true

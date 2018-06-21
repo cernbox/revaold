@@ -366,6 +366,100 @@ func (p *proxy) registerRoutes() {
 
 	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.basicAuth(p.listTrashbin)).Methods("GET")
 	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.basicAuth(p.restoreTrashbin)).Methods("POST")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/getVersions.php", p.basicAuth(p.getVersions)).Methods("GET")
+}
+
+/*
+{
+  "data": {
+    "versions": {
+      "1529501898.64217314#/3769_001.pdf": {
+        "eos.size": "226665",
+        "eos.mtime": "1529501898",
+        "eos.ctime": "1529501898.117864887",
+        "eos.mode": "0644",
+        "eos.uid": "95491",
+        "eos.gid": "2763",
+        "eos.fxid": "64217314",
+        "eos.fid": "1679913748",
+        "eos.ino": "450948412985049088",
+        "eos.pid": "96056290",
+        "eos.pxid": "05b9b3e2",
+        "eos.xstype": "adler",
+        "eos.xs": "51163093",
+        "eos.etag": "450948412985049088:51163093",
+        "eos.layout": "replica",
+        "eos.nstripes": "2",
+        "eos.lid": "00600112",
+        "eos.nrep": "2",
+        "eos.fsid": "1030",
+        "eos.file": "/eos/user/g/gonzalhu/.sys.v#.3769_001.pdf/1529501898.64217314",
+        "etag": "450948412985049088:51163093",
+        "fileid": 450948412985049100,
+        "mtime": 1529501898,
+        "size": "226665",
+        "storage_mtime": 1529501898,
+        "path": "/3769_001.pdf",
+        "path_hash": "3bb79fa07612f1c538302dd35198e120",
+        "parent": 96056290,
+        "encrypted": 0,
+        "unencrypted_size": "226665",
+        "name": "3769_001.pdf",
+        "mimetype": "application/octet-stream",
+        "permissions": 31,
+        "current_revision_path": "files/3769_001.pdf",
+        "revision": "1529501898.64217314",
+        "cur": 0,
+        "version": "1529501898.64217314"
+      }
+    },
+    "endReached": true
+  },
+  "status": "success"
+}
+*/
+func (p *proxy) getVersions(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	path := r.URL.Query().Get("source")
+	if path == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	revisions, err := p.getVersionsForPath(ctx, path)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write([]byte(fmt.Sprintf("%+v", revisions)))
+}
+
+func (p *proxy) getVersionsForPath(ctx context.Context, path string) ([]*api.Revision, error) {
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getStorageClient().ListRevisions(gCtx, &api.PathReq{Path: path})
+	if err != nil {
+		return nil, err
+	}
+
+	revisions := []*api.Revision{}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Status != api.StatusCode_OK {
+			err := api.NewError(api.UnknownError)
+			return nil, err
+		}
+		revisions = append(revisions, res.Revision)
+	}
+	return revisions, nil
 }
 
 /*
@@ -577,6 +671,12 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	dir := r.URL.Query().Get("dir")
 	files := []string{}
+
+	if dir == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	if r.URL.Query().Get("files") != "" {
 		fullPath := path.Join(dir, r.URL.Query().Get("files"))
 		files = append(files, fullPath)
@@ -587,6 +687,11 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 			files = append(files, fullPath)
 
 		}
+	}
+
+	// if files is empty means that we need to download the whole content of dir
+	if len(files) == 0 {
+		files = append(files, dir)
 	}
 
 	// TODO(labkode): add request ID to the archive name so we can trace back archive.

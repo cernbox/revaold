@@ -2,11 +2,15 @@ package webdav
 
 import (
 	"bytes"
-
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"github.com/disintegration/imaging"
+	"github.com/rwcarlsen/goexif/exif"
+	"image/color"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -310,9 +314,196 @@ func (p *proxy) detectMimeType(pa string) string {
 	return mime.TypeByExtension(ext)
 }
 
+func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
+	p.logger.Info("get request for preview")
+	ctx := r.Context()
+	reqPath := mux.Vars(r)["path"]
+	//etag := r.URL.Query().Get("c")
+	widthString := r.URL.Query().Get("x")
+	heightString := r.URL.Query().Get("y")
+
+	width, err := strconv.ParseInt(widthString, 10, 64)
+	if err != nil {
+		p.logger.Warn("", zap.String("x", widthString))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	height, err := strconv.ParseInt(heightString, 10, 64)
+	if err != nil {
+		p.logger.Warn("", zap.String("y", heightString))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	gReq := &api.PathReq{Path: reqPath}
+	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if mdRes.Status != api.StatusCode_OK {
+		p.writeError(mdRes.Status, w, r)
+		return
+	}
+
+	md := mdRes.Metadata
+	if md.IsDir {
+		p.logger.Warn("file is a folder")
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	// check if the file is already stored
+	key := fmt.Sprintf("%s-%s", reqPath, md.Etag)
+	thumbname := getMD5Hash(key)
+	target := path.Join(p.temporaryFolder, thumbname)
+
+	if _, err := os.Stat(target); err == nil {
+		p.logger.Info("preview found on disk for path", zap.String("path", reqPath), zap.String("preview", target))
+		fd, err := os.Open(target)
+		defer fd.Close()
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", p.detectMimeType(md.Path))
+		w.Header().Set("ETag", md.Etag)
+		w.Header().Set("OC-FileId", md.Id)
+		w.Header().Set("OC-ETag", md.Etag)
+		t := time.Unix(int64(md.Mtime), 0)
+		lastModifiedString := t.Format(time.RFC1123)
+		w.Header().Set("Last-Modified", lastModifiedString)
+		if md.Checksum != "" {
+			w.Header().Set("OC-Checksum", md.Checksum)
+		}
+		w.WriteHeader(http.StatusOK)
+		io.Copy(w, fd)
+		return
+	}
+
+	// TODO(labkode): check for size limit
+	p.logger.Info("generating preview for path", zap.String("path", reqPath), zap.String("preview", target))
+
+	stream, err := p.getStorageClient().ReadFile(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	contents := []byte{}
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				contents = append(contents, dc.Data...)
+			}
+		}
+	}
+	basename := path.Base(reqPath)
+
+	format, err := imaging.FormatFromFilename(basename)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var rotate int
+	var flip FlipDirection
+	reader := bytes.NewReader(contents)
+
+	ex, err := exif.Decode(reader)
+	if err == nil {
+		rotate, flip = exifOrientation(ex)
+	}
+
+	_, err = reader.Seek(0, 0)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	img, err := imaging.Decode(reader)
+	if err != nil {
+		panic(err)
+	}
+
+	img = imaging.Thumbnail(img, int(width), int(height), imaging.Linear)
+
+	// apply transformations
+	if rotate > 0 {
+		img = imaging.Rotate(img, float64(rotate), color.Transparent)
+	}
+	if flip == FlipVertical {
+		img = imaging.FlipV(img)
+	} else {
+		img = imaging.FlipH(img)
+	}
+
+	fd, err := os.Create(target)
+	defer fd.Close()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = imaging.Encode(fd, img, format)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	fd.Close()
+	// TODO(labkode): use a multi-writer to write to respone and to disk at same time
+
+	w.Header().Set("Content-Type", p.detectMimeType(md.Path))
+	w.Header().Set("ETag", md.Etag)
+	w.Header().Set("OC-FileId", md.Id)
+	w.Header().Set("OC-ETag", md.Etag)
+	t := time.Unix(int64(md.Mtime), 0)
+	lastModifiedString := t.Format(time.RFC1123)
+	w.Header().Set("Last-Modified", lastModifiedString)
+	if md.Checksum != "" {
+		w.Header().Set("OC-Checksum", md.Checksum)
+	}
+	w.WriteHeader(http.StatusOK)
+
+	fd, err = os.Open(target)
+	defer fd.Close()
+	io.Copy(w, fd)
+
+}
 func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	path := mux.Vars(r)["path"]
+	isPreview := (r.URL.Query().Get("preview") == "1" || r.URL.Query().Get("forceIcon") == "1")
+	if isPreview {
+		p.getPreview(w, r)
+		return
+	}
 
 	gCtx := GetContextWithAuth(ctx)
 	gReq := &api.PathReq{Path: path}
@@ -1456,4 +1647,74 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 	token, _ := api.ContextGetAccessToken(ctx)
 	header := metadata.New(map[string]string{"authorization": "bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)
+}
+
+// exifOrientation parses the  EXIF data in r and returns the stored
+// orientation as the angle and flip necessary to transform the image.
+func exifOrientation(ex *exif.Exif) (int, FlipDirection) {
+	var (
+		angle    int
+		flipMode FlipDirection
+	)
+	tag, err := ex.Get(exif.Orientation)
+	if err != nil {
+		return 0, 0
+	}
+	orient, err := tag.Int(0)
+	if err != nil {
+		return 0, 0
+	}
+	switch orient {
+	case topLeftSide:
+		// do nothing
+	case topRightSide:
+		flipMode = 2
+	case bottomRightSide:
+		angle = 180
+	case bottomLeftSide:
+		angle = 180
+		flipMode = 2
+	case leftSideTop:
+		angle = -90
+		flipMode = 2
+	case rightSideTop:
+		angle = -90
+	case rightSideBottom:
+		angle = 90
+		flipMode = 2
+	case leftSideBottom:
+		angle = 90
+	}
+	return angle, flipMode
+}
+
+// Exif Orientation Tag values
+// Exif Orientation Tag values
+// http://sylvana.net/jpegcrop/exif_orientation.html
+const (
+	topLeftSide     = 1
+	topRightSide    = 2
+	bottomRightSide = 3
+	bottomLeftSide  = 4
+	leftSideTop     = 5
+	rightSideTop    = 6
+	rightSideBottom = 7
+	leftSideBottom  = 8
+)
+
+// The FlipDirection type is used by the Flip option in DecodeOpts
+// to indicate in which direction to flip an image.
+type FlipDirection int
+
+// FlipVertical and FlipHorizontal are two possible FlipDirections
+// values to indicate in which direction an image will be flipped.
+const (
+	FlipVertical FlipDirection = 1 << iota
+	FlipHorizontal
+)
+
+func getMD5Hash(text string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(text))
+	return hex.EncodeToString(hasher.Sum(nil))
 }

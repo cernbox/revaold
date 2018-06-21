@@ -357,9 +357,10 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if the file is already stored
-	key := fmt.Sprintf("%s-%s", reqPath, md.Etag)
+	key := fmt.Sprintf("%s-%s-%d-%d", reqPath, md.Etag, width, height)
 	thumbname := getMD5Hash(key)
 	target := path.Join(p.temporaryFolder, thumbname)
+	p.logger.Info("preparing preview", zap.String("path", reqPath), zap.String("key", key), zap.String("target", target))
 
 	if _, err := os.Stat(target); err == nil {
 		p.logger.Info("preview found on disk for path", zap.String("path", reqPath), zap.String("preview", target))

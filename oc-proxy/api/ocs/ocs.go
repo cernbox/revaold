@@ -366,7 +366,130 @@ func (p *proxy) registerRoutes() {
 
 	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.basicAuth(p.listTrashbin)).Methods("GET")
 	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.basicAuth(p.restoreTrashbin)).Methods("POST")
+
 	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/getVersions.php", p.basicAuth(p.getVersions)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.basicAuth(p.rollbackVersion)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/download.php", p.basicAuth(p.downloadVersion)).Methods("GET")
+
+}
+
+func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	filename := r.URL.Query().Get("file")
+	revision := r.URL.Query().Get("revision")
+
+	if filename == "" || revision == "" {
+		p.logger.Warn("missing params", zap.String("file", filename), zap.String("revision", revision))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+
+	_, err := p.getMetadata(ctx, filename)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	stream, err := p.getStorageClient().ReadRevision(gCtx, &api.RevisionReq{Path: filename, RevKey: revision})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(filename))
+	w.WriteHeader(http.StatusOK)
+	var reader io.Reader
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				reader = bytes.NewReader(dc.Data)
+				_, err := io.CopyN(w, reader, int64(dc.Length))
+				if err != nil {
+					p.logger.Error("", zap.Error(err))
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+		}
+	}
+}
+
+/*
+{
+   "data":{
+      "revision":"1529574036.646df75d",
+      "file":"\/ideas\/hello.txt"
+   },
+   "status":"success"
+}
+*/
+type rollbackVersionRes struct {
+	Data struct {
+		Revision string
+		File     string
+	}
+	Status string
+}
+
+func (p *proxy) rollbackVersion(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	filename := r.URL.Query().Get("file")
+	revision := r.URL.Query().Get("revision")
+
+	if filename == "" || revision == "" {
+		p.logger.Warn("missing params", zap.String("file", filename), zap.String("revision", revision))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getStorageClient().RestoreRevision(gCtx, &api.RevisionReq{Path: filename, RevKey: revision})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.Status != api.StatusCode_OK {
+		err := api.NewError(api.UnknownError)
+		p.logger.Error("", zap.Error(err))
+		return
+	}
+
+	resp := &rollbackVersionRes{Status: "success", Data: struct {
+		Revision string
+		File     string
+	}{revision, filename}}
+
+	encoded, err := json.Marshal(resp)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
 }
 
 /*
@@ -418,6 +541,22 @@ func (p *proxy) registerRoutes() {
   "status": "success"
 }
 */
+type getVersionsRes struct {
+	Status string       `json:"status"`
+	Data   *versionsRes `json:"data"`
+}
+type versionsRes struct {
+	Versions map[string]*versionEntry `json:"versions"`
+}
+
+type versionEntry struct {
+	Revision string `json:"revision"`
+	Version  string `json:"version"`
+	Name     string `json:"name"`
+	MTime    int64  `json:"mtime"`
+	Size     int    `json:"size"`
+}
+
 func (p *proxy) getVersions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	path := r.URL.Query().Get("source")
@@ -432,7 +571,31 @@ func (p *proxy) getVersions(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Write([]byte(fmt.Sprintf("%+v", revisions)))
+
+	ocRevisions := map[string]*versionEntry{}
+	for _, r := range revisions {
+		e := &versionEntry{
+			Revision: r.RevKey,
+			Name:     path,
+			Size:     int(r.Size),
+			Version:  r.RevKey,
+			MTime:    int64(r.Mtime),
+		}
+		key := fmt.Sprintf("%s/%s", path, e.Revision)
+		ocRevisions[key] = e
+	}
+
+	payload := &versionsRes{Versions: ocRevisions}
+	res := &getVersionsRes{Data: payload, Status: "success"}
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
 }
 
 func (p *proxy) getVersionsForPath(ctx context.Context, path string) ([]*api.Revision, error) {

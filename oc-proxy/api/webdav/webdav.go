@@ -237,6 +237,9 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
 	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
 	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
+
+	// gallery app routes
+	p.router.HandleFunc("/cernbox/index.php/apps/gallery/preview/{path:.*}", p.basicAuth(p.getGalleryPreview)).Methods("GET")
 }
 
 func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
@@ -312,6 +315,190 @@ func (p *proxy) capabilities(w http.ResponseWriter, r *http.Request) {
 func (p *proxy) detectMimeType(pa string) string {
 	ext := path.Ext(pa)
 	return mime.TypeByExtension(ext)
+}
+
+// TODO(labkode): refactor getGalleryPreview and getPreview
+func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
+	p.logger.Info("get request for gallery preview")
+	ctx := r.Context()
+	reqPath := mux.Vars(r)["path"]
+	widthString := r.URL.Query().Get("width")
+	heightString := r.URL.Query().Get("height")
+
+	width, err := strconv.ParseInt(widthString, 10, 64)
+	if err != nil {
+		p.logger.Warn("", zap.String("x", widthString))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	height, err := strconv.ParseInt(heightString, 10, 64)
+	if err != nil {
+		p.logger.Warn("", zap.String("y", heightString))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	gReq := &api.PathReq{Path: reqPath}
+	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if mdRes.Status != api.StatusCode_OK {
+		p.writeError(mdRes.Status, w, r)
+		return
+	}
+
+	md := mdRes.Metadata
+	if md.IsDir {
+		p.logger.Warn("file is a folder")
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	// check if the file is already stored
+	key := fmt.Sprintf("%s-%s-%d-%d", reqPath, md.Etag, width, height)
+	thumbname := getMD5Hash(key)
+	target := path.Join(p.temporaryFolder, thumbname)
+	p.logger.Info("preparing preview", zap.String("path", reqPath), zap.String("key", key), zap.String("target", target))
+
+	if _, err := os.Stat(target); err == nil {
+		p.logger.Info("preview found on disk for path", zap.String("path", reqPath), zap.String("preview", target))
+		fd, err := os.Open(target)
+		defer fd.Close()
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", p.detectMimeType(md.Path))
+		w.Header().Set("ETag", md.Etag)
+		w.Header().Set("OC-FileId", md.Id)
+		w.Header().Set("OC-ETag", md.Etag)
+		t := time.Unix(int64(md.Mtime), 0)
+		lastModifiedString := t.Format(time.RFC1123)
+		w.Header().Set("Last-Modified", lastModifiedString)
+		if md.Checksum != "" {
+			w.Header().Set("OC-Checksum", md.Checksum)
+		}
+		w.WriteHeader(http.StatusOK)
+		io.Copy(w, fd)
+		return
+	}
+
+	// TODO(labkode): check for size limit
+	p.logger.Info("generating preview for path", zap.String("path", reqPath), zap.String("preview", target))
+
+	stream, err := p.getStorageClient().ReadFile(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	contents := []byte{}
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				contents = append(contents, dc.Data...)
+			}
+		}
+	}
+	basename := path.Base(reqPath)
+
+	format, err := imaging.FormatFromFilename(basename)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var rotate int
+	var flip FlipDirection
+	reader := bytes.NewReader(contents)
+
+	ex, err := exif.Decode(reader)
+	if err == nil {
+		rotate, flip = exifOrientation(ex)
+	}
+
+	_, err = reader.Seek(0, 0)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	img, err := imaging.Decode(reader)
+	if err != nil {
+		panic(err)
+	}
+
+	img = imaging.Thumbnail(img, int(width), int(height), imaging.Linear)
+
+	// apply transformations
+	if rotate > 0 {
+		img = imaging.Rotate(img, float64(rotate), color.Transparent)
+	}
+	if flip == FlipVertical {
+		img = imaging.FlipV(img)
+	} else {
+		img = imaging.FlipH(img)
+	}
+
+	fd, err := os.Create(target)
+	defer fd.Close()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	err = imaging.Encode(fd, img, format)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	fd.Close()
+	// TODO(labkode): use a multi-writer to write to respone and to disk at same time
+
+	w.Header().Set("Content-Type", p.detectMimeType(md.Path))
+	w.Header().Set("ETag", md.Etag)
+	w.Header().Set("OC-FileId", md.Id)
+	w.Header().Set("OC-ETag", md.Etag)
+	t := time.Unix(int64(md.Mtime), 0)
+	lastModifiedString := t.Format(time.RFC1123)
+	w.Header().Set("Last-Modified", lastModifiedString)
+	if md.Checksum != "" {
+		w.Header().Set("OC-Checksum", md.Checksum)
+	}
+	w.WriteHeader(http.StatusOK)
+
+	fd, err = os.Open(target)
+	defer fd.Close()
+	io.Copy(w, fd)
+
 }
 
 func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {

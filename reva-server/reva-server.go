@@ -16,6 +16,7 @@ import (
 	"github.com/cernbox/reva/api/auth_manager_nop"
 	"github.com/cernbox/reva/api/mount"
 	"github.com/cernbox/reva/api/public_link_manager_owncloud"
+	"github.com/cernbox/reva/api/share_manager_owncloud"
 	"github.com/cernbox/reva/api/storage_eos"
 	"github.com/cernbox/reva/api/storage_local"
 	"github.com/cernbox/reva/api/storage_wrapper_home"
@@ -81,6 +82,7 @@ func main() {
 	loadMountTable(logger, vs, mountTable)
 	tokenManager := token_manager_jwt.New(gc.GetString("token-manager-jwt-secret"))
 	authManager := auth_manager_nop.New()
+	shareManager, err := share_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
 	publicLinkManager, err := public_link_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
 
 	server := grpc.NewServer(
@@ -108,7 +110,7 @@ func main() {
 
 	api.RegisterAuthServer(server, authsvc.New(authManager, tokenManager))
 	api.RegisterStorageServer(server, storagesvc.New(vs))
-	api.RegisterShareServer(server, sharesvc.New(publicLinkManager))
+	api.RegisterShareServer(server, sharesvc.New(publicLinkManager, shareManager))
 	api.RegisterPreviewServer(server, previewsvc.New())
 
 	logger.Info("listening for grpc connecitons on: " + gc.GetString("tcp-address"))

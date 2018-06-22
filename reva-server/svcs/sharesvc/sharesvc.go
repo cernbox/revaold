@@ -8,23 +8,89 @@ import (
 	"go.uber.org/zap"
 )
 
-func New(lm api.PublicLinkManager) api.ShareServer {
-	return &svc{linkManager: lm}
+func New(lm api.PublicLinkManager, sm api.ShareManager) api.ShareServer {
+	return &svc{linkManager: lm, shareManager: sm}
 }
 
 type svc struct {
-	linkManager api.PublicLinkManager
+	linkManager  api.PublicLinkManager
+	shareManager api.ShareManager
 }
 
-func (s *svc) AddFolderShare(ctx context.Context, req *api.NewFolderShareReq) (*api.FolderShareResponse, error) {
-	return &api.FolderShareResponse{}, nil
+func (s *svc) ListReceivedShares(req *api.EmptyReq, stream api.Share_ListReceivedSharesServer) error {
+	return nil
 }
 
-func (s *svc) UpdateFolderShare(ctx context.Context, req *api.UpdateFolderShareReq) (*api.EmptyResponse, error) {
+func (s *svc) MountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
 	return &api.EmptyResponse{}, nil
 }
 
+func (s *svc) UnmountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
+	return &api.EmptyResponse{}, nil
+}
+
+func (s *svc) ListFolderShares(req *api.ListFolderSharesReq, stream api.Share_ListFolderSharesServer) error {
+	ctx := stream.Context()
+	l := ctx_zap.Extract(ctx)
+	shares, err := s.shareManager.ListFolderShares(ctx)
+	if err != nil {
+		l.Error("error listing folder shares", zap.Error(err))
+		return err
+	}
+	for _, share := range shares {
+		folderShareRes := &api.FolderShareResponse{FolderShare: share}
+		if err := stream.Send(folderShareRes); err != nil {
+			l.Error("error streaming folder share", zap.Error(err))
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *svc) GetFolderShare(ctx context.Context, req *api.ShareIDReq) (*api.FolderShareResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	share, err := s.shareManager.GetFolderShare(ctx, req.Id)
+	if err != nil {
+		if api.IsErrorCode(err, api.FolderShareNotFoundErrorCode) {
+			return &api.FolderShareResponse{Status: api.StatusCode_FOLDER_SHARE_NOT_FOUND}, nil
+		}
+		l.Error("error gettting folder share", zap.Error(err))
+		return nil, err
+	}
+	res := &api.FolderShareResponse{FolderShare: share}
+	return res, nil
+
+}
+
+func (s *svc) AddFolderShare(ctx context.Context, req *api.NewFolderShareReq) (*api.FolderShareResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	share, err := s.shareManager.AddFolderShare(ctx, req.Path, req.Recipient, req.ReadOnly)
+	if err != nil {
+		l.Error("error creating folder share", zap.Error(err))
+		return nil, err
+	}
+	folderShareRes := &api.FolderShareResponse{FolderShare: share}
+	return folderShareRes, nil
+}
+
+func (s *svc) UpdateFolderShare(ctx context.Context, req *api.UpdateFolderShareReq) (*api.FolderShareResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	share, err := s.shareManager.UpdateFolderShare(ctx, req.Id, req.UpdateReadOnly, req.ReadOnly)
+	if err != nil {
+		l.Error("error updating folder share", zap.Error(err))
+		return nil, err
+	}
+	folderShareRes := &api.FolderShareResponse{FolderShare: share}
+	return folderShareRes, nil
+}
+
 func (s *svc) UnshareFolder(ctx context.Context, req *api.UnshareFolderReq) (*api.EmptyResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	err := s.shareManager.Unshare(ctx, req.Id)
+	if err != nil {
+		l.Error("error deleting folder share", zap.Error(err))
+		return nil, err
+	}
 	return &api.EmptyResponse{}, nil
 }
 
@@ -66,6 +132,9 @@ func (s *svc) InspectPublicLink(ctx context.Context, req *api.ShareIDReq) (*api.
 	l := ctx_zap.Extract(ctx)
 	publicLink, err := s.linkManager.InspectPublicLink(ctx, req.Id)
 	if err != nil {
+		if api.IsErrorCode(err, api.PublicLinkNotFoundErrorCode) {
+			return &api.PublicLinkResponse{Status: api.StatusCode_PUBLIC_LINK_NOT_FOUND}, nil
+		}
 		l.Error("error inspecting public link", zap.Error(err))
 		return nil, err
 	}
@@ -101,20 +170,4 @@ func (s *svc) UpdatePublicLink(ctx context.Context, req *api.UpdateLinkReq) (*ap
 	}
 	publicLinkRes := &api.PublicLinkResponse{PublicLink: publicLink}
 	return publicLinkRes, nil
-}
-
-func (s *svc) ListFolderShares(req *api.ListFolderSharesReq, stream api.Share_ListFolderSharesServer) error {
-	return nil
-}
-
-func (s *svc) ListReceivedShares(req *api.EmptyReq, stream api.Share_ListReceivedSharesServer) error {
-	return nil
-}
-
-func (s *svc) MountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
-	return &api.EmptyResponse{}, nil
-}
-
-func (s *svc) UnmountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
-	return &api.EmptyResponse{}, nil
 }

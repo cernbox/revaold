@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,94 +24,45 @@ import (
 	"time"
 )
 
-type ShareType int
-type Permission int
-type ItemType string
-type ShareState int
+func (p *proxy) registerRoutes() {
+	// requests targeting a file/folder
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.createShare)).Methods("POST")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
 
-const (
-	ShareTypeUser       ShareType = 0
-	ShareTypeGroup                = 1
-	ShareTypePublicLink           = 3
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.acceptShare)).Methods("POST")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.rejectShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
 
-	PermissionRead      Permission = 1
-	PermissionReadWrite Permission = 15
+	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/loadfile", p.basicAuth(p.loadFile)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.basicAuth(p.saveFile)).Methods("PUT")
 
-	ItemTypeFile   ItemType = "file"
-	ItemTypeFolder ItemType = "folder"
+	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.basicAuth(p.downloadArchive)).Methods("GET")
 
-	ShareStateAccepted ShareState = 0
-	ShareStatePending             = 1
-	ShareStateRejected            = 2
-)
+	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.basicAuth(p.getEOSInfo)).Methods("POST")
 
-type ResponseMeta struct {
-	Status       string `json:"status"`
-	StatusCode   int    `json:"statuscode"`
-	Message      string `json:"message"`
-	TotalItems   string `json:"totalitems"`
-	ItemsPerPage string `json:"itemsperpage"`
-}
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.basicAuth(p.listTrashbin)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.basicAuth(p.restoreTrashbin)).Methods("POST")
 
-type OCSPayload struct {
-	Meta *ResponseMeta `json:"meta"`
-	Data interface{}   `json:"data"`
-}
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/getVersions.php", p.basicAuth(p.getVersions)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.basicAuth(p.rollbackVersion)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/download.php", p.basicAuth(p.downloadVersion)).Methods("GET")
 
-type OCSResponse struct {
-	OCS *OCSPayload `json:"ocs"`
-}
-
-type JSONInt struct {
-	Value int
-	Valid bool
-	Set   bool
-}
-
-type JSONString struct {
-	Value string
-	Valid bool
-	Set   bool
-}
-
-func (i *JSONString) UnmarshalJSON(data []byte) error {
-	// If this method was called, the value was set.
-	i.Set = true
-
-	if string(data) == "null" {
-		// The key was set to null
-		i.Valid = false
-		return nil
-	}
-
-	// The key isn't set to null
-	var temp string
-	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
-	}
-	i.Value = temp
-	i.Valid = true
-	return nil
-}
-
-func (i *JSONInt) UnmarshalJSON(data []byte) error {
-	// If this method was called, the value was set.
-	i.Set = true
-
-	if string(data) == "null" {
-		// The key was set to null
-		i.Valid = false
-		return nil
-	}
-
-	// The key isn't set to null
-	var temp int
-	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
-	}
-	i.Value = temp
-	i.Valid = true
-	return nil
 }
 
 /*
@@ -178,10 +130,14 @@ type NewShareOCSRequest struct {
 }
 
 type Options struct {
-	Logger       *zap.Logger
+	Logger *zap.Logger
+
 	REVAHostname string
 	REVAPort     int
 	Router       *mux.Router
+
+	CBOXGroupDaemonURI    string
+	CBOXGroupDaemonSecret string
 }
 
 func (opt *Options) init() {
@@ -199,9 +155,11 @@ func New(opt *Options) (http.Handler, error) {
 	}
 
 	proxy := &proxy{
-		router:   opt.Router,
-		revaHost: fmt.Sprintf("%s:%d", opt.REVAHostname, opt.REVAPort),
-		logger:   opt.Logger,
+		router:                opt.Router,
+		revaHost:              fmt.Sprintf("%s:%d", opt.REVAHostname, opt.REVAPort),
+		logger:                opt.Logger,
+		cboxGroupDaemonURI:    opt.CBOXGroupDaemonURI,
+		cboxGroupDaemonSecret: opt.CBOXGroupDaemonSecret,
 	}
 
 	conn, err := grpc.Dial(proxy.revaHost, grpc.WithInsecure())
@@ -215,11 +173,13 @@ func New(opt *Options) (http.Handler, error) {
 }
 
 type proxy struct {
-	router     *mux.Router
-	authClient api.AuthClient
-	revaHost   string
-	grpcConn   *grpc.ClientConn
-	logger     *zap.Logger
+	router                *mux.Router
+	authClient            api.AuthClient
+	revaHost              string
+	cboxGroupDaemonURI    string
+	cboxGroupDaemonSecret string
+	grpcConn              *grpc.ClientConn
+	logger                *zap.Logger
 }
 
 func (p *proxy) getStorageClient() api.StorageClient {
@@ -330,47 +290,6 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		p.logger.Info("request is authenticated", zap.String("account_id", user.AccountId))
 		h.ServeHTTP(w, r)
 	})
-}
-
-func (p *proxy) registerRoutes() {
-	// requests targeting a file/folder
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.createShare)).Methods("POST")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
-
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.acceptShare)).Methods("POST")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.rejectShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
-
-	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/loadfile", p.basicAuth(p.loadFile)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.basicAuth(p.saveFile)).Methods("PUT")
-
-	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.basicAuth(p.downloadArchive)).Methods("GET")
-
-	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.basicAuth(p.getEOSInfo)).Methods("POST")
-
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.basicAuth(p.listTrashbin)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.basicAuth(p.restoreTrashbin)).Methods("POST")
-
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/getVersions.php", p.basicAuth(p.getVersions)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.basicAuth(p.rollbackVersion)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/download.php", p.basicAuth(p.downloadVersion)).Methods("GET")
-
 }
 
 func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
@@ -1492,15 +1411,120 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
-	entries := []*OCSShareeEntry{
-		&OCSShareeEntry{
-			Label: "labradorsvc",
-			Value: &OCSShareeEntryValue{ShareType: ShareTypeUser, ShareWith: "labradorsvc"},
-		},
+type searchEntry struct {
+	DN          string          `json:"dn"`
+	CN          string          `json:"cn"`
+	AccountType LDAPAccountType `json:"account_type"`
+	DisplayName string          `json:"display_name"`
+	Mail        string          `json:"mail"`
+}
+
+func (p *proxy) getShareType(ldapType LDAPAccountType) ShareType {
+	if ldapType == LDAPAccountTypePrimary || ldapType == LDAPAccountTypeSecondary || ldapType == LDAPAccountTypeService {
+		return ShareTypeUser
+	} else if ldapType == LDAPAccountTypeEGroup || ldapType == LDAPAccountTypeEGroup {
+		return ShareTypeGroup
+	} else {
+		// fallback to user
+		return ShareTypeUser
 	}
-	exact := &OCSShareeExact{Users: []*OCSShareeEntry{}, Groups: []*OCSShareeEntry{}, Remotes: []*OCSShareeEntry{}}
-	data := &OCSShareeData{Exact: exact, Users: entries, Groups: []*OCSShareeEntry{}, Remotes: []*OCSShareeEntry{}}
+}
+func (p *proxy) getSearchTarget(search string) string {
+	tokens := strings.Split(search, ":")
+	if len(tokens) == 0 {
+		return tokens[0]
+	} else {
+		return tokens[len(tokens)-1]
+	}
+}
+
+// search calls the cboxgroupd daemon for finding entries.
+func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("search")
+
+	//itemType := r.URL.Query().Get("itemType")
+	//perPage := r.URL.Query().Get("perPage")
+
+	if search == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	searchTarget := p.getSearchTarget(search)
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	url := fmt.Sprintf("%s/api/v1/search/%s", p.cboxGroupDaemonURI, search)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", p.cboxGroupDaemonSecret))
+	res, err := client.Do(req)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.StatusCode != http.StatusOK {
+		p.logger.Error("error calling cboxgroupd search", zap.Int("status", res.StatusCode))
+		w.WriteHeader(res.StatusCode)
+		return
+
+	}
+
+	searchEntries := []*searchEntry{}
+	body, err := ioutil.ReadAll(res.Body)
+	defer res.Body.Close()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(res.StatusCode)
+		return
+	}
+
+	err = json.Unmarshal(body, &searchEntries)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	exactUserEntries := []*OCSShareeEntry{}
+	inexactUserEntries := []*OCSShareeEntry{}
+	exactGroupEntries := []*OCSShareeEntry{}
+	inexactGroupEntries := []*OCSShareeEntry{}
+	for _, se := range searchEntries {
+		shareType := p.getShareType(se.AccountType)
+		ocsEntry := &OCSShareeEntry{
+			Value: &OCSShareeEntryValue{ShareType: p.getShareType(se.AccountType), ShareWith: se.CN},
+		}
+
+		if shareType == ShareTypeUser {
+			ocsEntry.Label = fmt.Sprintf("%s (%s)", se.DisplayName, se.CN)
+			if se.CN == searchTarget {
+				exactUserEntries = append(exactUserEntries, ocsEntry)
+			} else {
+				inexactUserEntries = append(inexactUserEntries, ocsEntry)
+			}
+
+		} else { // asumme group
+			ocsEntry.Label = se.CN // owncloud will append (group) at the end
+			if se.CN == searchTarget {
+				exactGroupEntries = append(exactGroupEntries, ocsEntry)
+			} else {
+				inexactGroupEntries = append(inexactGroupEntries, ocsEntry)
+			}
+
+		}
+
+	}
+
+	exact := &OCSShareeExact{Users: exactUserEntries, Groups: exactGroupEntries, Remotes: []*OCSShareeEntry{}}
+	data := &OCSShareeData{Exact: exact, Users: inexactUserEntries, Groups: inexactGroupEntries, Remotes: []*OCSShareeEntry{}}
 
 	meta := &ResponseMeta{Status: "ok", StatusCode: 100, Message: "OK"}
 	payload := &OCSPayload{Meta: meta, Data: data}
@@ -1517,75 +1541,9 @@ func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
+func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly bool, expiration int64, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	newShare := &NewShareOCSRequest{}
-
-	if r.Header.Get("Content-Type") == "application/json" {
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		err = json.Unmarshal(body, newShare)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-	} else { // assume x-www-form-urlencoded
-		err := r.ParseForm()
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-
-		shareTypeString := r.Form.Get("shareType")
-		shareWith := r.Form.Get("shareWith")
-		permissionsString := r.Form.Get("permissions")
-		path := r.Form.Get("path")
-
-		var shareType ShareType
-		var permissions Permission
-		if shareTypeString == "0" {
-			shareType = ShareTypeUser
-		} else if shareTypeString == "1" {
-			shareType = ShareTypeGroup
-		}
-
-		perm, err := strconv.ParseInt(permissionsString, 10, 64)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		permissions = Permission(perm)
-
-		newShare.Path = path
-		newShare.ShareWith = shareWith
-		newShare.ShareType = shareType
-		newShare.Permissions = permissions
-	}
-
-	// get public link shares
 	gCtx := GetContextWithAuth(ctx)
-	var readOnly bool
-	if newShare.Permissions == PermissionRead {
-		readOnly = true
-	}
-
-	var expiration int64
-	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
-		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
-		if err != nil {
-			p.logger.Error("expire data format is not valid", zap.Error(err))
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		expiration = t.Unix()
-	}
-
 	newLinkReq := &api.NewLinkReq{
 		Path:     newShare.Path,
 		ReadOnly: readOnly,
@@ -1623,6 +1581,142 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
+
+}
+
+func (p *proxy) createFolderShare(newShare *NewShareOCSRequest, readOnly bool, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	recipientType := api.ShareRecipient_USER
+	if newShare.ShareType == ShareTypeGroup {
+		recipientType = api.ShareRecipient_GROUP
+	}
+
+	recipient := &api.ShareRecipient{
+		Identity: newShare.ShareWith,
+		Type:     recipientType,
+	}
+
+	newFolderShareReq := &api.NewFolderShareReq{
+		Path:      newShare.Path,
+		ReadOnly:  readOnly,
+		Recipient: recipient,
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	folderShareRes, err := p.getShareClient().AddFolderShare(gCtx, newFolderShareReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if folderShareRes.Status != api.StatusCode_OK {
+		p.writeError(folderShareRes.Status, w, r)
+		return
+	}
+
+	folderShare := folderShareRes.FolderShare
+	ocsShare, err := p.folderShareToOCSShare(ctx, folderShare)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	payload := &OCSPayload{Meta: meta, Data: ocsShare}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+
+}
+func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
+	newShare := &NewShareOCSRequest{}
+
+	if r.Header.Get("Content-Type") == "application/json" {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		err = json.Unmarshal(body, newShare)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else { // assume x-www-form-urlencoded
+		err := r.ParseForm()
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		shareTypeString := r.Form.Get("shareType")
+		shareWith := r.Form.Get("shareWith")
+		permissionsString := r.Form.Get("permissions")
+		path := r.Form.Get("path")
+
+		var shareType ShareType
+		var permissions Permission
+		if shareTypeString == "0" {
+			shareType = ShareTypeUser
+		} else if shareTypeString == "1" {
+			shareType = ShareTypeGroup
+		}
+
+		perm, err := strconv.ParseInt(permissionsString, 10, 64)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		permissions = Permission(perm)
+
+		newShare.Path = path
+		newShare.ShareWith = shareWith
+		newShare.ShareType = shareType
+		newShare.Permissions = permissions
+
+	}
+
+	var readOnly bool
+	if newShare.Permissions == PermissionRead {
+		readOnly = true
+	}
+
+	var expiration int64
+	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
+		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
+		if err != nil {
+			p.logger.Error("expire data format is not valid", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		expiration = t.Unix()
+	}
+
+	if newShare.ShareType == ShareTypePublicLink {
+		p.createPublicLinkShare(newShare, readOnly, expiration, w, r)
+		return
+	} else if newShare.ShareType == ShareTypeUser || newShare.ShareType == ShareTypeGroup {
+		p.createFolderShare(newShare, readOnly, w, r)
+		return
+	} else {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
 }
 
 func (p *proxy) getRemoteShares(w http.ResponseWriter, r *http.Request) {
@@ -1641,6 +1735,7 @@ func (p *proxy) getRemoteShares(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 
 }
+
 func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	path := r.URL.Query().Get("path")
@@ -1651,47 +1746,22 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get public link shares
-	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getShareClient().ListPublicLinks(gCtx, &api.EmptyReq{})
+	ocsShares, err := p.getPublicLinkShares(ctx)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	publicLinks := []*api.PublicLink{}
-	for {
-		plr, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		if plr.Status != api.StatusCode_OK {
-			p.writeError(plr.Status, w, r)
-			return
-		}
-		publicLinks = append(publicLinks, plr.PublicLink)
+	folderShares, err := p.getFolderShares(ctx)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 
 	}
 
-	ocsShares := []*OCSShare{}
-	for _, pl := range publicLinks {
-		ocsShare, err := p.publicLinkToOCSShare(ctx, pl)
-		if err != nil {
-			p.logger.Error("cannot convert public link to ocs share", zap.Error(err))
-			continue
-		}
-		fmt.Println(ocsShare)
-		ocsShares = append(ocsShares, ocsShare)
-	}
-
+	ocsShares = append(ocsShares, folderShares...)
 	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
 	payload := &OCSPayload{Meta: meta, Data: ocsShares}
 	ocsRes := &OCSResponse{OCS: payload}
@@ -1706,6 +1776,132 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
+func (p *proxy) getPublicLinkShares(ctx context.Context) ([]*OCSShare, error) {
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getShareClient().ListPublicLinks(gCtx, &api.EmptyReq{})
+	if err != nil {
+		return nil, err
+	}
+
+	publicLinks := []*api.PublicLink{}
+	for {
+		plr, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		if plr.Status != api.StatusCode_OK {
+			return nil, err
+		}
+		publicLinks = append(publicLinks, plr.PublicLink)
+
+	}
+
+	ocsShares := []*OCSShare{}
+	for _, pl := range publicLinks {
+		ocsShare, err := p.publicLinkToOCSShare(ctx, pl)
+		if err != nil {
+			p.logger.Error("cannot convert public link to ocs share", zap.Error(err), zap.String("pl", fmt.Sprintf("%+v", pl)))
+			continue
+		}
+		ocsShares = append(ocsShares, ocsShare)
+	}
+	return ocsShares, nil
+
+}
+
+func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getShareClient().ListFolderShares(gCtx, &api.ListFolderSharesReq{})
+	if err != nil {
+		return nil, err
+	}
+
+	folderShares := []*api.FolderShare{}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Status != api.StatusCode_OK {
+			return nil, err
+		}
+		folderShares = append(folderShares, res.FolderShare)
+
+	}
+
+	ocsShares := []*OCSShare{}
+	for _, share := range folderShares {
+		ocsShare, err := p.folderShareToOCSShare(ctx, share)
+		if err != nil {
+			p.logger.Error("cannot convert folder share to ocs share", zap.Error(err), zap.String("folder share", fmt.Sprintf("%+v", share)))
+			continue
+		}
+		ocsShares = append(ocsShares, ocsShare)
+	}
+	return ocsShares, nil
+
+}
+
+func (p *proxy) folderShareToOCSShare(ctx context.Context, share *api.FolderShare) (*OCSShare, error) {
+	fmt.Println("folder share IN", share)
+	// TODO(labkode): harden check
+	user, _ := api.ContextGetUser(ctx)
+	owner := user.AccountId
+
+	md, err := p.getMetadata(ctx, share.Path)
+	if err != nil {
+		return nil, err
+	}
+
+	var itemType ItemType = ItemTypeFolder
+	shareType := ShareTypeUser
+	if share.Recipient.Type == api.ShareRecipient_GROUP {
+		shareType = ShareTypeGroup
+	}
+
+	var mimeType = "httpd/unix-directory"
+	var permissions Permission
+	if share.ReadOnly {
+		permissions = PermissionRead
+	} else {
+		permissions = PermissionReadWrite
+	}
+
+	var shareWith string = share.Recipient.Identity
+
+	ocsShare := &OCSShare{
+		ShareType:            shareType,
+		ID:                   share.Id,
+		DisplayNameFileOwner: owner,
+		DisplayNameOwner:     owner,
+		FileSource:           share.Path,
+		FileTarget:           share.Path,
+		ItemSource:           share.Path,
+		ItemType:             itemType,
+		MimeType:             mimeType,
+		Name:                 share.Path,
+		Path:                 md.Path,
+		Permissions:          permissions,
+		ShareTime:            int(share.Mtime),
+		State:                ShareStateAccepted,
+		UIDFileOwner:         owner,
+		UIDOwner:             owner,
+		ShareWith:            shareWith,
+		ShareWithDisplayName: shareWith,
+	}
+	fmt.Println("folder share OUT ", ocsShare)
+	return ocsShare, nil
+}
 func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *api.PublicLink) (*OCSShare, error) {
 	// TODO(labkode): harden check
 	user, _ := api.ContextGetUser(ctx)
@@ -1834,12 +2030,127 @@ func (p *proxy) getReceivedShares(w http.ResponseWriter, r *http.Request, path s
 	w.Write(encoded)
 }
 
+func (p *proxy) getPublicLink(ctx context.Context, id string) (*api.PublicLink, error) {
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getShareClient().InspectPublicLink(gCtx, &api.ShareIDReq{Id: id})
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Status != api.StatusCode_OK {
+		if res.Status == api.StatusCode_PUBLIC_LINK_NOT_FOUND {
+			return nil, api.NewError(api.PublicLinkNotFoundErrorCode)
+		}
+	}
+	return res.PublicLink, nil
+}
+
+func (p *proxy) getOCSPublicLink(ctx context.Context, id string) (*OCSShare, bool, error) {
+	pl, err := p.getPublicLink(ctx, id)
+	if err == nil {
+		ocsShare, err2 := p.publicLinkToOCSShare(ctx, pl)
+		if err2 != nil {
+			return nil, false, err2
+		}
+		return ocsShare, true, nil
+	}
+	if api.IsErrorCode(err, api.PublicLinkNotFoundErrorCode) {
+		return nil, false, nil
+	}
+	return nil, false, err
+
+}
+
+func (p *proxy) getOCSFolderShare(ctx context.Context, id string) (*OCSShare, bool, error) {
+	share, err := p.getFolderShare(ctx, id)
+	if err == nil {
+		ocsShare, err2 := p.folderShareToOCSShare(ctx, share)
+		if err2 != nil {
+			return nil, false, err2
+		}
+		return ocsShare, true, nil
+	}
+	if api.IsErrorCode(err, api.FolderShareNotFoundErrorCode) {
+		return nil, false, nil
+	}
+	return nil, false, err
+
+}
+
+func (p *proxy) getFolderShare(ctx context.Context, id string) (*api.FolderShare, error) {
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getShareClient().GetFolderShare(gCtx, &api.ShareIDReq{Id: id})
+	if err != nil {
+		return nil, err
+	}
+
+	if res.Status != api.StatusCode_OK {
+		if res.Status == api.StatusCode_FOLDER_SHARE_NOT_FOUND {
+			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
+		}
+	}
+	return res.FolderShare, nil
+
+}
+
 func (p *proxy) getShare(w http.ResponseWriter, r *http.Request) {
-	sharedWithMe := r.Header.Get("shared_with_me")
-	w.Write([]byte(sharedWithMe))
+	ctx := r.Context()
+	// we don't know based on the shareID if this is a public link or folder share,
+	// so we query both backends, and the first that responds we use it
+	shareID := mux.Vars(r)["share_id"]
+
+	ocsShare, found, err := p.getOCSPublicLink(ctx, shareID)
+	ocsShare2, found2, err2 := p.getOCSFolderShare(ctx, shareID)
+
+	if err != nil || err2 != nil {
+		p.logger.Error("", zap.Error(err), zap.Error(err2))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if found {
+		ocsShares := []*OCSShare{ocsShare}
+		meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+		payload := &OCSPayload{Meta: meta, Data: ocsShares}
+		ocsRes := &OCSResponse{OCS: payload}
+		encoded, err := json.Marshal(ocsRes)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(encoded)
+		return
+
+	}
+
+	if found2 {
+		ocsShares := []*OCSShare{ocsShare2}
+		meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+		payload := &OCSPayload{Meta: meta, Data: ocsShares}
+		ocsRes := &OCSResponse{OCS: payload}
+		encoded, err := json.Marshal(ocsRes)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(encoded)
+		return
+
+	}
+
+	p.logger.Warn("share not found", zap.String("shareID", shareID))
+	w.WriteHeader(http.StatusNotFound)
+
 }
 
 func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
+	// TODO(labkode): separate methods for folder shares and link shares.
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
 	shareID := mux.Vars(r)["share_id"]
@@ -1857,47 +2168,71 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
+func (p *proxy) isPublicLinkShare(ctx context.Context, shareID string) (bool, error) {
+	_, err := p.getPublicLink(ctx, shareID)
+	if err != nil {
+		if api.IsErrorCode(err, api.PublicLinkNotFoundErrorCode) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (p *proxy) isFolderShare(ctx context.Context, shareID string) (bool, error) {
+	_, err := p.getFolderShare(ctx, shareID)
+	if err != nil {
+		if api.IsErrorCode(err, api.FolderShareNotFoundErrorCode) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// TODO(labkode): check for updateReadOnly
+func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	shareID := mux.Vars(r)["share_id"]
-	body, err := ioutil.ReadAll(r.Body)
+	req := &api.UpdateFolderShareReq{Id: shareID, ReadOnly: readOnly, UpdateReadOnly: true}
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getShareClient().UpdateFolderShare(gCtx, req)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	newShare := &NewShareOCSRequest{}
-	err = json.Unmarshal(body, newShare)
+	if res.Status != api.StatusCode_OK {
+		p.writeError(res.Status, w, r)
+		return
+
+	}
+
+	share := res.FolderShare
+	ocsShare, err := p.folderShareToOCSShare(ctx, share)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	updateExpiration := false
-	updatePassword := false
-	var expiration int64
-	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
-		updateExpiration = true
-		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
-		if err != nil {
-			p.logger.Error("expire data format is not valid", zap.Error(err))
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		expiration = t.Unix()
+	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	payload := &OCSPayload{Meta: meta, Data: ocsShare}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
+}
 
-	if newShare.Password.Set {
-		updatePassword = true
-	}
-
-	var readOnly bool
-	if newShare.Permissions == PermissionRead {
-		readOnly = true
-	}
-
+// TODO(labkode): check for updateReadOnly
+func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSRequest, updateExpiration, updatePassword bool, expiration int64, readOnly bool, w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	updateLinkReq := &api.UpdateLinkReq{
 		UpdateExpiration: updateExpiration,
 		UpdatePassword:   updatePassword,
@@ -1941,6 +2276,110 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
+
+}
+func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	shareID := mux.Vars(r)["share_id"]
+
+	newShare := &NewShareOCSRequest{}
+	if r.Header.Get("Content-Type") == "application/json" {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		err = json.Unmarshal(body, newShare)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else { // assume x-www-form-urlencoded
+		err := r.ParseForm()
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		shareTypeString := r.Form.Get("shareType")
+		shareWith := r.Form.Get("shareWith")
+		permissionsString := r.Form.Get("permissions")
+		path := r.Form.Get("path")
+
+		var shareType ShareType
+		var permissions Permission
+		if shareTypeString == "0" {
+			shareType = ShareTypeUser
+		} else if shareTypeString == "1" {
+			shareType = ShareTypeGroup
+		}
+
+		perm, err := strconv.ParseInt(permissionsString, 10, 64)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		permissions = Permission(perm)
+
+		newShare.Path = path
+		newShare.ShareWith = shareWith
+		newShare.ShareType = shareType
+		newShare.Permissions = permissions
+
+	}
+
+	updateExpiration := false
+	updatePassword := false
+	var expiration int64
+	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
+		updateExpiration = true
+		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
+		if err != nil {
+			p.logger.Error("expire data format is not valid", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		expiration = t.Unix()
+	}
+
+	if newShare.Password.Set {
+		updatePassword = true
+	}
+
+	var readOnly bool
+	if newShare.Permissions == PermissionRead {
+		readOnly = true
+	}
+
+	found, err := p.isPublicLinkShare(ctx, shareID)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if found {
+		p.updatePublicLinkShare(shareID, newShare, updateExpiration, updatePassword, expiration, readOnly, w, r)
+		return
+	}
+
+	found, err = p.isFolderShare(ctx, shareID)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if found {
+		p.updateFolderShare(shareID, readOnly, w, r)
+		return
+	}
+
+	p.logger.Warn("share id not found on public link and folder share managers", zap.String("shareID", shareID))
+	w.WriteHeader(http.StatusNotFound)
 }
 
 func (p *proxy) acceptShare(w http.ResponseWriter, r *http.Request) {
@@ -1987,3 +2426,104 @@ func (p *proxy) detectMimeType(isDir bool, pa string) string {
 	ext := path.Ext(pa)
 	return mime.TypeByExtension(ext)
 }
+
+type ShareType int
+type Permission int
+type ItemType string
+type ShareState int
+
+const (
+	ShareTypeUser       ShareType = 0
+	ShareTypeGroup                = 1
+	ShareTypePublicLink           = 3
+
+	PermissionRead      Permission = 1
+	PermissionReadWrite Permission = 15
+
+	ItemTypeFile   ItemType = "file"
+	ItemTypeFolder ItemType = "folder"
+
+	ShareStateAccepted ShareState = 0
+	ShareStatePending             = 1
+	ShareStateRejected            = 2
+)
+
+type ResponseMeta struct {
+	Status       string `json:"status"`
+	StatusCode   int    `json:"statuscode"`
+	Message      string `json:"message"`
+	TotalItems   string `json:"totalitems"`
+	ItemsPerPage string `json:"itemsperpage"`
+}
+
+type OCSPayload struct {
+	Meta *ResponseMeta `json:"meta"`
+	Data interface{}   `json:"data"`
+}
+
+type OCSResponse struct {
+	OCS *OCSPayload `json:"ocs"`
+}
+
+type JSONInt struct {
+	Value int
+	Valid bool
+	Set   bool
+}
+
+type JSONString struct {
+	Value string
+	Valid bool
+	Set   bool
+}
+
+func (i *JSONString) UnmarshalJSON(data []byte) error {
+	// If this method was called, the value was set.
+	i.Set = true
+
+	if string(data) == "null" {
+		// The key was set to null
+		i.Valid = false
+		return nil
+	}
+
+	// The key isn't set to null
+	var temp string
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	i.Value = temp
+	i.Valid = true
+	return nil
+}
+
+func (i *JSONInt) UnmarshalJSON(data []byte) error {
+	// If this method was called, the value was set.
+	i.Set = true
+
+	if string(data) == "null" {
+		// The key was set to null
+		i.Valid = false
+		return nil
+	}
+
+	// The key isn't set to null
+	var temp int
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+	i.Value = temp
+	i.Valid = true
+	return nil
+}
+
+type LDAPAccountType string
+
+var (
+	LDAPAccountTypePrimary   LDAPAccountType = "primary"
+	LDAPAccountTypeSecondary LDAPAccountType = "secondary"
+	LDAPAccountTypeService   LDAPAccountType = "service"
+	LDAPAccountTypeEGroup    LDAPAccountType = "egroup"
+	LDAPAccountTypeUnixGroup LDAPAccountType = "unixgroup"
+	LDAPAccountTypeUndefined LDAPAccountType = "undefined"
+)

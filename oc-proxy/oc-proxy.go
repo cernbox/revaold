@@ -47,6 +47,9 @@ func init() {
 	flag.String("revahost", "localhost", "Hostname of the REVA server")
 	flag.Int("revaport", 1099, "Port of the REVA server")
 
+	flag.String("cboxgroupdaemonuri", "http://localhost:2002", "URI of the CBOX group daemon")
+	flag.String("cboxgroupdaemonsecret", "foo", "Secret to communicate with the CBOX group daemon")
+
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 	viper.BindPFlags(pflag.CommandLine)
@@ -86,10 +89,12 @@ func main() {
 	}
 
 	ocsOpts := &ocs.Options{
-		Logger:       logger,
-		REVAHostname: viper.GetString("revahostname"),
-		REVAPort:     viper.GetInt("revaport"),
-		Router:       router,
+		Logger:                logger,
+		REVAHostname:          viper.GetString("revahostname"),
+		REVAPort:              viper.GetInt("revaport"),
+		CBOXGroupDaemonSecret: viper.GetString("cboxgroupdaemonsecret"),
+		CBOXGroupDaemonURI:    viper.GetString("cboxgroupdaemonuri"),
+		Router:                router,
 	}
 	_, err = ocs.New(ocsOpts)
 	if err != nil {

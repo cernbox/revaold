@@ -22,10 +22,13 @@ const (
 	// PathInvalidError is used when a path is invalid, like not begging with /
 	PathInvalidError ErrorCode = "PATH_INVALID_ERROR"
 
-	// LinkNotFoundErrorCode is used when a resource is not found.
+	// PublicLinkNotFoundErrorCode is used when a resource is not found.
 	PublicLinkNotFoundErrorCode ErrorCode = "PUBLIC_LINK_NOT_FOUND"
 
 	PublicLinkInvalidExpireDateErrorCode ErrorCode = "PUBLIC_LINK_INVALID_EXPIRE_DATE"
+
+	// FolderShareNotFoundErrorCode is used when a resource is not found.
+	FolderShareNotFoundErrorCode ErrorCode = "FOLDER_SHARE_NOT_FOUND"
 
 	// StorageOperationNotSupported is used when some operation is not available on
 	// the storage, like emptying the recycle bin

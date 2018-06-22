@@ -33,10 +33,12 @@ service Share {
   rpc InspectPublicLink(ShareIDReq) returns (PublicLinkResponse) {}
   rpc RevokePublicLink(ShareIDReq) returns  (EmptyResponse) {}
   rpc ListPublicLinks(EmptyReq) returns (stream PublicLinkResponse) {}
+
   rpc AddFolderShare(NewFolderShareReq) returns (FolderShareResponse) {}
-  rpc UpdateFolderShare(UpdateFolderShareReq) returns (EmptyResponse) {}
+  rpc UpdateFolderShare(UpdateFolderShareReq) returns (FolderShareResponse) {}
   rpc ListFolderShares(ListFolderSharesReq) returns (stream FolderShareResponse) {}
   rpc UnshareFolder(UnshareFolderReq) returns (EmptyResponse) {}
+  rpc GetFolderShare(ShareIDReq) returns (FolderShareResponse) {}
 
   rpc ListReceivedShares(EmptyReq) returns (stream ReceivedShareResponse) {}
   rpc MountReceivedShare(ReceivedShareReq) returns (EmptyResponse) {}
@@ -77,6 +79,7 @@ enum StatusCode {
   STORAGE_NOT_SUPPORTED = 9;
   USER_NOT_FOUND = 10;
   TOKEN_INVALID = 11;
+  FOLDER_SHARE_NOT_FOUND = 12;
 }
 
 
@@ -235,6 +238,16 @@ message PublicLinkResponse {
   PublicLink publicLink = 2;
 }
 
+message ShareRecipient {
+  string identity = 1;
+  RecipientType type = 2;
+  
+  enum RecipientType{
+    USER = 0;
+    GROUP = 1;
+  }
+}
+
 message PublicLink {
   string id = 1;
   string token = 2;
@@ -243,11 +256,12 @@ message PublicLink {
   uint64 expires = 5;
   bool read_only = 6;
   uint64 mtime = 7;
+  ItemType item_type = 8;
+
   enum ItemType {
     FILE = 0;
     FOLDER = 1;
   }
-  ItemType item_type = 8;
 }
 
 message TokenReq {
@@ -269,10 +283,10 @@ message FolderShare {
   string id = 1;
   string path = 2;
   string owner_id = 3;
-  string recipient_id = 4;
+  ShareRecipient recipient = 4;
   bool read_only = 5;
-  uint64 ctime = 7;
-  uint64 mtime = 8;
+  uint64 ctime = 6;
+  uint64 mtime = 7;
 }
 
 
@@ -285,7 +299,7 @@ message ReceivedShare {
   string id = 1;
   string path = 2;
   string owner_id = 3;
-  string recipient_id = 4;
+  ShareRecipient recipient = 4;
   bool read_only = 5;
   bool mounted = 6;
   string mount_name = 7;
@@ -295,13 +309,14 @@ message ReceivedShare {
 
 message NewFolderShareReq {
   string path = 1;  
-  string recipient = 2;
+  ShareRecipient recipient = 2;
   bool read_only = 3;
 }
 
 message UpdateFolderShareReq {
   string id = 1;
-  bool read_only = 2;
+  bool update_read_only = 2;
+  bool read_only = 3;
 }
 
 message UnshareFolderReq {

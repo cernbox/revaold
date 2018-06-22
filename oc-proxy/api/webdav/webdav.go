@@ -31,183 +31,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type Options struct {
-	Logger            *zap.Logger
-	TemporaryFolder   string
-	ChunksFolder      string
-	MaxUploadFileSize uint64
-	REVAHostname      string
-	REVAPort          int
-	Router            *mux.Router
-}
-
-func (opt *Options) init() {
-	if opt.TemporaryFolder == "" {
-		opt.TemporaryFolder = os.TempDir()
-	}
-
-	if opt.ChunksFolder == "" {
-		opt.ChunksFolder = filepath.Join(opt.TemporaryFolder, "chunks")
-	}
-
-}
-
-func New(opt *Options) (http.Handler, error) {
-	if opt == nil {
-		opt = &Options{}
-	}
-
-	opt.init()
-
-	if opt.Router == nil {
-		opt.Router = mux.NewRouter()
-	}
-
-	if err := os.MkdirAll(opt.TemporaryFolder, 0755); err != nil {
-		return nil, err
-	}
-
-	if err := os.MkdirAll(opt.ChunksFolder, 0755); err != nil {
-		return nil, err
-	}
-
-	proxy := &proxy{
-		maxUploadFileSize: int64(opt.MaxUploadFileSize),
-		router:            opt.Router,
-		chunksFolder:      opt.ChunksFolder,
-		temporaryFolder:   opt.TemporaryFolder,
-		revaHost:          fmt.Sprintf("%s:%d", opt.REVAHostname, opt.REVAPort),
-		logger:            opt.Logger,
-	}
-
-	conn, err := grpc.Dial(proxy.revaHost, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	proxy.grpcConn = conn
-
-	proxy.registerRoutes()
-	return proxy, nil
-}
-
-type proxy struct {
-	temporaryFolder   string
-	chunksFolder      string
-	maxUploadFileSize int64
-	router            *mux.Router
-	authClient        api.AuthClient
-	storageClient     api.StorageClient
-	revaHost          string
-	grpcConn          *grpc.ClientConn
-	logger            *zap.Logger
-}
-
-func (p *proxy) getAuthClient() api.AuthClient {
-	return api.NewAuthClient(p.grpcConn)
-}
-
-func (p *proxy) getStorageClient() api.StorageClient {
-	return api.NewStorageClient(p.grpcConn)
-}
-
-func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	p.router.ServeHTTP(w, r)
-}
-
-func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		normalizedPath := mux.Vars(r)["path"]
-		normalizedPath = path.Join("/", path.Clean(normalizedPath))
-		mux.Vars(r)["path"] = normalizedPath
-
-		authClient := p.getAuthClient()
-
-		// try to get token from cookie
-		authCookie, err := r.Cookie("oc_sessionpassphrase")
-		if err == nil {
-			token := authCookie.Value
-			userRes, err := authClient.VerifyToken(ctx, &api.VerifyTokenReq{Token: token})
-			if err != nil {
-				p.logger.Error("", zap.Error(err))
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			} else {
-				if userRes.Status != api.StatusCode_OK {
-					p.logger.Warn("cookie token is invalid or not longer valid", zap.Error(err))
-				} else {
-					user := userRes.User
-					ctx = api.ContextSetUser(ctx, user)
-					ctx = api.ContextSetAccessToken(ctx, token)
-					r = r.WithContext(ctx)
-					p.logger.Info("user authenticated with cookie", zap.String("account_id", user.AccountId))
-					h(w, r)
-					return
-				}
-			}
-
-		} else {
-			p.logger.Info("cookie oc_sessionpassphrase not set")
-		}
-
-		// try to get credentials using basic auth
-		username, password, ok := r.BasicAuth()
-		if !ok {
-			p.logger.Info("basic auth not provided")
-			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		// try to authenticate user with username and password
-		gReq := &api.CreateTokenReq{ClientId: username, ClientSecret: password}
-		gTokenRes, err := authClient.CreateToken(ctx, gReq)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-
-		}
-		if gTokenRes.Status != api.StatusCode_OK {
-			p.logger.Warn("token is not valid", zap.Int("status", int(gTokenRes.Status)))
-			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		token := gTokenRes.Token
-		p.logger.Info("token created", zap.String("token", token.Token))
-
-		gReq2 := &api.VerifyTokenReq{Token: token.Token}
-		userRes, err := authClient.VerifyToken(ctx, gReq2)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		if userRes.Status != api.StatusCode_OK {
-			p.logger.Error("", zap.Error(err))
-			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		// save token into cookie for further requests
-		cookie := &http.Cookie{}
-		cookie.Name = "oc_sessionpassphrase"
-		cookie.Value = token.Token
-		cookie.MaxAge = 3600
-		http.SetCookie(w, cookie)
-
-		user := userRes.User
-		ctx = api.ContextSetUser(ctx, user)
-		ctx = api.ContextSetAccessToken(ctx, token.Token)
-		r = r.WithContext(ctx)
-
-		p.logger.Info("request is authenticated", zap.String("account_id", user.AccountId))
-		h.ServeHTTP(w, r)
-	})
-}
-
 func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
@@ -1905,4 +1728,181 @@ func getMD5Hash(text string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(text))
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+type Options struct {
+	Logger            *zap.Logger
+	TemporaryFolder   string
+	ChunksFolder      string
+	MaxUploadFileSize uint64
+	REVAHostname      string
+	REVAPort          int
+	Router            *mux.Router
+}
+
+func (opt *Options) init() {
+	if opt.TemporaryFolder == "" {
+		opt.TemporaryFolder = os.TempDir()
+	}
+
+	if opt.ChunksFolder == "" {
+		opt.ChunksFolder = filepath.Join(opt.TemporaryFolder, "chunks")
+	}
+
+}
+
+func New(opt *Options) (http.Handler, error) {
+	if opt == nil {
+		opt = &Options{}
+	}
+
+	opt.init()
+
+	if opt.Router == nil {
+		opt.Router = mux.NewRouter()
+	}
+
+	if err := os.MkdirAll(opt.TemporaryFolder, 0755); err != nil {
+		return nil, err
+	}
+
+	if err := os.MkdirAll(opt.ChunksFolder, 0755); err != nil {
+		return nil, err
+	}
+
+	proxy := &proxy{
+		maxUploadFileSize: int64(opt.MaxUploadFileSize),
+		router:            opt.Router,
+		chunksFolder:      opt.ChunksFolder,
+		temporaryFolder:   opt.TemporaryFolder,
+		revaHost:          fmt.Sprintf("%s:%d", opt.REVAHostname, opt.REVAPort),
+		logger:            opt.Logger,
+	}
+
+	conn, err := grpc.Dial(proxy.revaHost, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	proxy.grpcConn = conn
+
+	proxy.registerRoutes()
+	return proxy, nil
+}
+
+type proxy struct {
+	temporaryFolder   string
+	chunksFolder      string
+	maxUploadFileSize int64
+	router            *mux.Router
+	authClient        api.AuthClient
+	storageClient     api.StorageClient
+	revaHost          string
+	grpcConn          *grpc.ClientConn
+	logger            *zap.Logger
+}
+
+func (p *proxy) getAuthClient() api.AuthClient {
+	return api.NewAuthClient(p.grpcConn)
+}
+
+func (p *proxy) getStorageClient() api.StorageClient {
+	return api.NewStorageClient(p.grpcConn)
+}
+
+func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	p.router.ServeHTTP(w, r)
+}
+
+func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		normalizedPath := mux.Vars(r)["path"]
+		normalizedPath = path.Join("/", path.Clean(normalizedPath))
+		mux.Vars(r)["path"] = normalizedPath
+
+		authClient := p.getAuthClient()
+
+		// try to get token from cookie
+		authCookie, err := r.Cookie("oc_sessionpassphrase")
+		if err == nil {
+			token := authCookie.Value
+			userRes, err := authClient.VerifyToken(ctx, &api.VerifyTokenReq{Token: token})
+			if err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			} else {
+				if userRes.Status != api.StatusCode_OK {
+					p.logger.Warn("cookie token is invalid or not longer valid", zap.Error(err))
+				} else {
+					user := userRes.User
+					ctx = api.ContextSetUser(ctx, user)
+					ctx = api.ContextSetAccessToken(ctx, token)
+					r = r.WithContext(ctx)
+					p.logger.Info("user authenticated with cookie", zap.String("account_id", user.AccountId))
+					h(w, r)
+					return
+				}
+			}
+
+		} else {
+			p.logger.Info("cookie oc_sessionpassphrase not set")
+		}
+
+		// try to get credentials using basic auth
+		username, password, ok := r.BasicAuth()
+		if !ok {
+			p.logger.Info("basic auth not provided")
+			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// try to authenticate user with username and password
+		gReq := &api.CreateTokenReq{ClientId: username, ClientSecret: password}
+		gTokenRes, err := authClient.CreateToken(ctx, gReq)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+
+		}
+		if gTokenRes.Status != api.StatusCode_OK {
+			p.logger.Warn("token is not valid", zap.Int("status", int(gTokenRes.Status)))
+			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		token := gTokenRes.Token
+		p.logger.Info("token created", zap.String("token", token.Token))
+
+		gReq2 := &api.VerifyTokenReq{Token: token.Token}
+		userRes, err := authClient.VerifyToken(ctx, gReq2)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if userRes.Status != api.StatusCode_OK {
+			p.logger.Error("", zap.Error(err))
+			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// save token into cookie for further requests
+		cookie := &http.Cookie{}
+		cookie.Name = "oc_sessionpassphrase"
+		cookie.Value = token.Token
+		cookie.MaxAge = 3600
+		http.SetCookie(w, cookie)
+
+		user := userRes.User
+		ctx = api.ContextSetUser(ctx, user)
+		ctx = api.ContextSetAccessToken(ctx, token.Token)
+		r = r.WithContext(ctx)
+
+		p.logger.Info("request is authenticated", zap.String("account_id", user.AccountId))
+		h.ServeHTTP(w, r)
+	})
 }

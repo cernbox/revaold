@@ -110,17 +110,19 @@ type PublicLinkManager interface {
 }
 
 type ShareManager interface {
-	AddFolderShare(ctx context.Context, path, recipient string, readOnly bool) (*FolderShare, error)
-	UpdateFolderShare(ctx context.Context, shareID string, readOnly bool) (*FolderShare, error)
-	ListFolderShares(ctx context.Context) ([]*FolderShare, error)
+	AddFolderShare(ctx context.Context, path string, recipient *ShareRecipient, readOnly bool) (*FolderShare, error)
 	GetFolderShare(ctx context.Context, shareID string) (*FolderShare, error)
 	Unshare(ctx context.Context, shareID string) error
-	ListFolderMembers(ctx context.Context, path string) ([]string, error)
-	GetFolderSharesInPath(ctx context.Context, path string) ([]*FolderShare, error)
+	UpdateFolderShare(ctx context.Context, shareID string, updateReadOnly, readOnly bool) (*FolderShare, error)
+	ListFolderShares(ctx context.Context) ([]*FolderShare, error)
+	/*
+		ListFolderRecipients(ctx context.Context, path string) ([]*ShareRecipient, error)
+		GetFolderSharesInPath(ctx context.Context, path string) ([]*FolderShare, error)
 
-	ListReceivedShares(ctx context.Context) ([]*FolderShare, error)
-	MountReceivedShare(ctx context.Context, shareID string) error
-	UnmountReceivedShare(ctx context.Context, shareID string) error
+		ListReceivedShares(ctx context.Context) ([]*FolderShare, error)
+		MountReceivedShare(ctx context.Context, shareID string) error
+		UnmountReceivedShare(ctx context.Context, shareID string) error
+	*/
 }
 
 type AuthManager interface {

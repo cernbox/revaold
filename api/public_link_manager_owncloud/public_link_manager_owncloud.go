@@ -53,6 +53,18 @@ type linkManager struct {
 	vfs api.VirtualStorage
 }
 
+// getFileIDParts returns the two parts of a fileID.
+// A fileID like home:1234 will be separated into the prefix (home) and the inode(1234).
+func splitFileID(fileID string) (string, string) {
+	tokens := strings.Split(fileID, ":")
+	return tokens[0], tokens[1]
+}
+
+// joinFileID concatenates the prefix and the inode to form a valid fileID.
+func joinFileID(prefix, inode string) string {
+	return strings.Join([]string{prefix, inode}, ":")
+}
+
 func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *api.PublicLinkOptions) (*api.PublicLink, error) {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
@@ -76,15 +88,15 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 	}
 	token := genToken()
 
-	itemSource := strings.Split(md.Id, ":")[1]
+	prefix, itemSource := splitFileID(md.Id)
 	fileSource, err := strconv.ParseUint(itemSource, 10, 64)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
 
-	stmtString := "insert into oc_share set share_type=?,uid_owner=?,uid_initiator=?,item_type=?,item_source=?,file_source=?,permissions=?,stime=?,token=?"
-	stmtValues := []interface{}{3, u.AccountId, u.AccountId, itemType, itemSource, fileSource, permissions, time.Now().Unix(), token}
+	stmtString := "insert into oc_share set share_type=?,uid_owner=?,uid_initiator=?,item_type=?,fileid_prefix=?,item_source=?,file_source=?,permissions=?,stime=?,token=?"
+	stmtValues := []interface{}{3, u.AccountId, u.AccountId, itemType, prefix, itemSource, fileSource, permissions, time.Now().Unix(), token}
 
 	if opt.Password != "" {
 		hashedPassword, err := hashPassword(opt.Password)
@@ -227,8 +239,6 @@ func (lm *linkManager) InspectPublicLink(ctx context.Context, id string) (*api.P
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	// TODO(labkode): check that this works after the migration.
-	pb.Path = "home:" + pb.Path // hardcoded mount
 	return pb, nil
 }
 
@@ -251,7 +261,6 @@ func (lm *linkManager) ListPublicLinks(ctx context.Context) ([]*api.PublicLink, 
 			//TODO(labkode): log error and continue
 			continue
 		}
-		pb.Path = "home:" + pb.Path // hardcoded mount
 		publicLinks = append(publicLinks, pb)
 
 	}
@@ -315,6 +324,7 @@ type ocShare struct {
 
 type dbShare struct {
 	ID          int
+	Prefix      string
 	ItemSource  string
 	ShareWith   string
 	Token       string
@@ -333,6 +343,7 @@ func (lm *linkManager) getDBShare(ctx context.Context, accountID, id string) (*d
 	}
 
 	var (
+		prefix      string
 		itemSource  string
 		shareWith   string
 		expiration  string
@@ -342,25 +353,33 @@ func (lm *linkManager) getDBShare(ctx context.Context, accountID, id string) (*d
 		token       string
 	)
 
-	query := "select coalesce(share_with, '') as share_with, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and uid_owner=? and id=?"
-	if err := lm.db.QueryRow(query, 3, accountID, id).Scan(&shareWith, &itemSource, &token, &expiration, &stime, &permissions, &itemType); err != nil {
-		// TODO(labkode): return not found error code
+	query := "select coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and uid_owner=? and id=?"
+	if err := lm.db.QueryRow(query, 3, accountID, id).Scan(&shareWith, &prefix, &itemSource, &token, &expiration, &stime, &permissions, &itemType); err != nil {
+		fmt.Println("hello")
+		if err == sql.ErrNoRows {
+			fmt.Println("inside")
+			return nil, api.NewError(api.PublicLinkNotFoundErrorCode)
+		}
+		fmt.Println("chao")
+
 		return nil, err
 	}
-	dbShare := &dbShare{ID: int(intID), ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
+	dbShare := &dbShare{ID: int(intID), Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
 	return dbShare, nil
 
 }
 func (lm *linkManager) getDBShares(ctx context.Context, accountID string) ([]*dbShare, error) {
-	query := "select id, coalesce(share_with, '') as share_with, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and uid_owner=?"
+	query := "select id, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and uid_owner=?"
 	rows, err := lm.db.Query(query, 3, accountID)
 	if err != nil {
 		return nil, err
 	}
+
 	defer rows.Close()
 
 	var (
 		id          int
+		prefix      string
 		itemSource  string
 		shareWith   string
 		token       string
@@ -372,11 +391,11 @@ func (lm *linkManager) getDBShares(ctx context.Context, accountID string) ([]*db
 
 	dbShares := []*dbShare{}
 	for rows.Next() {
-		err := rows.Scan(&id, &shareWith, &itemSource, &token, &expiration, &stime, &permissions, &itemType)
+		err := rows.Scan(&id, &shareWith, &prefix, &itemSource, &token, &expiration, &stime, &permissions, &itemType)
 		if err != nil {
 			return nil, err
 		}
-		dbShare := &dbShare{ID: id, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
+		dbShare := &dbShare{ID: id, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
 		dbShares = append(dbShares, dbShare)
 
 	}
@@ -405,12 +424,14 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 
 		itemType = api.PublicLink_FILE
 	}
+
+	fileID := joinFileID(dbShare.Prefix, dbShare.ItemSource)
 	publicLink := &api.PublicLink{
 		Id:        fmt.Sprintf("%d", dbShare.ID),
 		Token:     dbShare.Token,
 		Mtime:     uint64(dbShare.STime),
 		Protected: dbShare.ShareWith != "",
-		Path:      dbShare.ItemSource,
+		Path:      fileID,
 		Expires:   expires,
 		ReadOnly:  dbShare.Permissions == 1,
 		ItemType:  itemType,

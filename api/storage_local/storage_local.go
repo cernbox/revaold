@@ -73,6 +73,17 @@ func (fs *localStorage) GetPathByID(ctx context.Context, id string) (string, err
 	return "", api.NewError(api.StorageNotSupportedErrorCode)
 }
 
+func (fs *localStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+
+func (fs *localStorage) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+func (fs *localStorage) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+
 func (fs *localStorage) CreateDir(ctx context.Context, name string) error {
 	name = fs.addNamespace(name)
 	return os.Mkdir(name, 0644)

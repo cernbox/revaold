@@ -55,6 +55,39 @@ func (m *mount) GetPathByID(ctx context.Context, id string) (string, error) {
 	return path.Join(m.GetMountPoint(), p), nil
 }
 
+func (m *mount) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	if m.isReadOnly() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	}
+	p, _, err := m.getInternalPath(ctx, path)
+	if err != nil {
+		return err
+	}
+	return m.storage.SetACL(ctx, p, readOnly, recipient, shareList)
+}
+
+func (m *mount) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	if m.isReadOnly() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	}
+	p, _, err := m.getInternalPath(ctx, path)
+	if err != nil {
+		return err
+	}
+	return m.storage.UpdateACL(ctx, p, readOnly, recipient, shareList)
+}
+
+func (m *mount) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	if m.isReadOnly() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	}
+	p, _, err := m.getInternalPath(ctx, path)
+	if err != nil {
+		return err
+	}
+	return m.storage.UnsetACL(ctx, p, recipient, shareList)
+}
+
 func (m *mount) CreateDir(ctx context.Context, path string) error {
 	if m.isReadOnly() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")

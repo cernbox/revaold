@@ -154,6 +154,38 @@ func (fs *eosStorage) GetPathByID(ctx context.Context, id string) (string, error
 	return fi.Path, nil
 }
 
+func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	path = fs.getInternalPath(ctx, path)
+	return fs.c.AddACL(ctx, u.AccountId, path, readOnly, recipient, shareList)
+
+}
+
+func (fs *eosStorage) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	path = fs.getInternalPath(ctx, path)
+	return fs.c.RemoveACL(ctx, u.AccountId, path, recipient, shareList)
+
+}
+
+func (fs *eosStorage) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	path = fs.getInternalPath(ctx, path)
+	return fs.c.AddACL(ctx, u.AccountId, path, readOnly, recipient, shareList)
+}
+
 func (fs *eosStorage) GetMetadata(ctx context.Context, path string) (*api.Metadata, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {

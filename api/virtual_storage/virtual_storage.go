@@ -96,6 +96,49 @@ func (v *vfs) GetPathByID(ctx context.Context, id string) (string, error) {
 	return m.GetPathByID(ctx, id)
 }
 
+func (v *vfs) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	derefPath, err := v.getDereferencedPath(ctx, path)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return err
+	}
+	m, err := v.GetMount(derefPath)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return err
+	}
+	return m.SetACL(ctx, derefPath, readOnly, recipient, shareList)
+
+}
+
+func (v *vfs) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	derefPath, err := v.getDereferencedPath(ctx, path)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return err
+	}
+	m, err := v.GetMount(derefPath)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return err
+	}
+	return m.UnsetACL(ctx, derefPath, recipient, shareList)
+}
+
+func (v *vfs) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	derefPath, err := v.getDereferencedPath(ctx, path)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return err
+	}
+	m, err := v.GetMount(derefPath)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return err
+	}
+	return m.UpdateACL(ctx, derefPath, readOnly, recipient, shareList)
+}
+
 func (v *vfs) CreateDir(ctx context.Context, path string) error {
 	derefPath, err := v.getDereferencedPath(ctx, path)
 	if err != nil {

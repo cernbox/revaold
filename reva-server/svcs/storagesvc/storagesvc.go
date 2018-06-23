@@ -37,6 +37,36 @@ func (s *svc) RestoreRevision(ctx context.Context, req *api.RevisionReq) (*api.E
 	return &api.EmptyResponse{}, nil
 }
 
+func (s *svc) UpdateACL(ctx context.Context, req *api.ACLReq) (*api.EmptyResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	err := s.vs.UpdateACL(ctx, req.Path, req.ReadOnly, req.Recipient, req.Shares)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	return &api.EmptyResponse{}, nil
+}
+
+func (s *svc) SetACL(ctx context.Context, req *api.ACLReq) (*api.EmptyResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	err := s.vs.SetACL(ctx, req.Path, req.ReadOnly, req.Recipient, req.Shares)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	return &api.EmptyResponse{}, nil
+}
+
+func (s *svc) UnsetACL(ctx context.Context, req *api.ACLReq) (*api.EmptyResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	err := s.vs.UnsetACL(ctx, req.Path, req.Recipient, req.Shares)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	return &api.EmptyResponse{}, nil
+}
+
 func (s *svc) RestoreRecycleEntry(ctx context.Context, req *api.RecycleEntryReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.RestoreRecycleEntry(ctx, req.RestoreKey); err != nil {

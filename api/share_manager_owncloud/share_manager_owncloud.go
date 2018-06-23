@@ -123,6 +123,12 @@ func (sm *shareManager) Unshare(ctx context.Context, id string) error {
 		return err
 	}
 
+	share, err := sm.GetFolderShare(ctx, id)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return err
+	}
+
 	stmt, err := sm.db.Prepare("delete from oc_share where uid_owner=? and id=?")
 	if err != nil {
 		l.Error("", zap.Error(err))
@@ -146,6 +152,16 @@ func (sm *shareManager) Unshare(ctx context.Context, id string) error {
 		l.Error("", zap.Error(err), zap.String("id", id))
 		return err
 	}
+
+	// re-set acl on the storage
+	err = sm.vfs.UnsetACL(ctx, share.Path, share.Recipient, []*api.FolderShare{})
+	if err != nil {
+		l.Error("error removing acl on storage, fix manually", zap.Error(err))
+		return err
+	}
+
+	l.Info("share removed from storage acl", zap.String("share_id", share.Id))
+
 	return nil
 }
 
@@ -231,6 +247,21 @@ func (sm *shareManager) AddFolderShare(ctx context.Context, path string, recipie
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
+
+	// set acl on the storage
+	err = sm.vfs.SetACL(ctx, path, readOnly, recipient, []*api.FolderShare{})
+	if err != nil {
+		l.Error("error setting acl on storage, rollbacking operation", zap.Error(err))
+		err2 := sm.Unshare(ctx, share.Id)
+		if err2 != nil {
+			l.Error("cannot remove non commited share, fix manually", zap.Error(err2), zap.String("share_id", share.Id))
+			return nil, err2
+		}
+		return nil, err
+	}
+
+	l.Info("share commited on storage acl", zap.String("share_id", share.Id))
+
 	return share, nil
 }
 

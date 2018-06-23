@@ -90,6 +90,9 @@ type Storage interface {
 	RestoreRecycleEntry(ctx context.Context, restoreKey string) error
 	EmptyRecycle(ctx context.Context, path string) error
 	GetPathByID(ctx context.Context, id string) (string, error)
+	SetACL(ctx context.Context, path string, readOnly bool, recipient *ShareRecipient, shareList []*FolderShare) error
+	UnsetACL(ctx context.Context, path string, recipient *ShareRecipient, shareList []*FolderShare) error
+	UpdateACL(ctx context.Context, path string, readOnly bool, recipient *ShareRecipient, shareList []*FolderShare) error
 }
 
 type PublicLinkOptions struct {

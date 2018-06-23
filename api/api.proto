@@ -25,6 +25,9 @@ service Storage {
   rpc ListRecycle(PathReq) returns (stream RecycleEntryResponse) {}
   rpc RestoreRecycleEntry(RecycleEntryReq) returns (EmptyResponse) {}
   rpc EmptyRecycle(PathReq) returns (EmptyResponse) {}
+  rpc SetACL(ACLReq) returns (EmptyResponse) {}
+  rpc UpdateACL(ACLReq) returns (EmptyResponse) {}
+  rpc UnsetACL(ACLReq) returns (EmptyResponse) {}
 }
 
 service Share {
@@ -245,7 +248,15 @@ message ShareRecipient {
   enum RecipientType{
     USER = 0;
     GROUP = 1;
+    UNIX = 2;
   }
+}
+
+message ACLReq {
+  string path = 1;
+  ShareRecipient recipient = 2;
+  bool read_only = 3;
+  repeated FolderShare shares = 4;
 }
 
 message PublicLink {

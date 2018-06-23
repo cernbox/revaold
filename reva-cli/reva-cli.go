@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/codegangsta/cli"
 	"github.com/cernbox/reva/reva-cli/cmds"
+	"github.com/codegangsta/cli"
 )
 
 func main() {
@@ -12,7 +12,7 @@ func main() {
 	app := cli.NewApp()
 	app.Authors = []cli.Author{
 		cli.Author{
-			Name:  "Hugo González Labrador",
+			Name:  "Hugo GonzÃÂÃÂ¡lez Labrador",
 			Email: "contact@hugo.labkode.com",
 		},
 	}

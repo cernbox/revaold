@@ -64,6 +64,17 @@ func (fs *linkStorage) getLinkMetadata(ctx context.Context, link *api.PublicLink
 	return finfo, nil
 }
 
+func (fs *linkStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+
+func (fs *linkStorage) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+func (fs *linkStorage) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	return api.NewError(api.StorageNotSupportedErrorCode)
+}
+
 func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata, error) {
 	if p == "/" {
 		return &api.Metadata{

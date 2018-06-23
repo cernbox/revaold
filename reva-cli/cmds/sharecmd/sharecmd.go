@@ -1,6 +1,7 @@
 package sharecmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -15,8 +16,14 @@ import (
 var CreateFolderShareCommand = cli.Command{
 	Name:      "folder-share-create",
 	Usage:     "Creates a folder share",
-	ArgsUsage: "Usage: folder-share-create <path> <recipient> <read-only>",
-	Action:    createFolderShare,
+	ArgsUsage: "Usage: folder-share-create <path> <recipient-type> <recipient> <read-only>",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "read-write",
+			Usage: "Sets the share to read-write so people can add/delete files",
+		},
+	},
+	Action: createFolderShare,
 }
 
 var ListFolderSharesCommand = cli.Command{
@@ -37,7 +44,13 @@ var UpdateFolderShareCommand = cli.Command{
 	Name:      "folder-share-update",
 	Usage:     "Update a folder share",
 	ArgsUsage: "Usage: folder-share-update <share-id> <read-only>",
-	Action:    updateFolderShare,
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "read-write",
+			Usage: "Sets the share to read-write so people can add/delete files",
+		},
+	},
+	Action: updateFolderShare,
 }
 
 var ListReceivedSharesCommand = cli.Command{
@@ -306,19 +319,160 @@ func updatePublicLink(c *cli.Context) error {
 	return nil
 }
 
-func createFolderShare(c *cli.Context) {
-	fmt.Println("not implemented")
+func getRecipientType(t string) (api.ShareRecipient_RecipientType, error) {
+	switch t {
+	case "user":
+		return api.ShareRecipient_USER, nil
+	case "group":
+		return api.ShareRecipient_GROUP, nil
+	case "unix-group":
+		return api.ShareRecipient_UNIX, nil
+	default:
+		return 0, errors.New("unknow recipient type")
+	}
 }
 
-func listFolderShares(c *cli.Context) {
-	fmt.Println("not implemented")
+func getRecipientTypeHuman(t api.ShareRecipient_RecipientType) string {
+	switch t {
+	case api.ShareRecipient_USER:
+		return "user"
+	case api.ShareRecipient_GROUP:
+		return "group"
+	case api.ShareRecipient_UNIX:
+		return "unix-group"
+	default:
+		return "unknown"
+	}
+
 }
 
-func removeFolderShare(c *cli.Context) {
-	fmt.Println("not implemented")
+func createFolderShare(c *cli.Context) error {
+	if len(c.Args()) < 3 {
+		return cli.NewExitError(c.Command.ArgsUsage, 1)
+	}
+
+	path := c.Args().First()
+	recipientTypeString := c.Args().Get(1)
+	recipient := c.Args().Get(2)
+	readWrite := c.Bool("read-write")
+
+	recipientType, err := getRecipientType(recipientTypeString)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	if path == "" || recipientTypeString == "" || recipient == "" {
+		return cli.NewExitError(c.Command.ArgsUsage, 1)
+	}
+
+	client, err := util.GetSharingClient()
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	req := &api.NewFolderShareReq{Path: path, ReadOnly: !readWrite, Recipient: &api.ShareRecipient{Identity: recipient, Type: recipientType}}
+
+	ctx := util.GetContextWithAuth()
+	res, err := client.AddFolderShare(ctx, req)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	if res.Status != api.StatusCode_OK {
+		return cli.NewExitError(res.Status, 1)
+	}
+	share := res.FolderShare
+
+	modified := time.Unix(int64(share.Mtime), 0).Format(time.RFC3339)
+
+	fmt.Fprintf(c.App.Writer, "ID: %s\nReadOnly: %t\nType: %s Recipient: %s\nModify: %s Timestamp: %d\nPath: %s\n", share.Id, share.ReadOnly, recipientTypeString, share.Recipient.Identity, modified, share.Mtime, share.Path)
+	return nil
 }
-func updateFolderShare(c *cli.Context) {
-	fmt.Println("not implemented")
+
+func listFolderShares(c *cli.Context) error {
+	ctx := util.GetContextWithAuth()
+	client, err := util.GetSharingClient()
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	stream, err := client.ListFolderShares(ctx, &api.ListFolderSharesReq{})
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	lines := []string{"#ID|ReadOnly|Type|Recipient|Modified|Path"}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+		if res.Status != api.StatusCode_OK {
+			return cli.NewExitError(res.Status, 1)
+		}
+		share := res.FolderShare
+		recipientType := getRecipientTypeHuman(share.Recipient.Type)
+		line := fmt.Sprintf("%s|%t|%s|%s|%d|%s", share.Id, share.ReadOnly, recipientType, share.Recipient.Identity, share.Mtime, share.Path)
+		lines = append(lines, line)
+	}
+	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))
+	return nil
+}
+
+func removeFolderShare(c *cli.Context) error {
+	id := c.Args().First()
+	if id == "" {
+		return cli.NewExitError(c.Command.ArgsUsage, 1)
+	}
+
+	client, err := util.GetSharingClient()
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	ctx := util.GetContextWithAuth()
+	req := &api.UnshareFolderReq{Id: id}
+	res, err := client.UnshareFolder(ctx, req)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	if res.Status != api.StatusCode_OK {
+		return cli.NewExitError(res.Status, 1)
+	}
+	return nil
+}
+
+func updateFolderShare(c *cli.Context) error {
+	id := c.Args().First()
+	if id == "" {
+		return cli.NewExitError(c.Command.ArgsUsage, 1)
+	}
+
+	readWrite := c.Bool("read-write")
+
+	req := &api.UpdateFolderShareReq{Id: id, ReadOnly: !readWrite, UpdateReadOnly: true}
+	ctx := util.GetContextWithAuth()
+	client, err := util.GetSharingClient()
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	res, err := client.UpdateFolderShare(ctx, req)
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+	if res.Status != api.StatusCode_OK {
+		return cli.NewExitError(res.Status, 1)
+	}
+
+	share := res.FolderShare
+	modified := time.Unix(int64(share.Mtime), 0).Format(time.RFC3339)
+
+	recipientTypeString := getRecipientTypeHuman(share.Recipient.Type)
+	fmt.Fprintf(c.App.Writer, "ID: %s\nReadOnly: %t\nType: %s Recipient: %s\nModify: %s Timestamp: %d\nPath: %s\n", share.Id, share.ReadOnly, recipientTypeString, share.Recipient.Identity, modified, share.Mtime, share.Path)
+	return nil
+
 }
 func listReceivedShares(c *cli.Context) {
 	fmt.Println("not implemented")

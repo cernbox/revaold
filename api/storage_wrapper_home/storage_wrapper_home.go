@@ -50,6 +50,45 @@ func (fs *homeStorage) removeNamespace(ctx context.Context, user *api.User, np s
 	return p
 }
 
+func (fs *homeStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	path = fs.getInternalPath(ctx, u, path)
+	err = fs.wrappedStorage.SetACL(ctx, path, readOnly, recipient, shareList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fs *homeStorage) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	path = fs.getInternalPath(ctx, u, path)
+	err = fs.wrappedStorage.UpdateACL(ctx, path, readOnly, recipient, shareList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (fs *homeStorage) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	path = fs.getInternalPath(ctx, u, path)
+	err = fs.wrappedStorage.UnsetACL(ctx, path, recipient, shareList)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (fs *homeStorage) GetPathByID(ctx context.Context, id string) (string, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {

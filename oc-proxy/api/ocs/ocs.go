@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cernbox/reva/api"
+	reva_api "github.com/cernbox/reva/api"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -18,50 +18,53 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
+var shareIDRegexp = regexp.MustCompile(`\(id:.+\)$`)
+
 func (p *proxy) registerRoutes() {
 	// requests targeting a file/folder
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.createShare)).Methods("POST")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.createShare)).Methods("POST")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.tokenAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
 
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares", p.basicAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.acceptShare)).Methods("POST")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.basicAuth(p.rejectShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.basicAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.basicAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.basicAuth(p.search)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.tokenAuth(p.acceptShare)).Methods("POST")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.tokenAuth(p.rejectShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.tokenAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/loadfile", p.basicAuth(p.loadFile)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.basicAuth(p.saveFile)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/loadfile", p.tokenAuth(p.loadFile)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.tokenAuth(p.saveFile)).Methods("PUT")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.basicAuth(p.downloadArchive)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.tokenAuth(p.downloadArchive)).Methods("GET")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.basicAuth(p.getEOSInfo)).Methods("POST")
+	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.tokenAuth(p.getEOSInfo)).Methods("POST")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.basicAuth(p.listTrashbin)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.basicAuth(p.restoreTrashbin)).Methods("POST")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.tokenAuth(p.listTrashbin)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.tokenAuth(p.restoreTrashbin)).Methods("POST")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/getVersions.php", p.basicAuth(p.getVersions)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.basicAuth(p.rollbackVersion)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/download.php", p.basicAuth(p.downloadVersion)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/getVersions.php", p.tokenAuth(p.getVersions)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.tokenAuth(p.rollbackVersion)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/download.php", p.tokenAuth(p.downloadVersion)).Methods("GET")
 
 }
 
@@ -138,9 +141,30 @@ type Options struct {
 
 	CBOXGroupDaemonURI    string
 	CBOXGroupDaemonSecret string
+
+	OwnCloudHomePrefix string
+	RevaHomePrefix     string
+
+	OwnCloudSharePrefix string
+	RevaSharePrefix     string
 }
 
 func (opt *Options) init() {
+
+	if opt.OwnCloudHomePrefix == "" {
+		opt.OwnCloudHomePrefix = "/"
+	}
+	if opt.RevaHomePrefix == "" {
+		opt.RevaHomePrefix = "/home"
+	}
+
+	if opt.OwnCloudSharePrefix == "" {
+		opt.OwnCloudSharePrefix = "/__myshares"
+	}
+	if opt.RevaSharePrefix == "" {
+		opt.RevaSharePrefix = "/shared-with-me"
+	}
+
 }
 
 func New(opt *Options) (http.Handler, error) {
@@ -160,6 +184,12 @@ func New(opt *Options) (http.Handler, error) {
 		logger:                opt.Logger,
 		cboxGroupDaemonURI:    opt.CBOXGroupDaemonURI,
 		cboxGroupDaemonSecret: opt.CBOXGroupDaemonSecret,
+
+		ownCloudHomePrefix: opt.OwnCloudHomePrefix,
+		revaHomePrefix:     opt.RevaHomePrefix,
+
+		ownCloudSharePrefix: opt.OwnCloudSharePrefix,
+		revaSharePrefix:     opt.RevaSharePrefix,
 	}
 
 	conn, err := grpc.Dial(proxy.revaHost, grpc.WithInsecure())
@@ -174,24 +204,30 @@ func New(opt *Options) (http.Handler, error) {
 
 type proxy struct {
 	router                *mux.Router
-	authClient            api.AuthClient
+	authClient            reva_api.AuthClient
 	revaHost              string
 	cboxGroupDaemonURI    string
 	cboxGroupDaemonSecret string
 	grpcConn              *grpc.ClientConn
 	logger                *zap.Logger
+
+	ownCloudHomePrefix string
+	revaHomePrefix     string
+
+	ownCloudSharePrefix string
+	revaSharePrefix     string
 }
 
-func (p *proxy) getStorageClient() api.StorageClient {
-	return api.NewStorageClient(p.grpcConn)
+func (p *proxy) getStorageClient() reva_api.StorageClient {
+	return reva_api.NewStorageClient(p.grpcConn)
 }
 
-func (p *proxy) getShareClient() api.ShareClient {
-	return api.NewShareClient(p.grpcConn)
+func (p *proxy) getShareClient() reva_api.ShareClient {
+	return reva_api.NewShareClient(p.grpcConn)
 }
 
-func (p *proxy) getAuthClient() api.AuthClient {
-	return api.NewAuthClient(p.grpcConn)
+func (p *proxy) getAuthClient() reva_api.AuthClient {
+	return reva_api.NewAuthClient(p.grpcConn)
 }
 
 func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -211,18 +247,18 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		authCookie, err := r.Cookie("oc_sessionpassphrase")
 		if err == nil {
 			token := authCookie.Value
-			userRes, err := authClient.VerifyToken(ctx, &api.VerifyTokenReq{Token: token})
+			userRes, err := authClient.VerifyToken(ctx, &reva_api.VerifyTokenReq{Token: token})
 			if err != nil {
 				p.logger.Error("", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			} else {
-				if userRes.Status != api.StatusCode_OK {
+				if userRes.Status != reva_api.StatusCode_OK {
 					p.logger.Warn("cookie token is invalid or not longer valid", zap.Error(err))
 				} else {
 					user := userRes.User
-					ctx = api.ContextSetUser(ctx, user)
-					ctx = api.ContextSetAccessToken(ctx, token)
+					ctx = reva_api.ContextSetUser(ctx, user)
+					ctx = reva_api.ContextSetAccessToken(ctx, token)
 					r = r.WithContext(ctx)
 					p.logger.Info("user authenticated with cookie", zap.String("account_id", user.AccountId))
 					h(w, r)
@@ -244,7 +280,7 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// try to authenticate user with username and password
-		gReq := &api.CreateTokenReq{ClientId: username, ClientSecret: password}
+		gReq := &reva_api.CreateTokenReq{ClientId: username, ClientSecret: password}
 		gTokenRes, err := authClient.CreateToken(ctx, gReq)
 		if err != nil {
 			p.logger.Error("", zap.Error(err))
@@ -252,7 +288,7 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 			return
 
 		}
-		if gTokenRes.Status != api.StatusCode_OK {
+		if gTokenRes.Status != reva_api.StatusCode_OK {
 			p.logger.Warn("token is not valid", zap.Int("status", int(gTokenRes.Status)))
 			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -261,14 +297,14 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		token := gTokenRes.Token
 		p.logger.Info("token created", zap.String("token", token.Token))
 
-		gReq2 := &api.VerifyTokenReq{Token: token.Token}
+		gReq2 := &reva_api.VerifyTokenReq{Token: token.Token}
 		userRes, err := authClient.VerifyToken(ctx, gReq2)
 		if err != nil {
 			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if userRes.Status != api.StatusCode_OK {
+		if userRes.Status != reva_api.StatusCode_OK {
 			p.logger.Error("", zap.Error(err))
 			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
 			w.WriteHeader(http.StatusUnauthorized)
@@ -283,8 +319,8 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		http.SetCookie(w, cookie)
 
 		user := userRes.User
-		ctx = api.ContextSetUser(ctx, user)
-		ctx = api.ContextSetAccessToken(ctx, token.Token)
+		ctx = reva_api.ContextSetUser(ctx, user)
+		ctx = reva_api.ContextSetAccessToken(ctx, token.Token)
 		r = r.WithContext(ctx)
 
 		p.logger.Info("request is authenticated", zap.String("account_id", user.AccountId))
@@ -304,22 +340,22 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gCtx := GetContextWithAuth(ctx)
-
-	_, err := p.getMetadata(ctx, filename)
+	revaPath := p.getRevaPath(ctx, filename)
+	_, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	stream, err := p.getStorageClient().ReadRevision(gCtx, &api.RevisionReq{Path: filename, RevKey: revision})
+	stream, err := p.getStorageClient().ReadRevision(gCtx, &reva_api.RevisionReq{Path: revaPath, RevKey: revision})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(filename))
+	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(revaPath))
 	w.WriteHeader(http.StatusOK)
 	var reader io.Reader
 	for {
@@ -332,7 +368,7 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if dcRes.Status != api.StatusCode_OK {
+		if dcRes.Status != reva_api.StatusCode_OK {
 			p.writeError(dcRes.Status, w, r)
 			return
 		}
@@ -382,15 +418,16 @@ func (p *proxy) rollbackVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gCtx := GetContextWithAuth(ctx)
-	res, err := p.getStorageClient().RestoreRevision(gCtx, &api.RevisionReq{Path: filename, RevKey: revision})
+	revaPath := p.getRevaPath(ctx, filename)
+	res, err := p.getStorageClient().RestoreRevision(gCtx, &reva_api.RevisionReq{Path: revaPath, RevKey: revision})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	if res.Status != api.StatusCode_OK {
-		err := api.NewError(api.UnknownError)
+	if res.Status != reva_api.StatusCode_OK {
+		err := reva_api.NewError(reva_api.UnknownError)
 		p.logger.Error("", zap.Error(err))
 		return
 	}
@@ -484,7 +521,8 @@ func (p *proxy) getVersions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	revisions, err := p.getVersionsForPath(ctx, path)
+	revaPath := p.getRevaPath(ctx, path)
+	revisions, err := p.getVersionsForPath(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -495,7 +533,7 @@ func (p *proxy) getVersions(w http.ResponseWriter, r *http.Request) {
 	for _, r := range revisions {
 		e := &versionEntry{
 			Revision: r.RevKey,
-			Name:     path,
+			Name:     p.getOCPath(ctx, path),
 			Size:     int(r.Size),
 			Version:  r.RevKey,
 			MTime:    int64(r.Mtime),
@@ -517,14 +555,14 @@ func (p *proxy) getVersions(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-func (p *proxy) getVersionsForPath(ctx context.Context, path string) ([]*api.Revision, error) {
+func (p *proxy) getVersionsForPath(ctx context.Context, path string) ([]*reva_api.Revision, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getStorageClient().ListRevisions(gCtx, &api.PathReq{Path: path})
+	stream, err := p.getStorageClient().ListRevisions(gCtx, &reva_api.PathReq{Path: path})
 	if err != nil {
 		return nil, err
 	}
 
-	revisions := []*api.Revision{}
+	revisions := []*reva_api.Revision{}
 	for {
 		res, err := stream.Recv()
 		if err == io.EOF {
@@ -535,8 +573,8 @@ func (p *proxy) getVersionsForPath(ctx context.Context, path string) ([]*api.Rev
 			return nil, err
 		}
 
-		if res.Status != api.StatusCode_OK {
-			err := api.NewError(api.UnknownError)
+		if res.Status != reva_api.StatusCode_OK {
+			err := reva_api.NewError(reva_api.UnknownError)
 			return nil, err
 		}
 		revisions = append(revisions, res.Revision)
@@ -640,7 +678,7 @@ type SaveFileResponse struct {
 	Mtime int `json:"mtime"`
 }
 
-type WalkFunc func(path string, md *api.Metadata, err error) error
+type WalkFunc func(path string, md *reva_api.Metadata, err error) error
 
 var SkipDir = errors.New("skip this directory")
 
@@ -664,7 +702,7 @@ func (p *proxy) readDirNames(ctx context.Context, dirname string) ([]string, err
 	names := []string{}
 
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getStorageClient().ListFolder(gCtx, &api.PathReq{Path: dirname})
+	stream, err := p.getStorageClient().ListFolder(gCtx, &reva_api.PathReq{Path: dirname})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		return names, err
@@ -679,7 +717,7 @@ func (p *proxy) readDirNames(ctx context.Context, dirname string) ([]string, err
 			p.logger.Error("", zap.Error(err))
 			return names, err
 		}
-		if mdRes.Status != api.StatusCode_OK {
+		if mdRes.Status != reva_api.StatusCode_OK {
 			p.logger.Error("", zap.Int("status", int(mdRes.Status)))
 			return names, err
 		}
@@ -691,7 +729,7 @@ func (p *proxy) readDirNames(ctx context.Context, dirname string) ([]string, err
 }
 
 // walk recursively descends path, calling walkFn.
-func (p *proxy) walkRecursive(ctx context.Context, path string, md *api.Metadata, walkFn WalkFunc) error {
+func (p *proxy) walkRecursive(ctx context.Context, path string, md *reva_api.Metadata, walkFn WalkFunc) error {
 	if !md.IsDir {
 		return walkFn(path, md, nil)
 	}
@@ -730,19 +768,21 @@ func (p *proxy) walkRecursive(ctx context.Context, path string, md *api.Metadata
 	return nil
 }
 
-func (p *proxy) getMetadata(ctx context.Context, path string) (*api.Metadata, error) {
+func (p *proxy) getMetadata(ctx context.Context, revaPath string) (*reva_api.Metadata, error) {
 	gCtx := GetContextWithAuth(ctx)
-	mdRes, err := p.getStorageClient().Inspect(gCtx, &api.PathReq{Path: path})
+	mdRes, err := p.getStorageClient().Inspect(gCtx, &reva_api.PathReq{Path: revaPath})
 	if err != nil {
-		p.logger.Error("", zap.Error(err), zap.String("path", path))
+		p.logger.Error("", zap.Error(err), zap.String("path", revaPath))
 		return nil, err
 	}
-	if mdRes.Status != api.StatusCode_OK {
-		p.logger.Error("", zap.Int("status", int(mdRes.Status)), zap.String("path", path))
+	if mdRes.Status != reva_api.StatusCode_OK {
+		p.logger.Error("", zap.Int("status", int(mdRes.Status)), zap.String("path", revaPath))
 		// TODO(labkode): set better error code
-		return nil, api.NewError(api.StorageNotSupportedErrorCode).WithMessage(fmt.Sprintf("status: %d", mdRes.Status))
+		return nil, reva_api.NewError(reva_api.StorageNotSupportedErrorCode).WithMessage(fmt.Sprintf("status: %d", mdRes.Status))
 	}
-	return mdRes.Metadata, nil
+	md := mdRes.Metadata
+	md.Path = p.getOCPath(ctx, md.Path)
+	return md, nil
 }
 
 /*
@@ -766,6 +806,7 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 		fileList := r.URL.Query()["files[]"]
 		for _, fn := range fileList {
 			fullPath := path.Join(dir, fn)
+			fullPath = p.getRevaPath(ctx, fullPath)
 			files = append(files, fullPath)
 
 		}
@@ -786,6 +827,15 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 
 	// TODO(labkode): check for size because once the data is being written to the client we cannot override the headers.
 
+	// if downloadStartSecret is set in the query param we need to set the cookie ocDownloadStarted with same value.
+	if r.URL.Query().Get("downloadStartSecret") != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:    "ocDownloadStarted",
+			Value:   r.URL.Query().Get("downloadStartSecret"),
+			Path:    "/",
+			Expires: time.Now().Add(time.Second * 30)})
+	}
+
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", archiveName))
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.WriteHeader(http.StatusOK)
@@ -795,7 +845,7 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 	tw := tar.NewWriter(w)
 	defer tw.Close()
 	for _, fn := range files {
-		err := p.Walk(ctx, fn, func(path string, md *api.Metadata, err error) error {
+		err := p.Walk(ctx, fn, func(path string, md *reva_api.Metadata, err error) error {
 			if err != nil {
 				return err
 			}
@@ -821,7 +871,8 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 			// if file, write file contents into the tar archive
 			if !md.IsDir {
 
-				stream, err := p.getStorageClient().ReadFile(gCtx, &api.PathReq{Path: md.Path})
+				revaPath := p.getRevaPath(ctx, md.Path)
+				stream, err := p.getStorageClient().ReadFile(gCtx, &reva_api.PathReq{Path: revaPath})
 				if err != nil {
 					p.logger.Error("", zap.Error(err))
 					return err
@@ -836,9 +887,9 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 						p.logger.Error("", zap.Error(err))
 						return err
 					}
-					if dcRes.Status != api.StatusCode_OK {
+					if dcRes.Status != reva_api.StatusCode_OK {
 						p.logger.Error("", zap.Int("status", int(dcRes.Status)))
-						return api.NewError(api.StorageNotSupportedErrorCode)
+						return reva_api.NewError(reva_api.StorageNotSupportedErrorCode)
 					}
 
 					dc := dcRes.DataChunk
@@ -882,12 +933,14 @@ func (p *proxy) getEOSInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := r.Form.Get("path")
-	md, err := p.getMetadata(ctx, path)
+	revaPath := p.getRevaPath(ctx, path)
+	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	md.Path = p.getOCPath(ctx, md.Path)
 
 	data := &struct {
 		EosInstance string `json:"eos-instance"`
@@ -979,14 +1032,15 @@ type listTrashbinData struct {
 func (p *proxy) listTrashbin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getStorageClient().ListRecycle(gCtx, &api.PathReq{Path: "/"})
+	revaPath := p.getRevaPath(ctx, p.ownCloudHomePrefix)
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathReq{Path: revaPath})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	entries := []*api.RecycleEntry{}
+	entries := []*reva_api.RecycleEntry{}
 	for {
 		res, err := stream.Recv()
 		if err == io.EOF {
@@ -999,12 +1053,14 @@ func (p *proxy) listTrashbin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if res.Status != api.StatusCode_OK {
-			err := api.NewError(api.UnknownError)
+		if res.Status != reva_api.StatusCode_OK {
+			err := reva_api.NewError(reva_api.UnknownError)
 			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		entry := res.RecycleEntry
+		entry.RestorePath = p.getOCPath(ctx, entry.RestorePath)
 		entries = append(entries, res.RecycleEntry)
 	}
 
@@ -1074,10 +1130,11 @@ func (p *proxy) restoreTrashbin(w http.ResponseWriter, r *http.Request) {
 	restoredEntries := []*restoredEntry{}
 	failedEntries := []*restoredEntry{}
 	for _, f := range files {
-		tokens := strings.Split(f, ".")
+		revaPath := p.getRevaPath(ctx, f)
+		tokens := strings.Split(revaPath, ".")
 		// the token after the last . is the restore key
 		if len(tokens) == 0 {
-			err := api.NewError(api.UnknownError).WithMessage(fmt.Sprintf("restore key is invalid. tokens: %+v", tokens))
+			err := reva_api.NewError(reva_api.UnknownError).WithMessage(fmt.Sprintf("restore key is invalid. tokens: %+v", tokens))
 			p.logger.Error("", zap.Error(err))
 			failedEntries = append(failedEntries, &restoredEntry{Filename: f, Timestamp: now})
 			continue
@@ -1108,14 +1165,14 @@ func (p *proxy) restoreTrashbin(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (p *proxy) getRecycleEntries(ctx context.Context) ([]*api.RecycleEntry, error) {
+func (p *proxy) getRecycleEntries(ctx context.Context) ([]*reva_api.RecycleEntry, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getStorageClient().ListRecycle(gCtx, &api.PathReq{Path: "/"})
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathReq{Path: "/"})
 	if err != nil {
 		return nil, err
 	}
 
-	entries := []*api.RecycleEntry{}
+	entries := []*reva_api.RecycleEntry{}
 	for {
 		res, err := stream.Recv()
 		if err == io.EOF {
@@ -1126,11 +1183,13 @@ func (p *proxy) getRecycleEntries(ctx context.Context) ([]*api.RecycleEntry, err
 			return nil, err
 		}
 
-		if res.Status != api.StatusCode_OK {
-			err := api.NewError(api.UnknownError)
+		if res.Status != reva_api.StatusCode_OK {
+			err := reva_api.NewError(reva_api.UnknownError)
 			return nil, err
 		}
-		entries = append(entries, res.RecycleEntry)
+		entry := res.RecycleEntry
+		entry.RestorePath = p.getOCPath(ctx, entry.RestorePath)
+		entries = append(entries, entry)
 	}
 	return entries, nil
 }
@@ -1199,13 +1258,13 @@ func (p *proxy) restoreAllFiles(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) restoreRecycleEntry(ctx context.Context, restoreKey string) error {
 	gCtx := GetContextWithAuth(ctx)
-	res, err := p.getStorageClient().RestoreRecycleEntry(gCtx, &api.RecycleEntryReq{RestoreKey: restoreKey})
+	res, err := p.getStorageClient().RestoreRecycleEntry(gCtx, &reva_api.RecycleEntryReq{RestoreKey: restoreKey})
 	if err != nil {
 		return err
 	}
 
-	if res.Status != api.StatusCode_OK {
-		return api.NewError(api.UnknownError).WithMessage(fmt.Sprintf("status: %d", res.Status))
+	if res.Status != reva_api.StatusCode_OK {
+		return reva_api.NewError(reva_api.UnknownError).WithMessage(fmt.Sprintf("status: %d", res.Status))
 
 	}
 	return nil
@@ -1231,7 +1290,8 @@ func (p *proxy) saveFile(w http.ResponseWriter, r *http.Request) {
 	//mtime := r.Form.Get("mtime")
 	path := r.Form.Get("path")
 
-	md, err := p.getMetadata(ctx, path)
+	revaPath := p.getRevaPath(ctx, path)
+	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1241,13 +1301,13 @@ func (p *proxy) saveFile(w http.ResponseWriter, r *http.Request) {
 	// TODO(labkode): check that sent mtime is bigger than stored one, else means a conflict and we do not override :)
 
 	gCtx := GetContextWithAuth(ctx)
-	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &api.EmptyReq{})
+	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if txInfoRes.Status != api.StatusCode_OK {
+	if txInfoRes.Status != reva_api.StatusCode_OK {
 		p.writeError(txInfoRes.Status, w, r)
 		return
 	}
@@ -1270,7 +1330,7 @@ func (p *proxy) saveFile(w http.ResponseWriter, r *http.Request) {
 	for {
 		n, err := reader.Read(buffer)
 		if n > 0 {
-			dc := &api.TxChunk{
+			dc := &reva_api.TxChunk{
 				TxId:   txInfo.TxId,
 				Length: uint64(n),
 				Data:   buffer,
@@ -1301,25 +1361,25 @@ func (p *proxy) saveFile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if writeSummaryRes.Status != api.StatusCode_OK {
+	if writeSummaryRes.Status != reva_api.StatusCode_OK {
 		p.writeError(writeSummaryRes.Status, w, r)
 		return
 	}
 
 	// all the chunks have been sent, we need to close the tx
-	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &api.TxEnd{Path: path, TxId: txInfo.TxId})
+	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	if emptyRes.Status != api.StatusCode_OK {
+	if emptyRes.Status != reva_api.StatusCode_OK {
 		p.writeError(emptyRes.Status, w, r)
 		return
 	}
 
-	md, err = p.getMetadata(ctx, path)
+	md, err = p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1347,7 +1407,8 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Query().Get("filename")
 	fullPath := path.Join(dir, filename)
 
-	md, err := p.getMetadata(ctx, fullPath)
+	revaPath := p.getRevaPath(ctx, fullPath)
+	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1355,8 +1416,7 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gCtx := GetContextWithAuth(ctx)
-	pathReq := &api.PathReq{Path: fullPath}
-
+	pathReq := &reva_api.PathReq{Path: revaPath}
 	stream, err := p.getStorageClient().ReadFile(gCtx, pathReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -1377,7 +1437,7 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if dcRes.Status != api.StatusCode_OK {
+		if dcRes.Status != reva_api.StatusCode_OK {
 			p.writeError(dcRes.Status, w, r)
 			return
 		}
@@ -1544,7 +1604,7 @@ func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
 func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly bool, expiration int64, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
-	newLinkReq := &api.NewLinkReq{
+	newLinkReq := &reva_api.NewLinkReq{
 		Path:     newShare.Path,
 		ReadOnly: readOnly,
 		Password: newShare.Password.Value,
@@ -1556,7 +1616,7 @@ func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly boo
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if publicLinkRes.Status != api.StatusCode_OK {
+	if publicLinkRes.Status != reva_api.StatusCode_OK {
 		p.writeError(publicLinkRes.Status, w, r)
 		return
 	}
@@ -1587,17 +1647,17 @@ func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly boo
 func (p *proxy) createFolderShare(newShare *NewShareOCSRequest, readOnly bool, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	recipientType := api.ShareRecipient_USER
+	recipientType := reva_api.ShareRecipient_USER
 	if newShare.ShareType == ShareTypeGroup {
-		recipientType = api.ShareRecipient_GROUP
+		recipientType = reva_api.ShareRecipient_GROUP
 	}
 
-	recipient := &api.ShareRecipient{
+	recipient := &reva_api.ShareRecipient{
 		Identity: newShare.ShareWith,
 		Type:     recipientType,
 	}
 
-	newFolderShareReq := &api.NewFolderShareReq{
+	newFolderShareReq := &reva_api.NewFolderShareReq{
 		Path:      newShare.Path,
 		ReadOnly:  readOnly,
 		Recipient: recipient,
@@ -1610,7 +1670,7 @@ func (p *proxy) createFolderShare(newShare *NewShareOCSRequest, readOnly bool, w
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	if folderShareRes.Status != api.StatusCode_OK {
+	if folderShareRes.Status != reva_api.StatusCode_OK {
 		p.writeError(folderShareRes.Status, w, r)
 		return
 	}
@@ -1638,6 +1698,7 @@ func (p *proxy) createFolderShare(newShare *NewShareOCSRequest, readOnly bool, w
 
 }
 func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	newShare := &NewShareOCSRequest{}
 
 	if r.Header.Get("Content-Type") == "application/json" {
@@ -1689,6 +1750,8 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 		newShare.Permissions = permissions
 
 	}
+
+	newShare.Path = p.getRevaPath(ctx, newShare.Path)
 
 	var readOnly bool
 	if newShare.Permissions == PermissionRead {
@@ -1762,6 +1825,18 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ocsShares = append(ocsShares, folderShares...)
+
+	// if path is set, filter to only shares from that path
+	if path != "" {
+		filtered := []*OCSShare{}
+		for _, v := range ocsShares {
+			if v.Path == path {
+				filtered = append(filtered, v)
+			}
+		}
+		ocsShares = filtered
+	}
+
 	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
 	payload := &OCSPayload{Meta: meta, Data: ocsShares}
 	ocsRes := &OCSResponse{OCS: payload}
@@ -1778,12 +1853,12 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) getPublicLinkShares(ctx context.Context) ([]*OCSShare, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getShareClient().ListPublicLinks(gCtx, &api.EmptyReq{})
+	stream, err := p.getShareClient().ListPublicLinks(gCtx, &reva_api.EmptyReq{})
 	if err != nil {
 		return nil, err
 	}
 
-	publicLinks := []*api.PublicLink{}
+	publicLinks := []*reva_api.PublicLink{}
 	for {
 		plr, err := stream.Recv()
 		if err == io.EOF {
@@ -1794,7 +1869,7 @@ func (p *proxy) getPublicLinkShares(ctx context.Context) ([]*OCSShare, error) {
 			return nil, err
 		}
 
-		if plr.Status != api.StatusCode_OK {
+		if plr.Status != reva_api.StatusCode_OK {
 			return nil, err
 		}
 		publicLinks = append(publicLinks, plr.PublicLink)
@@ -1814,14 +1889,18 @@ func (p *proxy) getPublicLinkShares(ctx context.Context) ([]*OCSShare, error) {
 
 }
 
-func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
+func (p *proxy) getSharedMountPath(ctx context.Context, share *reva_api.FolderShare) string {
+	return path.Join(p.ownCloudSharePrefix, share.Id)
+}
+
+func (p *proxy) getReceivedFolderShares(ctx context.Context) ([]*OCSShare, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getShareClient().ListFolderShares(gCtx, &api.ListFolderSharesReq{})
+	stream, err := p.getShareClient().ListReceivedShares(gCtx, &reva_api.EmptyReq{})
 	if err != nil {
 		return nil, err
 	}
 
-	folderShares := []*api.FolderShare{}
+	folderShares := []*reva_api.FolderShare{}
 	for {
 		res, err := stream.Recv()
 		if err == io.EOF {
@@ -1832,7 +1911,46 @@ func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
 			return nil, err
 		}
 
-		if res.Status != api.StatusCode_OK {
+		if res.Status != reva_api.StatusCode_OK {
+			return nil, err
+		}
+		folderShares = append(folderShares, res.Share)
+
+	}
+
+	ocsShares := []*OCSShare{}
+	for _, share := range folderShares {
+		fmt.Println(share)
+		ocsShare, err := p.receivedFolderShareToOCSShare(ctx, share)
+		if err != nil {
+			p.logger.Error("cannot convert folder share to ocs share", zap.Error(err), zap.String("folder share", fmt.Sprintf("%+v", share)))
+			continue
+		}
+		ocsShares = append(ocsShares, ocsShare)
+	}
+	return ocsShares, nil
+
+}
+
+func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getShareClient().ListFolderShares(gCtx, &reva_api.ListFolderSharesReq{})
+	if err != nil {
+		return nil, err
+	}
+
+	folderShares := []*reva_api.FolderShare{}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		if res.Status != reva_api.StatusCode_OK {
 			return nil, err
 		}
 		folderShares = append(folderShares, res.FolderShare)
@@ -1852,20 +1970,72 @@ func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
 
 }
 
-func (p *proxy) folderShareToOCSShare(ctx context.Context, share *api.FolderShare) (*OCSShare, error) {
-	fmt.Println("folder share IN", share)
+func (p *proxy) receivedFolderShareToOCSShare(ctx context.Context, share *reva_api.FolderShare) (*OCSShare, error) {
 	// TODO(labkode): harden check
-	user, _ := api.ContextGetUser(ctx)
+	user, _ := reva_api.ContextGetUser(ctx)
 	owner := user.AccountId
 
-	md, err := p.getMetadata(ctx, share.Path)
+	ocPath := p.getSharedMountPath(ctx, share)
+	revaPath := p.getRevaPath(ctx, ocPath)
+	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		return nil, err
 	}
 
 	var itemType ItemType = ItemTypeFolder
 	shareType := ShareTypeUser
-	if share.Recipient.Type == api.ShareRecipient_GROUP {
+	if share.Recipient.Type == reva_api.ShareRecipient_GROUP {
+		shareType = ShareTypeGroup
+	}
+
+	var mimeType = "httpd/unix-directory"
+	var permissions Permission
+	if share.ReadOnly {
+		permissions = PermissionRead
+	} else {
+		permissions = PermissionReadWrite
+	}
+
+	var shareWith string = share.Recipient.Identity
+
+	ocsShare := &OCSShare{
+		ShareType:            shareType,
+		ID:                   share.Id,
+		DisplayNameFileOwner: owner,
+		DisplayNameOwner:     owner,
+		FileSource:           md.Id,
+		//FileTarget:           md.Path,
+		FileTarget: ocPath,
+		ItemSource: md.Id,
+		ItemType:   itemType,
+		MimeType:   mimeType,
+		//Name:                 md.Path,
+		Path:                 md.Path,
+		Permissions:          permissions,
+		ShareTime:            int(share.Mtime),
+		State:                ShareStateAccepted,
+		UIDFileOwner:         owner,
+		UIDOwner:             owner,
+		ShareWith:            shareWith,
+		ShareWithDisplayName: shareWith,
+	}
+	return ocsShare, nil
+}
+func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.FolderShare) (*OCSShare, error) {
+	fmt.Println("folder share IN", share)
+	// TODO(labkode): harden check
+	user, _ := reva_api.ContextGetUser(ctx)
+	owner := user.AccountId
+
+	md, err := p.getMetadata(ctx, share.Path)
+	if err != nil {
+		return nil, err
+	}
+	md.Path = p.getOCPath(ctx, md.Path)
+
+	var itemType ItemType = ItemTypeFolder
+	shareType := ShareTypeUser
+	if share.Recipient.Type == reva_api.ShareRecipient_GROUP {
 		shareType = ShareTypeGroup
 	}
 
@@ -1902,25 +2072,26 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *api.FolderShar
 	fmt.Println("folder share OUT ", ocsShare)
 	return ocsShare, nil
 }
-func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *api.PublicLink) (*OCSShare, error) {
+func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLink) (*OCSShare, error) {
 	// TODO(labkode): harden check
-	user, _ := api.ContextGetUser(ctx)
+	user, _ := reva_api.ContextGetUser(ctx)
 	owner := user.AccountId
 
 	md, err := p.getMetadata(ctx, pl.Path)
 	if err != nil {
 		return nil, err
 	}
+	md.Path = p.getOCPath(ctx, md.Path)
 
 	var itemType ItemType
-	if pl.ItemType == api.PublicLink_FOLDER {
+	if pl.ItemType == reva_api.PublicLink_FOLDER {
 		itemType = ItemTypeFolder
 	} else {
 		itemType = ItemTypeFile
 	}
 
 	var mimeType string
-	if pl.ItemType == api.PublicLink_FOLDER {
+	if pl.ItemType == reva_api.PublicLink_FOLDER {
 		mimeType = "httpd/unix-directory"
 	} else {
 		mimeType = mime.TypeByExtension(path.Ext(pl.Path))
@@ -1969,55 +2140,17 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *api.PublicLink) (*
 }
 
 func (p *proxy) getReceivedShares(w http.ResponseWriter, r *http.Request, path string) {
-	shares := []*OCSShare{}
-	if path == "" {
-		shares = []*OCSShare{
-			&OCSShare{
-				ID:               "244",
-				Path:             "/A new Vespa.pdf",
-				Permissions:      PermissionRead,
-				MimeType:         "application/pdf",
-				ShareType:        ShareTypeUser,
-				DisplayNameOwner: "Labrador",
-				UIDOwner:         "labradorsvc",
-				ItemSource:       "home:1234",
-				FileSource:       "home:1234",
-				FileTarget:       "/A new Vespa.pdf",
-				State:            ShareStateAccepted,
-				ItemType:         ItemTypeFile,
-			},
-			&OCSShare{
-				ID:               "245",
-				Path:             "/Red trail",
-				Permissions:      PermissionRead,
-				MimeType:         "application/json",
-				ShareType:        ShareTypeGroup,
-				DisplayNameOwner: "cernbox-admins",
-				UIDOwner:         "lmascett",
-				ItemSource:       "home:1235",
-				FileSource:       "home:1235",
-				FileTarget:       "/Red trail",
-				State:            ShareStatePending,
-				ItemType:         ItemTypeFolder,
-			},
-			&OCSShare{
-				ID:               "246",
-				Path:             "/Bad stuff",
-				Permissions:      PermissionRead,
-				MimeType:         "httpd/unix-directory",
-				ShareType:        ShareTypeGroup,
-				DisplayNameOwner: "cernbox-admins",
-				UIDOwner:         "lmascett",
-				ItemSource:       "home:1236",
-				FileSource:       "home:1236",
-				FileTarget:       "/Bad stuff",
-				State:            ShareStateAccepted,
-				ItemType:         ItemTypeFolder,
-			},
-		}
+	ctx := r.Context()
+
+	ocsShares, err := p.getReceivedFolderShares(ctx)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-	payload := &OCSPayload{Meta: meta, Data: shares}
+
+	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	payload := &OCSPayload{Meta: meta, Data: ocsShares}
 	ocsRes := &OCSResponse{OCS: payload}
 	encoded, err := json.Marshal(ocsRes)
 	if err != nil {
@@ -2028,18 +2161,79 @@ func (p *proxy) getReceivedShares(w http.ResponseWriter, r *http.Request, path s
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
+	/*
+		shares := []*OCSShare{}
+		if path == "" {
+			shares = []*OCSShare{
+				&OCSShare{
+					ID:               "244",
+					Path:             "/A new Vespa.pdf",
+					Permissions:      PermissionRead,
+					MimeType:         "application/pdf",
+					ShareType:        ShareTypeUser,
+					DisplayNameOwner: "Labrador",
+					UIDOwner:         "labradorsvc",
+					ItemSource:       "home:1234",
+					FileSource:       "home:1234",
+					FileTarget:       "/A new Vespa.pdf",
+					State:            ShareStateAccepted,
+					ItemType:         ItemTypeFile,
+				},
+				&OCSShare{
+					ID:               "245",
+					Path:             "/Red trail",
+					Permissions:      PermissionRead,
+					MimeType:         "application/json",
+					ShareType:        ShareTypeGroup,
+					DisplayNameOwner: "cernbox-admins",
+					UIDOwner:         "lmascett",
+					ItemSource:       "home:1235",
+					FileSource:       "home:1235",
+					FileTarget:       "/Red trail",
+					State:            ShareStatePending,
+					ItemType:         ItemTypeFolder,
+				},
+				&OCSShare{
+					ID:               "246",
+					Path:             "/Bad stuff",
+					Permissions:      PermissionRead,
+					MimeType:         "httpd/unix-directory",
+					ShareType:        ShareTypeGroup,
+					DisplayNameOwner: "cernbox-admins",
+					UIDOwner:         "lmascett",
+					ItemSource:       "home:1236",
+					FileSource:       "home:1236",
+					FileTarget:       "/Bad stuff",
+					State:            ShareStateAccepted,
+					ItemType:         ItemTypeFolder,
+				},
+			}
+		}
+		meta := &ResponseMeta{Status: "ok", StatusCode: 100}
+		payload := &OCSPayload{Meta: meta, Data: shares}
+		ocsRes := &OCSResponse{OCS: payload}
+		encoded, err := json.Marshal(ocsRes)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(encoded)
+	*/
 }
 
-func (p *proxy) getPublicLink(ctx context.Context, id string) (*api.PublicLink, error) {
+func (p *proxy) getPublicLink(ctx context.Context, id string) (*reva_api.PublicLink, error) {
 	gCtx := GetContextWithAuth(ctx)
-	res, err := p.getShareClient().InspectPublicLink(gCtx, &api.ShareIDReq{Id: id})
+	res, err := p.getShareClient().InspectPublicLink(gCtx, &reva_api.ShareIDReq{Id: id})
 	if err != nil {
 		return nil, err
 	}
 
-	if res.Status != api.StatusCode_OK {
-		if res.Status == api.StatusCode_PUBLIC_LINK_NOT_FOUND {
-			return nil, api.NewError(api.PublicLinkNotFoundErrorCode)
+	if res.Status != reva_api.StatusCode_OK {
+		if res.Status == reva_api.StatusCode_PUBLIC_LINK_NOT_FOUND {
+			return nil, reva_api.NewError(reva_api.PublicLinkNotFoundErrorCode)
 		}
 	}
 	return res.PublicLink, nil
@@ -2054,7 +2248,7 @@ func (p *proxy) getOCSPublicLink(ctx context.Context, id string) (*OCSShare, boo
 		}
 		return ocsShare, true, nil
 	}
-	if api.IsErrorCode(err, api.PublicLinkNotFoundErrorCode) {
+	if reva_api.IsErrorCode(err, reva_api.PublicLinkNotFoundErrorCode) {
 		return nil, false, nil
 	}
 	return nil, false, err
@@ -2070,23 +2264,23 @@ func (p *proxy) getOCSFolderShare(ctx context.Context, id string) (*OCSShare, bo
 		}
 		return ocsShare, true, nil
 	}
-	if api.IsErrorCode(err, api.FolderShareNotFoundErrorCode) {
+	if reva_api.IsErrorCode(err, reva_api.FolderShareNotFoundErrorCode) {
 		return nil, false, nil
 	}
 	return nil, false, err
 
 }
 
-func (p *proxy) getFolderShare(ctx context.Context, id string) (*api.FolderShare, error) {
+func (p *proxy) getFolderShare(ctx context.Context, id string) (*reva_api.FolderShare, error) {
 	gCtx := GetContextWithAuth(ctx)
-	res, err := p.getShareClient().GetFolderShare(gCtx, &api.ShareIDReq{Id: id})
+	res, err := p.getShareClient().GetFolderShare(gCtx, &reva_api.ShareIDReq{Id: id})
 	if err != nil {
 		return nil, err
 	}
 
-	if res.Status != api.StatusCode_OK {
-		if res.Status == api.StatusCode_FOLDER_SHARE_NOT_FOUND {
-			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
+	if res.Status != reva_api.StatusCode_OK {
+		if res.Status == reva_api.StatusCode_FOLDER_SHARE_NOT_FOUND {
+			return nil, reva_api.NewError(reva_api.FolderShareNotFoundErrorCode)
 		}
 	}
 	return res.FolderShare, nil
@@ -2154,14 +2348,14 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
 	shareID := mux.Vars(r)["share_id"]
-	res, err := p.getShareClient().RevokePublicLink(gCtx, &api.ShareIDReq{Id: shareID})
+	res, err := p.getShareClient().RevokePublicLink(gCtx, &reva_api.ShareIDReq{Id: shareID})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	if res.Status != api.StatusCode_OK {
+	if res.Status != reva_api.StatusCode_OK {
 		p.writeError(res.Status, w, r)
 		return
 	}
@@ -2171,7 +2365,7 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 func (p *proxy) isPublicLinkShare(ctx context.Context, shareID string) (bool, error) {
 	_, err := p.getPublicLink(ctx, shareID)
 	if err != nil {
-		if api.IsErrorCode(err, api.PublicLinkNotFoundErrorCode) {
+		if reva_api.IsErrorCode(err, reva_api.PublicLinkNotFoundErrorCode) {
 			return false, nil
 		}
 		return false, err
@@ -2182,7 +2376,7 @@ func (p *proxy) isPublicLinkShare(ctx context.Context, shareID string) (bool, er
 func (p *proxy) isFolderShare(ctx context.Context, shareID string) (bool, error) {
 	_, err := p.getFolderShare(ctx, shareID)
 	if err != nil {
-		if api.IsErrorCode(err, api.FolderShareNotFoundErrorCode) {
+		if reva_api.IsErrorCode(err, reva_api.FolderShareNotFoundErrorCode) {
 			return false, nil
 		}
 		return false, err
@@ -2193,7 +2387,7 @@ func (p *proxy) isFolderShare(ctx context.Context, shareID string) (bool, error)
 // TODO(labkode): check for updateReadOnly
 func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	req := &api.UpdateFolderShareReq{Id: shareID, ReadOnly: readOnly, UpdateReadOnly: true}
+	req := &reva_api.UpdateFolderShareReq{Id: shareID, ReadOnly: readOnly, UpdateReadOnly: true}
 	gCtx := GetContextWithAuth(ctx)
 	res, err := p.getShareClient().UpdateFolderShare(gCtx, req)
 	if err != nil {
@@ -2202,7 +2396,7 @@ func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.Response
 		return
 	}
 
-	if res.Status != api.StatusCode_OK {
+	if res.Status != reva_api.StatusCode_OK {
 		p.writeError(res.Status, w, r)
 		return
 
@@ -2233,7 +2427,7 @@ func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.Response
 // TODO(labkode): check for updateReadOnly
 func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSRequest, updateExpiration, updatePassword bool, expiration int64, readOnly bool, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	updateLinkReq := &api.UpdateLinkReq{
+	updateLinkReq := &reva_api.UpdateLinkReq{
 		UpdateExpiration: updateExpiration,
 		UpdatePassword:   updatePassword,
 		UpdateReadOnly:   true,
@@ -2251,7 +2445,7 @@ func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSReque
 		return
 	}
 
-	if publicLinkRes.Status != api.StatusCode_OK {
+	if publicLinkRes.Status != reva_api.StatusCode_OK {
 		p.writeError(publicLinkRes.Status, w, r)
 		return
 	}
@@ -2389,32 +2583,32 @@ func (p *proxy) rejectShare(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) isNotFoundError(err error) bool {
-	return api.IsErrorCode(err, api.StorageNotFoundErrorCode)
+	return reva_api.IsErrorCode(err, reva_api.StorageNotFoundErrorCode)
 }
 
-func (p *proxy) writeError(status api.StatusCode, w http.ResponseWriter, r *http.Request) {
+func (p *proxy) writeError(status reva_api.StatusCode, w http.ResponseWriter, r *http.Request) {
 	p.logger.Warn("write error", zap.Int("status", int(status)))
-	if status == api.StatusCode_STORAGE_NOT_FOUND {
+	if status == reva_api.StatusCode_STORAGE_NOT_FOUND {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if status == api.StatusCode_STORAGE_PERMISSIONDENIED {
+	if status == reva_api.StatusCode_STORAGE_PERMISSIONDENIED {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func getUserFromContext(ctx context.Context) (*api.User, error) {
-	u, ok := api.ContextGetUser(ctx)
+func getUserFromContext(ctx context.Context) (*reva_api.User, error) {
+	u, ok := reva_api.ContextGetUser(ctx)
 	if !ok {
-		return nil, api.NewError(api.ContextUserRequiredError)
+		return nil, reva_api.NewError(reva_api.ContextUserRequiredError)
 	}
 	return u, nil
 }
 
 func GetContextWithAuth(ctx context.Context) context.Context {
-	token, _ := api.ContextGetAccessToken(ctx)
+	token, _ := reva_api.ContextGetAccessToken(ctx)
 	header := metadata.New(map[string]string{"authorization": "bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)
 }
@@ -2527,3 +2721,83 @@ var (
 	LDAPAccountTypeUnixGroup LDAPAccountType = "unixgroup"
 	LDAPAccountTypeUndefined LDAPAccountType = "undefined"
 )
+
+func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		normalizedPath := mux.Vars(r)["path"]
+		normalizedPath = path.Join("/", path.Clean(normalizedPath))
+		mux.Vars(r)["path"] = normalizedPath
+
+		authClient := p.getAuthClient()
+
+		token := r.Header.Get("X-Access-Token")
+		if token == "" {
+			token = r.URL.Query().Get("x-access-token")
+		}
+		if token == "" {
+			p.logger.Warn("auth token not provided", zap.String("X-Access-Token", token))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		userRes, err := authClient.VerifyToken(ctx, &reva_api.VerifyTokenReq{Token: token})
+		if err != nil {
+			p.logger.Warn("", zap.Error(err), zap.String("token", token))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if userRes.Status != reva_api.StatusCode_OK {
+			p.logger.Warn("cookie token is invalid or not longer valid", zap.Error(err))
+		}
+
+		user := userRes.User
+		ctx = reva_api.ContextSetUser(ctx, user)
+		ctx = reva_api.ContextSetAccessToken(ctx, token)
+		r = r.WithContext(ctx)
+		p.logger.Info("user authenticated with token", zap.String("account_id", user.AccountId))
+		h(w, r)
+		return
+	})
+}
+
+func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
+	var revaPath string
+	if strings.HasPrefix(ocPath, p.ownCloudSharePrefix) {
+		revaPath = strings.TrimPrefix(ocPath, p.ownCloudSharePrefix)
+		revaPath = path.Join(p.revaSharePrefix, revaPath)
+	} else {
+		// apply home default
+		revaPath = strings.TrimPrefix(ocPath, p.ownCloudHomePrefix)
+		revaPath = path.Join(p.revaHomePrefix, revaPath)
+	}
+
+	p.logger.Debug(fmt.Sprintf("owncloud path conversion: oc(%s) => reva(%s)", ocPath, revaPath))
+	return revaPath
+}
+
+func (p *proxy) getOCPath(ctx context.Context, revaPath string) string {
+	var ocPath string
+
+	if strings.HasPrefix(revaPath, p.revaSharePrefix) {
+		ocPath = strings.TrimPrefix(revaPath, p.revaSharePrefix)
+		ocPath = path.Join(p.ownCloudSharePrefix, ocPath)
+	} else {
+		// apply home default
+		ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
+		ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+	}
+	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
+	return ocPath
+}
+
+func (p *proxy) splitRootPath(ctx context.Context, path string) (string, string, error) {
+	loc := shareIDRegexp.FindStringIndex(path)
+	if loc == nil {
+		return "", "", errors.New(fmt.Sprintf("path(%s) does not match regexp", path))
+	}
+	shareID := path[loc[0]+4 : loc[1]-1]
+	targetName := path[0:loc[0]]
+	return targetName, shareID, nil
+}

@@ -36,33 +36,33 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
 
 	// user prefixed webdav routes
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
 	// user-relative routes
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.basicAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/cernbox/remote.php/webdav/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
 	// gallery app routes
-	p.router.HandleFunc("/cernbox/index.php/apps/gallery/preview/{path:.*}", p.basicAuth(p.getGalleryPreview)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/gallery/preview/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
 }
 
 func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
@@ -162,8 +162,9 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	revaPath := p.getRevaPath(ctx, reqPath)
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: reqPath}
+	gReq := &api.PathReq{Path: revaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -176,6 +177,7 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
+	md.Path = p.getOCPath(ctx, md.Path)
 	if md.IsDir {
 		p.logger.Warn("file is a folder")
 		w.WriteHeader(http.StatusNotImplemented)
@@ -247,8 +249,8 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	basename := path.Base(reqPath)
 
+	basename := path.Base(reqPath)
 	format, err := imaging.FormatFromFilename(basename)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -347,7 +349,8 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: reqPath}
+	revaPath := p.getRevaPath(ctx, reqPath)
+	gReq := &api.PathReq{Path: revaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -509,7 +512,7 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 }
 func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	path := mux.Vars(r)["path"]
+	pa := mux.Vars(r)["path"]
 	isPreview := (r.URL.Query().Get("preview") == "1" || r.URL.Query().Get("forceIcon") == "1")
 	if isPreview {
 		p.getPreview(w, r)
@@ -517,7 +520,8 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: path}
+	revaPath := p.getRevaPath(ctx, pa)
+	gReq := &api.PathReq{Path: revaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -530,6 +534,7 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
+	md.Path = p.getOCPath(ctx, md.Path)
 	if md.IsDir {
 		p.logger.Warn("file is a folder")
 		w.WriteHeader(http.StatusNotImplemented)
@@ -554,6 +559,15 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("OC-Checksum", md.Checksum)
 	}
 
+	// if downloadStartSecret is set in the query param we need to set the cookie ocDownloadStarted with same value.
+	if r.URL.Query().Get("downloadStartSecret") != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:    "ocDownloadStarted",
+			Value:   r.URL.Query().Get("downloadStartSecret"),
+			Expires: time.Now().Add(time.Second * 30)})
+	}
+
+	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(md.Path))
 	w.WriteHeader(http.StatusOK)
 
 	var reader io.Reader
@@ -593,7 +607,8 @@ func (p *proxy) head(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: path}
+	revaPath := p.getRevaPath(ctx, path)
+	gReq := &api.PathReq{Path: revaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -618,9 +633,11 @@ func (p *proxy) head(w http.ResponseWriter, r *http.Request) {
 func (p *proxy) options(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	path := mux.Vars(r)["path"]
+	path = p.getRevaPath(ctx, path)
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: path}
+	revaPath := p.getRevaPath(ctx, path)
+	gReq := &api.PathReq{Path: revaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -651,7 +668,8 @@ func (p *proxy) delete(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: path}
+	revaPath := p.getRevaPath(ctx, path)
+	gReq := &api.PathReq{Path: revaPath}
 	emptyRes, err := p.getStorageClient().Delete(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -695,7 +713,8 @@ func (p *proxy) mkcol(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: path}
+	revaPath := p.getRevaPath(ctx, path)
+	gReq := &api.PathReq{Path: revaPath}
 	emptyRes, err := p.getStorageClient().CreateDir(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -746,7 +765,9 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 	destination = path.Join("/", path.Clean(strings.TrimPrefix(destinationURL.Path, toTrim)))
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.MoveReq{OldPath: oldPath, NewPath: destination}
+	oldRevaPath := p.getRevaPath(ctx, oldPath)
+	destinationRevaPath := p.getRevaPath(ctx, destination)
+	gReq := &api.MoveReq{OldPath: oldRevaPath, NewPath: destinationRevaPath}
 	emptyRes, err := p.getStorageClient().Move(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -758,7 +779,7 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gReq2 := &api.PathReq{Path: destination}
+	gReq2 := &api.PathReq{Path: destinationRevaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq2)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -770,6 +791,7 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := mdRes.Metadata
+	md.Path = p.getOCPath(ctx, md.Path)
 
 	w.Header().Set("ETag", md.Etag)
 	w.Header().Set("OC-FileId", md.Id)
@@ -816,7 +838,8 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: path}
+	revaPath := p.getRevaPath(ctx, path)
+	gReq := &api.PathReq{Path: revaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -830,8 +853,8 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
-	md := mdRes.Metadata
 
+	md := mdRes.Metadata
 	if md != nil && md.IsDir {
 		p.logger.Warn("file already exists and is a folder", zap.String("path", md.Path))
 		w.WriteHeader(http.StatusConflict)
@@ -841,6 +864,7 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 	// if If-Match header contains an Etag we need to check it against the ETag from the server
 	// so see if they match or not. If they do not match, StatusPreconditionFailed is returned
 	if md != nil {
+		md.Path = p.getOCPath(ctx, md.Path)
 		clientETag := r.Header.Get("If-Match")
 		serverETag := md.Etag
 		if clientETag != "" {
@@ -919,7 +943,7 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// all the chunks have been sent, we need to close the tx
-	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &api.TxEnd{Path: path, TxId: txInfo.TxId})
+	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1115,6 +1139,7 @@ func (p *proxy) putChunked(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	path := mux.Vars(r)["path"]
+	path = p.getRevaPath(ctx, path)
 	readCloser := http.MaxBytesReader(w, r.Body, p.maxUploadFileSize)
 	finish, fn, err := p.saveChunk(ctx, path, readCloser)
 	if err != nil {
@@ -1154,6 +1179,7 @@ func (p *proxy) putChunked(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
+	md.Path = p.getOCPath(ctx, md.Path)
 	if md != nil && md.IsDir {
 		p.logger.Warn("file already exists and is a folder", zap.String("path", md.Path))
 		w.WriteHeader(http.StatusConflict)
@@ -1282,7 +1308,8 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 
 	gCtx := GetContextWithAuth(ctx)
-	gReq := &api.PathReq{Path: path}
+	revaPath := p.getRevaPath(ctx, path)
+	gReq := &api.PathReq{Path: revaPath}
 
 	var children bool
 	depth := r.Header.Get("Depth")
@@ -1303,6 +1330,8 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := mdRes.Metadata
+	md.Path = p.getOCPath(ctx, md.Path)
+
 	mds = append(mds, md)
 
 	if children && md.IsDir {
@@ -1328,6 +1357,7 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			md = mdRes.Metadata
+			md.Path = p.getOCPath(ctx, md.Path)
 			mds = append(mds, md)
 		}
 	}
@@ -1738,6 +1768,12 @@ type Options struct {
 	REVAHostname      string
 	REVAPort          int
 	Router            *mux.Router
+
+	OwnCloudHomePrefix string
+	RevaHomePrefix     string
+
+	OwnCloudSharePrefix string
+	RevaSharePrefix     string
 }
 
 func (opt *Options) init() {
@@ -1747,6 +1783,22 @@ func (opt *Options) init() {
 
 	if opt.ChunksFolder == "" {
 		opt.ChunksFolder = filepath.Join(opt.TemporaryFolder, "chunks")
+	}
+
+	if opt.OwnCloudHomePrefix == "" {
+		opt.OwnCloudHomePrefix = "/"
+	}
+
+	if opt.RevaHomePrefix == "" {
+		opt.RevaHomePrefix = "/home"
+	}
+
+	if opt.OwnCloudSharePrefix == "" {
+		opt.OwnCloudSharePrefix = "/__myshares"
+	}
+
+	if opt.RevaSharePrefix == "" {
+		opt.RevaSharePrefix = "/shared-with-me"
 	}
 
 }
@@ -1771,12 +1823,16 @@ func New(opt *Options) (http.Handler, error) {
 	}
 
 	proxy := &proxy{
-		maxUploadFileSize: int64(opt.MaxUploadFileSize),
-		router:            opt.Router,
-		chunksFolder:      opt.ChunksFolder,
-		temporaryFolder:   opt.TemporaryFolder,
-		revaHost:          fmt.Sprintf("%s:%d", opt.REVAHostname, opt.REVAPort),
-		logger:            opt.Logger,
+		maxUploadFileSize:   int64(opt.MaxUploadFileSize),
+		router:              opt.Router,
+		chunksFolder:        opt.ChunksFolder,
+		temporaryFolder:     opt.TemporaryFolder,
+		revaHost:            fmt.Sprintf("%s:%d", opt.REVAHostname, opt.REVAPort),
+		logger:              opt.Logger,
+		ownCloudHomePrefix:  opt.OwnCloudHomePrefix,
+		revaHomePrefix:      opt.RevaHomePrefix,
+		ownCloudSharePrefix: opt.OwnCloudSharePrefix,
+		revaSharePrefix:     opt.RevaSharePrefix,
 	}
 
 	conn, err := grpc.Dial(proxy.revaHost, grpc.WithInsecure())
@@ -1799,6 +1855,43 @@ type proxy struct {
 	revaHost          string
 	grpcConn          *grpc.ClientConn
 	logger            *zap.Logger
+
+	ownCloudHomePrefix string
+	revaHomePrefix     string
+
+	ownCloudSharePrefix string
+	revaSharePrefix     string
+}
+
+func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
+	var revaPath string
+
+	if strings.HasPrefix(ocPath, p.ownCloudSharePrefix) {
+		revaPath = strings.TrimPrefix(ocPath, p.ownCloudSharePrefix)
+		revaPath = path.Join(p.revaSharePrefix, revaPath)
+	} else {
+		// apply home default
+		revaPath = strings.TrimPrefix(ocPath, p.ownCloudHomePrefix)
+		revaPath = path.Join(p.revaHomePrefix, revaPath)
+	}
+
+	p.logger.Debug(fmt.Sprintf("owncloud path conversion: oc(%s) => reva(%s)", ocPath, revaPath))
+	return revaPath
+}
+
+func (p *proxy) getOCPath(ctx context.Context, revaPath string) string {
+	var ocPath string
+
+	if strings.HasPrefix(revaPath, p.revaSharePrefix) {
+		ocPath = strings.TrimPrefix(revaPath, p.revaSharePrefix)
+		ocPath = path.Join(p.ownCloudSharePrefix, ocPath)
+	} else {
+		// apply home default
+		ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
+		ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+	}
+	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
+	return ocPath
 }
 
 func (p *proxy) getAuthClient() api.AuthClient {
@@ -1904,5 +1997,46 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 
 		p.logger.Info("request is authenticated", zap.String("account_id", user.AccountId))
 		h.ServeHTTP(w, r)
+	})
+}
+
+func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		normalizedPath := mux.Vars(r)["path"]
+		normalizedPath = path.Join("/", path.Clean(normalizedPath))
+		mux.Vars(r)["path"] = normalizedPath
+
+		authClient := p.getAuthClient()
+
+		token := r.Header.Get("X-Access-Token")
+		if token == "" {
+			token = r.URL.Query().Get("x-access-token")
+		}
+
+		if token == "" {
+			p.logger.Warn("auth token not provided", zap.String("X-Access-Token", token))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		userRes, err := authClient.VerifyToken(ctx, &api.VerifyTokenReq{Token: token})
+		if err != nil {
+			p.logger.Warn("", zap.Error(err), zap.String("token", token))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if userRes.Status != api.StatusCode_OK {
+			p.logger.Warn("cookie token is invalid or not longer valid", zap.Error(err))
+		}
+
+		user := userRes.User
+		ctx = api.ContextSetUser(ctx, user)
+		ctx = api.ContextSetAccessToken(ctx, token)
+		r = r.WithContext(ctx)
+		p.logger.Info("user authenticated with token", zap.String("account_id", user.AccountId))
+		h(w, r)
+		return
 	})
 }

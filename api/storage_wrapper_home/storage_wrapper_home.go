@@ -2,6 +2,7 @@ package storage_wrapper_home
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -42,12 +43,17 @@ func (fs *homeStorage) getInternalPath(ctx context.Context, user *api.User, p st
 func (fs *homeStorage) removeNamespace(ctx context.Context, user *api.User, np string) string {
 	l := ctx_zap.Extract(ctx)
 	homePath := fs.getHomePath(ctx, user)
-	p := strings.TrimPrefix(np, homePath)
-	if p == "" {
-		p = "/"
+	if strings.HasPrefix(np, homePath) {
+		p := strings.TrimPrefix(np, homePath)
+		if p == "" {
+			p = "/"
+		}
+		l.Debug("path conversion: internal => external", zap.String("internal", np), zap.String("external", p))
+		return p
 	}
-	l.Debug("path conversion: internal => external", zap.String("internal", np), zap.String("external", p))
-	return p
+	err := errors.New("internal path does not start with home prefix")
+	l.Error("", zap.Error(err), zap.String("internal", np), zap.String("home_prefix", homePath))
+	panic(err)
 }
 
 func (fs *homeStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {

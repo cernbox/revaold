@@ -30,6 +30,53 @@ type shareManager struct {
 	vfs api.VirtualStorage
 }
 
+func (sm *shareManager) GetReceivedFolderShare(ctx context.Context, id string) (*api.FolderShare, error) {
+	l := ctx_zap.Extract(ctx)
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
+	dbShare, err := sm.getDBShareWithMe(ctx, u.AccountId, id)
+	if err != nil {
+		l.Error("cannot get db share", zap.Error(err), zap.String("id", id), zap.String("user", u.AccountId))
+		return nil, err
+	}
+
+	share, err := sm.convertToReceivedFolderShare(ctx, dbShare)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	return share, nil
+}
+func (sm *shareManager) ListReceivedShares(ctx context.Context) ([]*api.FolderShare, error) {
+	l := ctx_zap.Extract(ctx)
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	dbShares, err := sm.getDBSharesWithMe(ctx, u.AccountId)
+	if err != nil {
+		return nil, err
+	}
+	shares := []*api.FolderShare{}
+	for _, dbShare := range dbShares {
+		share, err := sm.convertToReceivedFolderShare(ctx, dbShare)
+		if err != nil {
+			l.Error("", zap.Error(err))
+			//TODO(labkode): log error and continue
+			continue
+		}
+		shares = append(shares, share)
+
+	}
+	return shares, nil
+
+}
+
 func (sm *shareManager) ListFolderShares(ctx context.Context) ([]*api.FolderShare, error) {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
@@ -288,6 +335,7 @@ type ocShare struct {
 
 type dbShare struct {
 	ID          int
+	UIDOwner    string
 	Prefix      string
 	ItemSource  string
 	ShareWith   string
@@ -296,7 +344,7 @@ type dbShare struct {
 	STime       int
 }
 
-func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*dbShare, error) {
+func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id string) (*dbShare, error) {
 	l := ctx_zap.Extract(ctx)
 	intID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
@@ -305,6 +353,7 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 	}
 
 	var (
+		uidOwner    string
 		shareWith   string
 		prefix      string
 		itemSource  string
@@ -313,19 +362,21 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 		permissions int
 	)
 
-	query := "select coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where uid_owner=? and id=?"
-	if err := sm.db.QueryRow(query, accountID, id).Scan(&shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
+	query := "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where share_with=? and id=?"
+	l.Debug(fmt.Sprintf("%s => (%s, %d)", query, accountID, id))
+	if err := sm.db.QueryRow(query, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
 		}
 		return nil, err
 	}
-	dbShare := &dbShare{ID: int(intID), Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
+	dbShare := &dbShare{ID: int(intID), UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
 	return dbShare, nil
 
 }
-func (sm *shareManager) getDBShares(ctx context.Context, accountID string) ([]*dbShare, error) {
-	query := "select id, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where uid_owner=? and (share_type=? or share_type=?) "
+
+func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string) ([]*dbShare, error) {
+	query := "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where share_with=? and (share_type=? or share_type=?) "
 	rows, err := sm.db.Query(query, accountID, 0, 1)
 	if err != nil {
 		return nil, err
@@ -334,6 +385,7 @@ func (sm *shareManager) getDBShares(ctx context.Context, accountID string) ([]*d
 
 	var (
 		id          int
+		uidOwner    string
 		shareWith   string
 		prefix      string
 		itemSource  string
@@ -344,11 +396,11 @@ func (sm *shareManager) getDBShares(ctx context.Context, accountID string) ([]*d
 
 	dbShares := []*dbShare{}
 	for rows.Next() {
-		err := rows.Scan(&id, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType)
+		err := rows.Scan(&id, &uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType)
 		if err != nil {
 			return nil, err
 		}
-		dbShare := &dbShare{ID: id, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
+		dbShare := &dbShare{ID: id, UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
 		dbShares = append(dbShares, dbShare)
 
 	}
@@ -360,6 +412,96 @@ func (sm *shareManager) getDBShares(ctx context.Context, accountID string) ([]*d
 	return dbShares, nil
 }
 
+func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*dbShare, error) {
+	l := ctx_zap.Extract(ctx)
+	intID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		l.Error("cannot parse id to int64", zap.Error(err))
+		return nil, err
+	}
+
+	var (
+		uidOwner    string
+		shareWith   string
+		prefix      string
+		itemSource  string
+		shareType   int
+		stime       int
+		permissions int
+	)
+
+	query := "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where uid_owner=? and id=?"
+	if err := sm.db.QueryRow(query, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
+		}
+		return nil, err
+	}
+	dbShare := &dbShare{ID: int(intID), UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
+	return dbShare, nil
+
+}
+
+func (sm *shareManager) getDBShares(ctx context.Context, accountID string) ([]*dbShare, error) {
+	query := "select id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where uid_owner=? and (share_type=? or share_type=?) "
+	rows, err := sm.db.Query(query, accountID, 0, 1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var (
+		id          int
+		uidOwner    string
+		shareWith   string
+		prefix      string
+		itemSource  string
+		shareType   int
+		stime       int
+		permissions int
+	)
+
+	dbShares := []*dbShare{}
+	for rows.Next() {
+		err := rows.Scan(&id, &uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType)
+		if err != nil {
+			return nil, err
+		}
+		dbShare := &dbShare{ID: id, UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
+		dbShares = append(dbShares, dbShare)
+
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return dbShares, nil
+}
+
+func (sm *shareManager) convertToReceivedFolderShare(ctx context.Context, dbShare *dbShare) (*api.FolderShare, error) {
+	var recipientType api.ShareRecipient_RecipientType
+	if dbShare.ShareType == 0 {
+		recipientType = api.ShareRecipient_USER
+	} else {
+		recipientType = api.ShareRecipient_GROUP
+	}
+	path := joinFileID(dbShare.Prefix, dbShare.ItemSource)
+	share := &api.FolderShare{
+		OwnerId:  dbShare.UIDOwner,
+		Id:       fmt.Sprintf("%d", dbShare.ID),
+		Mtime:    uint64(dbShare.STime),
+		Path:     path,
+		ReadOnly: dbShare.Permissions == 1,
+		Recipient: &api.ShareRecipient{
+			Identity: dbShare.ShareWith,
+			Type:     recipientType,
+		},
+	}
+	return share, nil
+
+}
+
 func (sm *shareManager) convertToFolderShare(ctx context.Context, dbShare *dbShare) (*api.FolderShare, error) {
 	var recipientType api.ShareRecipient_RecipientType
 	if dbShare.ShareType == 0 {
@@ -369,6 +511,7 @@ func (sm *shareManager) convertToFolderShare(ctx context.Context, dbShare *dbSha
 	}
 	path := joinFileID(dbShare.Prefix, dbShare.ItemSource)
 	share := &api.FolderShare{
+		OwnerId:  dbShare.UIDOwner,
 		Id:       fmt.Sprintf("%d", dbShare.ID),
 		Mtime:    uint64(dbShare.STime),
 		Path:     path,

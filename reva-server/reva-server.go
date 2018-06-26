@@ -19,6 +19,7 @@ import (
 	"github.com/cernbox/reva/api/share_manager_owncloud"
 	"github.com/cernbox/reva/api/storage_eos"
 	"github.com/cernbox/reva/api/storage_local"
+	"github.com/cernbox/reva/api/storage_share"
 	"github.com/cernbox/reva/api/storage_wrapper_home"
 	//"github.com/cernbox/reva/api/storage_public_link"
 	"github.com/cernbox/reva/api/token_manager_jwt"
@@ -79,12 +80,13 @@ func main() {
 
 	vs := virtual_storage.NewVFS(logger)
 	mountTable := getMountTable(gc)
-	loadMountTable(logger, vs, mountTable)
-	tokenManager := token_manager_jwt.New(gc.GetString("token-manager-jwt-secret"))
-	authManager := auth_manager_nop.New()
+
 	shareManager, err := share_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
 	publicLinkManager, err := public_link_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
 
+	loadMountTable(logger, vs, mountTable, shareManager)
+	tokenManager := token_manager_jwt.New(gc.GetString("token-manager-jwt-secret"))
+	authManager := auth_manager_nop.New()
 	server := grpc.NewServer(
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			grpc_ctxtags.StreamServerInterceptor(),
@@ -157,7 +159,7 @@ func applyStorageWrappers(s api.Storage, storageWrappers []*api.StorageWrapper) 
 	return s, nil
 }
 
-func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTable) error {
+func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTable, sm api.ShareManager) error {
 	mounts := []api.Mount{}
 	for _, mte := range mt.Mounts {
 		storageDriver := mte.StorageDriver
@@ -194,6 +196,25 @@ func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTabl
 			if err != nil {
 				panic(err)
 			}
+
+			storage, err = applyStorageWrappers(storage, mte.StorageWrappers)
+			if err != nil {
+				panic(err)
+			}
+
+			mount := mount.New(mte.MountID, mte.MountPoint, mte.MountOptions, storage)
+			mounts = append(mounts, mount)
+		case "share":
+			bytes, err := json.Marshal(mte.StorageOptions)
+			if err != nil {
+				panic(err)
+			}
+			opts := &storage_share.Options{}
+			err = json.Unmarshal(bytes, opts)
+			if err != nil {
+				panic(err)
+			}
+			storage := storage_share.New(opts, vs, sm, logger)
 
 			storage, err = applyStorageWrappers(storage, mte.StorageWrappers)
 			if err != nil {

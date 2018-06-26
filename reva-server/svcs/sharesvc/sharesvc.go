@@ -18,6 +18,20 @@ type svc struct {
 }
 
 func (s *svc) ListReceivedShares(req *api.EmptyReq, stream api.Share_ListReceivedSharesServer) error {
+	ctx := stream.Context()
+	l := ctx_zap.Extract(ctx)
+	shares, err := s.shareManager.ListReceivedShares(ctx)
+	if err != nil {
+		l.Error("error listing received folder shares", zap.Error(err))
+		return err
+	}
+	for _, share := range shares {
+		folderShareRes := &api.ReceivedShareResponse{Share: share}
+		if err := stream.Send(folderShareRes); err != nil {
+			l.Error("error streaming received folder share", zap.Error(err))
+			return err
+		}
+	}
 	return nil
 }
 

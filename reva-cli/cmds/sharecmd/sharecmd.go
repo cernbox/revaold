@@ -474,9 +474,39 @@ func updateFolderShare(c *cli.Context) error {
 	return nil
 
 }
-func listReceivedShares(c *cli.Context) {
-	fmt.Println("not implemented")
+func listReceivedShares(c *cli.Context) error {
+	ctx := util.GetContextWithAuth()
+	client, err := util.GetSharingClient()
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	stream, err := client.ListReceivedShares(ctx, &api.EmptyReq{})
+	if err != nil {
+		return cli.NewExitError(err, 1)
+	}
+
+	lines := []string{"#ID|ReadOnly|Type|From|Modified|Path"}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+		if res.Status != api.StatusCode_OK {
+			return cli.NewExitError(res.Status, 1)
+		}
+		share := res.Share
+		recipientType := getRecipientTypeHuman(share.Recipient.Type)
+		line := fmt.Sprintf("%s|%t|%s|%s|%d|%s", share.Id, share.ReadOnly, recipientType, share.OwnerId, share.Mtime, share.Path)
+		lines = append(lines, line)
+	}
+	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))
+	return nil
 }
+
 func mountReceivedShare(c *cli.Context) {
 	fmt.Println("not implemented")
 }

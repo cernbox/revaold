@@ -2,6 +2,8 @@ package token_manager_jwt
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/cernbox/reva/api"
@@ -49,8 +51,29 @@ func (tm *tokenManager) VerifyToken(ctx context.Context, token string) (*api.Use
 	}
 
 	claims := rawToken.Claims.(jwt.MapClaims)
+	accountID, ok := claims["account_id"].(string)
+	if !ok {
+		return nil, errors.New("account_id claim is not a string")
+	}
+
+	rawGroups, ok := claims["groups"].([]interface{})
+	if !ok {
+		return nil, errors.New("groups claim is not a []interface{}")
+	}
+	groups := []string{}
+	for _, g := range rawGroups {
+		group, ok := g.(string)
+		if !ok {
+			err := errors.New(fmt.Sprintf("group %+v can not be casted to string", g))
+			l.Error("", zap.Error(err))
+			return nil, err
+		}
+		groups = append(groups, group)
+	}
+
 	user := &api.User{
-		AccountId: claims["account_id"].(string),
+		AccountId: accountID,
+		Groups:    groups,
 	}
 	return user, nil
 }

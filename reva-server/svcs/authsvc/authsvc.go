@@ -1,8 +1,8 @@
 package authsvc
 
 import (
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"github.com/cernbox/reva/api"
+	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 )
@@ -40,7 +40,7 @@ func (s *svc) VerifyToken(ctx context.Context, req *api.VerifyTokenReq) (*api.Us
 	u, err := s.tm.VerifyToken(ctx, token)
 	if err != nil {
 		l.Error("token invalid", zap.Error(err))
-		return nil, api.NewError(api.TokenInvalidErrorCode)
+		return nil, api.NewError(api.TokenInvalidErrorCode).WithMessage(err.Error())
 	}
 	userRes := &api.UserResponse{User: u}
 	return userRes, nil

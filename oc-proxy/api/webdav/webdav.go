@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"github.com/disintegration/imaging"
 	"github.com/rwcarlsen/goexif/exif"
@@ -30,6 +31,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
+
+var shareIDRegexp = regexp.MustCompile(`\(id:.+\)$`)
 
 func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
@@ -177,7 +180,7 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
-	md.Path = p.getOCPath(ctx, md.Path)
+	md.Path = p.getOCPath(ctx, md)
 	if md.IsDir {
 		p.logger.Warn("file is a folder")
 		w.WriteHeader(http.StatusNotImplemented)
@@ -534,7 +537,7 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
-	md.Path = p.getOCPath(ctx, md.Path)
+	md.Path = p.getOCPath(ctx, md)
 	if md.IsDir {
 		p.logger.Warn("file is a folder")
 		w.WriteHeader(http.StatusNotImplemented)
@@ -791,7 +794,7 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := mdRes.Metadata
-	md.Path = p.getOCPath(ctx, md.Path)
+	md.Path = p.getOCPath(ctx, md)
 
 	w.Header().Set("ETag", md.Etag)
 	w.Header().Set("OC-FileId", md.Id)
@@ -864,7 +867,7 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 	// if If-Match header contains an Etag we need to check it against the ETag from the server
 	// so see if they match or not. If they do not match, StatusPreconditionFailed is returned
 	if md != nil {
-		md.Path = p.getOCPath(ctx, md.Path)
+		md.Path = p.getOCPath(ctx, md)
 		clientETag := r.Header.Get("If-Match")
 		serverETag := md.Etag
 		if clientETag != "" {
@@ -1179,7 +1182,7 @@ func (p *proxy) putChunked(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
-	md.Path = p.getOCPath(ctx, md.Path)
+	md.Path = p.getOCPath(ctx, md)
 	if md != nil && md.IsDir {
 		p.logger.Warn("file already exists and is a folder", zap.String("path", md.Path))
 		w.WriteHeader(http.StatusConflict)
@@ -1330,7 +1333,7 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := mdRes.Metadata
-	md.Path = p.getOCPath(ctx, md.Path)
+	md.Path = p.getOCPath(ctx, md)
 
 	mds = append(mds, md)
 
@@ -1357,7 +1360,7 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			md = mdRes.Metadata
-			md.Path = p.getOCPath(ctx, md.Path)
+			md.Path = p.getOCPath(ctx, md)
 			mds = append(mds, md)
 		}
 	}
@@ -1549,8 +1552,13 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 		xml.Name{Space: "", Local: "d:getetag"},
 		"", []byte(md.Etag)}
 
+	perm := ""
+	if !md.IsReadOnly {
+		perm = "RWCKDNV"
+
+	}
 	ocPermissions := propertyXML{xml.Name{Space: "", Local: "oc:permissions"},
-		"", []byte("RDNVW")}
+		"", []byte(perm)}
 
 	quotaUsedBytes := propertyXML{
 		xml.Name{Space: "", Local: "d:quota-used-bytes"}, "", []byte("0")}
@@ -1590,7 +1598,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 	if md.IsDir {
 		getResourceType.InnerXML = []byte("<d:collection/>")
 		getContentType.InnerXML = []byte("httpd/unix-directory")
-		ocPermissions.InnerXML = []byte("RDNVCK")
+		ocPermissions.InnerXML = []byte(perm)
 	}
 
 	ocID := propertyXML{xml.Name{Space: "", Local: "oc:fileid"}, "",
@@ -1868,6 +1876,18 @@ func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
 
 	if strings.HasPrefix(ocPath, p.ownCloudSharePrefix) {
 		revaPath = strings.TrimPrefix(ocPath, p.ownCloudSharePrefix)
+		// remove file target before contacting reva
+		revaPath = strings.TrimPrefix(revaPath, "/")
+		tokens := strings.Split(revaPath, "/")
+		_, id, err := p.splitRootPath(ctx, tokens[0])
+		if err != nil {
+			p.logger.Error("error removing file target from ocPath", zap.Error(err), zap.String("ocPath", ocPath))
+		}
+		revaPath = path.Join("/", id)
+		if len(tokens) > 1 {
+			revaPath = path.Join(revaPath, path.Join(tokens[1:]...))
+		}
+
 		revaPath = path.Join(p.revaSharePrefix, revaPath)
 	} else {
 		// apply home default
@@ -1879,11 +1899,16 @@ func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
 	return revaPath
 }
 
-func (p *proxy) getOCPath(ctx context.Context, revaPath string) string {
+func (p *proxy) getOCPath(ctx context.Context, md *api.Metadata) string {
+	revaPath := md.Path
 	var ocPath string
 
 	if strings.HasPrefix(revaPath, p.revaSharePrefix) {
 		ocPath = strings.TrimPrefix(revaPath, p.revaSharePrefix)
+		ocPath = strings.TrimPrefix(ocPath, "/")
+		tokens := strings.Split(ocPath, "/")
+		tokens[0] = p.addShareTarget(ctx, tokens[0], md)
+		ocPath = path.Join("/", path.Join(tokens...))
 		ocPath = path.Join(p.ownCloudSharePrefix, ocPath)
 	} else {
 		// apply home default
@@ -1892,6 +1917,21 @@ func (p *proxy) getOCPath(ctx context.Context, revaPath string) string {
 	}
 	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
 	return ocPath
+}
+
+func (p *proxy) splitRootPath(ctx context.Context, path string) (string, string, error) {
+	loc := shareIDRegexp.FindStringIndex(path)
+	if loc == nil {
+		return "", "", errors.New(fmt.Sprintf("path(%s) does not match regexp", path))
+	}
+	shareID := path[loc[0]+4 : loc[1]-1]
+	targetName := path[0:loc[0]]
+	return targetName, shareID, nil
+}
+
+func (p *proxy) addShareTarget(ctx context.Context, id string, md *api.Metadata) string {
+	return fmt.Sprintf("%s (id:%s)", md.ShareTarget, id)
+
 }
 
 func (p *proxy) getAuthClient() api.AuthClient {

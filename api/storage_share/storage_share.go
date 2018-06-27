@@ -68,6 +68,8 @@ func (fs *shareStorage) getReceivedShareMetadata(ctx context.Context, share *api
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
+	finfo.IsReadOnly = share.ReadOnly
+	finfo.ShareTarget = share.Target
 	return finfo, nil
 }
 
@@ -111,8 +113,10 @@ func (fs *shareStorage) GetMetadata(ctx context.Context, p string) (*api.Metadat
 		return nil, err
 	}
 
+	md.IsReadOnly = shareMetadata.IsReadOnly
 	md.Path = path.Join("/", share.Id, strings.TrimPrefix(md.Path, shareMetadata.Path))
 	md.Id = share.Id
+	md.ShareTarget = shareMetadata.ShareTarget
 	return md, nil
 }
 
@@ -124,13 +128,11 @@ func (fs *shareStorage) listRoot(ctx context.Context) ([]*api.Metadata, error) {
 
 	finfos := []*api.Metadata{}
 	for _, share := range shares {
-		newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
-		fi, err := fs.vs.GetMetadata(newCtx, share.Path)
+		p := path.Join("/", share.Id)
+		fi, err := fs.GetMetadata(ctx, p)
 		if err != nil {
 			return nil, err
 		}
-		fi.Path = "/" + share.Id
-		fi.Id = share.Id
 		finfos = append(finfos, fi)
 	}
 	return finfos, nil
@@ -165,6 +167,8 @@ func (fs *shareStorage) ListFolder(ctx context.Context, name string) ([]*api.Met
 		p := path.Join(share.Id, strings.TrimPrefix(md.Path, shareMetadata.Path))
 		md.Path = path.Join("/", p)
 		md.Id = p
+		md.ShareTarget = shareMetadata.ShareTarget
+		md.IsReadOnly = shareMetadata.IsReadOnly
 		fs.logger.Debug("children entry", zap.String("childpath", md.Path), zap.String("originalchildmd.path", originalPath), zap.String("childmd.path", md.Path), zap.String("parentmd.path", shareMetadata.Path), zap.String("strings", strings.TrimPrefix(originalPath, shareMetadata.Path)))
 	}
 
@@ -189,6 +193,10 @@ func (fs *shareStorage) Upload(ctx context.Context, name string, r io.ReadCloser
 		return err
 	}
 
+	if share.ReadOnly {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+
 	p = path.Join(share.Path, p)
 	fmt.Println(share.Id + " >>> " + p)
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
@@ -204,6 +212,11 @@ func (fs *shareStorage) Move(ctx context.Context, oldName, newName string) error
 	if err != nil {
 		return err
 	}
+
+	if oldShare.ReadOnly {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+
 	if oldShare.Id != newShare.Id {
 		return errors.New("cross-share rename forbidden")
 	}
@@ -220,6 +233,10 @@ func (fs *shareStorage) CreateDir(ctx context.Context, name string) error {
 		return err
 	}
 
+	if share.ReadOnly {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+
 	p = path.Join(share.Path, p)
 	fmt.Println(share.Id + " >>> " + p)
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
@@ -230,6 +247,10 @@ func (fs *shareStorage) Delete(ctx context.Context, name string) error {
 	share, p, err := fs.getReceivedShare(ctx, name)
 	if err != nil {
 		return err
+	}
+
+	if share.ReadOnly {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
 	}
 
 	p = path.Join(share.Path, p)

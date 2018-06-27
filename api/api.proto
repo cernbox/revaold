@@ -128,11 +128,15 @@ message Metadata {
   string etag = 6;
   string checksum = 7;
   string deref_path = 8;
-  bytes sys = 9; // sys is for storing arbitrary data
+  bool is_read_only = 9;
+  bytes sys = 10; // sys is for storing arbitrary data
 
   // EOS filesytem extended metadata records
-  string eos_file = 10;
-  string eos_instance = 11;
+  string eos_file = 11;
+  string eos_instance = 12;
+
+  // Share extended metadata records
+  string share_target = 13;
 }
 
 message PathReq {
@@ -298,6 +302,7 @@ message FolderShare {
   bool read_only = 5;
   uint64 ctime = 6;
   uint64 mtime = 7;
+  string target = 8;
 }
 
 

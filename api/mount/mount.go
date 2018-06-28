@@ -281,7 +281,7 @@ func (m *mount) getInternalPath(ctx context.Context, p string) (string, string, 
 	l := ctx_zap.Extract(ctx)
 	if strings.HasPrefix(p, m.mountPoint) {
 		internalPath := path.Join("/", strings.TrimPrefix(p, m.mountPoint))
-		l.Debug("path conversion: external => internal", zap.String("external", p), zap.String("internal", internalPath))
+		l.Debug("path conversion: external => internal", zap.String("external", p), zap.String("internal", internalPath), zap.String("mount", m.mountPoint))
 		return internalPath, m.mountPoint, nil
 	}
 	return "", "", api.NewError(api.PathInvalidError).WithMessage("invalid path for this mount. mountpoint:" + m.mountPoint + " path:" + p)

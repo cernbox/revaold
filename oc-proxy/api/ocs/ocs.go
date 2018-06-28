@@ -56,6 +56,7 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.tokenAuth(p.saveFile)).Methods("PUT")
 
 	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.tokenAuth(p.downloadArchive)).Methods("GET")
+	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/getstoragestats.php", p.tokenAuth(p.getStorageStats)).Methods("GET")
 
 	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.tokenAuth(p.getEOSInfo)).Methods("POST")
 
@@ -66,6 +67,86 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.tokenAuth(p.rollbackVersion)).Methods("GET")
 	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/download.php", p.tokenAuth(p.downloadVersion)).Methods("GET")
 
+	p.router.HandleFunc("/cernbox/index.php/apps/gallery/config", p.tokenAuth(p.getGalleryConfig)).Methods("GET")
+
+	// avatars
+	p.router.HandleFunc("/cernbox/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
+
+	p.router.HandleFunc("/cernbox/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
+
+}
+
+func (p *proxy) getExternalShares(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte("[]"))
+
+}
+
+func (p *proxy) getAvatar(w http.ResponseWriter, r *http.Request) {
+	username := mux.Vars(r)["username"]
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(fmt.Sprintf(`{"data":{"displayname":"%s"}`, username)))
+
+}
+
+func (p *proxy) getGalleryConfig(w http.ResponseWriter, r *http.Request) {
+	msg := ` {"features":[],"mediatypes":["image\/png","image\/jpeg"]}`
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
+}
+
+/*
+{
+  "data": {
+    "uploadMaxFilesize": 2097152,
+    "maxHumanFilesize": "Upload (max. 2 MB)",
+    "freeSpace": 995088180464,
+    "usedSpacePercent": 0,
+    "owner": "gonzalhu",
+    "ownerDisplayName": "Hugo Gonzalez Labrador (gonzalhu)"
+  },
+  "status": "success"
+}
+*/
+
+type statRes struct {
+	Data   *storageStat `json:"data"`
+	Status string       `json:"status"`
+}
+
+type storageStat struct {
+	UploadMaxFilesize int    `json:"uploadMaxFilesize"`
+	MaxHumanFilesize  string `json:"maxHumanFilesize"`
+	FreeSpace         int    `json:"freeSpace"`
+	UsedSpacePercent  int    `json:"userSpacePercent"`
+	Owner             string `json:"owner"`
+	OwnerDisplayName  string `json:"ownerDisplayName"`
+}
+
+func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
+	var owner string
+	if user, ok := reva_api.ContextGetUser(r.Context()); ok {
+		owner = user.AccountId
+	}
+
+	// TODO(labkode): add quota method to Storage
+	stat := &storageStat{
+		UploadMaxFilesize: 10 * 1024 * 1024 * 1024, // 10 GiB
+		MaxHumanFilesize:  "Upload (max. 10GB)",
+		FreeSpace:         2 * 1024 * 1024 * 1024 * 1024, // 2TiB
+		UsedSpacePercent:  0,
+		Owner:             owner,
+		OwnerDisplayName:  owner,
+	}
+	res := &statRes{Data: stat, Status: "success"}
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
 }
 
 /*
@@ -2143,6 +2224,17 @@ func (p *proxy) getReceivedShares(w http.ResponseWriter, r *http.Request, path s
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+	}
+
+	filtered := []*OCSShare{}
+	if path != "" {
+		for _, v := range ocsShares {
+			if v.Path == path {
+				filtered = append(filtered, v)
+			}
+		}
+		ocsShares = filtered
+
 	}
 
 	meta := &ResponseMeta{Status: "ok", StatusCode: 200}

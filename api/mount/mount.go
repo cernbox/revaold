@@ -42,6 +42,7 @@ func (m *mount) isReadOnly() bool {
 func (m *mount) GetMountPoint() string              { return m.mountPoint }
 func (m *mount) GetMountPointId() string            { return m.mountPointId }
 func (m *mount) GetMountOptions() *api.MountOptions { return m.mountOptions }
+func (m *mount) GetStorage() api.Storage            { return m.storage }
 
 func (m *mount) GetPathByID(ctx context.Context, id string) (string, error) {
 	id, err := m.getInternalIDPath(ctx, id)

@@ -44,6 +44,7 @@ type Mount interface {
 	GetMountPoint() string
 	GetMountPointId() string
 	GetMountOptions() *MountOptions
+	GetStorage() Storage
 }
 
 type MountTable struct {

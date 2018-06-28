@@ -18,6 +18,7 @@ import (
 	"github.com/cernbox/reva/api/public_link_manager_owncloud"
 	"github.com/cernbox/reva/api/share_manager_owncloud"
 	"github.com/cernbox/reva/api/storage_eos"
+	"github.com/cernbox/reva/api/storage_homemigration"
 	"github.com/cernbox/reva/api/storage_local"
 	"github.com/cernbox/reva/api/storage_share"
 	"github.com/cernbox/reva/api/storage_wrapper_home"
@@ -85,6 +86,27 @@ func main() {
 	publicLinkManager, err := public_link_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
 
 	loadMountTable(logger, vs, mountTable, shareManager)
+
+	/* MIGRATION THINGIES */
+
+	homeMount, err := vs.GetMount("/oldhome")
+	if err != nil {
+		panic(err)
+	}
+
+	opts := &storage_homemigration.Options{
+		TargetStorage: homeMount.GetStorage(),
+		Logger:        logger,
+	}
+	storage, err := storage_homemigration.New(opts)
+	if err != nil {
+		panic(err)
+	}
+
+	mount := mount.New("home", "/home", &api.MountOptions{}, storage)
+	vs.AddMount(context.Background(), mount)
+	/* END Migration stuff */
+
 	tokenManager := token_manager_jwt.New(gc.GetString("token-manager-jwt-secret"))
 	authManager := auth_manager_nop.New()
 	server := grpc.NewServer(
@@ -223,6 +245,7 @@ func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTabl
 
 			mount := mount.New(mte.MountID, mte.MountPoint, mte.MountOptions, storage)
 			mounts = append(mounts, mount)
+
 		}
 	}
 

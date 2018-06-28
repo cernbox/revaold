@@ -17,6 +17,5 @@ func New() api.AuthManager {
 }
 
 func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret string) (*api.User, error) {
-	clientID = "gonzalhu"
 	return &api.User{AccountId: clientID, Groups: []string{}}, nil
 }

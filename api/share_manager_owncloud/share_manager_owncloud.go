@@ -248,6 +248,8 @@ func (sm *shareManager) AddFolderShare(ctx context.Context, p string, recipient 
 		return nil, err
 	}
 
+	// TODO(labkode): abort file sharing with user/groups
+
 	itemType := "file"
 	if md.IsDir {
 		itemType = "folder"

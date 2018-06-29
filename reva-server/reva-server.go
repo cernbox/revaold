@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/cernbox/cboxredirectd/api/redismigrator"
 	"github.com/cernbox/gohub/goconfig"
 	"github.com/cernbox/gohub/gologger"
 
@@ -74,6 +75,17 @@ func main() {
 	gc.Add("public-link-manager-owncloud-db-port", 3306, "Port where to access the owncloud database.")
 	gc.Add("public-link-manager-owncloud-db-name", "owncloud", "Name of the owncloud database.")
 
+	gc.Add("redis-tcp-address", "localhost:6379", "redis tcp address")
+	gc.Add("redis-read-timeout", 3, "timeout for socket reads. If reached, commands will fail with a timeout instead of blocking. Zero means default.")
+	gc.Add("redis-write-timeout", 0, "timeout for socket writes. If reached, commands will fail with a timeout instead of blocking. Zero means redis-read-timeout.")
+	gc.Add("redis-dial-timeout", 5, "dial timeout for establishing new connections. Zero means default.")
+	gc.Add("redis-idle-check-frequency", 60, "frequency of idle checks. Zero means default. When minus value is set, then idle check is disabled.")
+	gc.Add("redis-idle-timeout", 300, "amount of time after which client closes idle connections. Should be less than server's timeout. Zero means default.")
+	gc.Add("redis-max-retries", 0, "maximum number of retries before giving up. Zero means not retry failed commands.")
+	gc.Add("redis-pool-size", 0, "maximum number of socket connections. Zermo means 10 connections per every CPU as reported by runtime.NumCPU.")
+	gc.Add("redis-pool-timeout", 0, "time a client waits for connection if all connections are busy before returning an error. Zero means redis-read-timeout + 1 second.")
+	gc.Add("redis-password", "", "the password to authenticate to a protected Redis instance. Empty means no authentication.")
+
 	gc.BindFlags()
 	gc.ReadConfig()
 
@@ -89,15 +101,48 @@ func main() {
 
 	/* MIGRATION THINGIES */
 
-	homeMount, err := vs.GetMount("/oldhome")
+	oldHomeMount, err := vs.GetMount("/oldhome")
 	if err != nil {
 		panic(err)
 	}
 
-	opts := &storage_homemigration.Options{
-		TargetStorage: homeMount.GetStorage(),
-		Logger:        logger,
+	newHomeMap := map[string]api.Storage{}
+	for _, l := range "abcdefghilmnopqrstuvwxyz" {
+		letter := string(l)
+		m, err := vs.GetMount(fmt.Sprintf("/eoshome-%s", letter))
+		if err != nil {
+			panic(err)
+		}
+		newHomeMap[letter] = m.GetStorage()
 	}
+
+	migratorOpts := &redismigrator.Options{
+		Address:            gc.GetString("redis-tcp-address"),
+		DialTimeout:        gc.GetInt("redis-dial-timeout"),
+		IdleCheckFrequency: gc.GetInt("redis-idle-check-frequency"),
+		IdleTimeout:        gc.GetInt("redis-idle-timeout"),
+		Logger:             logger,
+		MaxRetries:         gc.GetInt("redis-max-retries"),
+		PoolSize:           gc.GetInt("redis-pool-size"),
+		PoolTimeout:        gc.GetInt("redis-pool-timeout"),
+		ReadTimeout:        gc.GetInt("redis-read-timeout"),
+		WriteTimeout:       gc.GetInt("redis-write-timeout"),
+		Password:           gc.GetString("redis-password"),
+	}
+
+	migrator, err := redismigrator.New(migratorOpts)
+	if err != nil {
+		logger.Error("", zap.Error(err))
+		panic(err)
+	}
+
+	opts := &storage_homemigration.Options{
+		OldHome:    oldHomeMount.GetStorage(),
+		Logger:     logger,
+		NewHomeMap: newHomeMap,
+		Migrator:   migrator,
+	}
+
 	storage, err := storage_homemigration.New(opts)
 	if err != nil {
 		panic(err)

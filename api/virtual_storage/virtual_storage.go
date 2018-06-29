@@ -524,7 +524,7 @@ func (v *vfs) getDereferencedPath(ctx context.Context, p string) (string, error)
 	if ok, id, tail := v.isMixedPath(p); ok {
 		derefPath, err := v.GetPathByID(ctx, id)
 		if err != nil {
-			return "", err
+			return "cannot get path by id", err
 		}
 		return path.Join(derefPath, tail), nil
 	}

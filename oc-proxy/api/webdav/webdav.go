@@ -764,12 +764,21 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 
 	// remove api base and service base to get real path
 	//toTrim := filepath.Join("/", dirs.Server.BaseURL, dirs.OCWebDAV.BaseURL) + "/cernbox/remote.php/dav/files/"
-	toTrim := "/cernbox/remote.php/dav/files/gonzalhu/"
-	destination = path.Join("/", path.Clean(strings.TrimPrefix(destinationURL.Path, toTrim)))
+	var destinationPath string
+	if strings.HasPrefix(destinationURL.Path, "remote.php/webdav") {
+		davPrefix := "remote.php/webdav"
+		index := strings.Index(destinationURL.Path, davPrefix)
+		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
+	} else { // url is /remote.php/dav/gonzalhu/files
+		username := mux.Vars(r)["username"]
+		davPrefix := fmt.Sprintf("remote.php/dav/files/%s", username)
+		index := strings.Index(destinationURL.Path, davPrefix)
+		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
+	}
 
 	gCtx := GetContextWithAuth(ctx)
 	oldRevaPath := p.getRevaPath(ctx, oldPath)
-	destinationRevaPath := p.getRevaPath(ctx, destination)
+	destinationRevaPath := p.getRevaPath(ctx, destinationPath)
 	gReq := &api.MoveReq{OldPath: oldRevaPath, NewPath: destinationRevaPath}
 	emptyRes, err := p.getStorageClient().Move(gCtx, gReq)
 	if err != nil {

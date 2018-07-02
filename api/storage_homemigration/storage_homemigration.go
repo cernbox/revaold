@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 
 	"github.com/cernbox/reva/api"
 	"go.uber.org/zap"
@@ -60,38 +61,48 @@ func (fs *eosStorage) GetPathByID(ctx context.Context, id string) (string, error
 	return "", api.NewError(api.StorageNotSupportedErrorCode)
 }
 
-func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) api.Storage {
+func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (api.Storage, string, string) {
 	s, ok := fs.newHomeMap[letter]
 	if !ok {
 		panic("storage not found for letter: " + letter)
 	}
-	return s
+	mountID := fmt.Sprintf("eoshome-%s", letter)
+	mountPrefix := "/" + mountID
+	return s, mountID, mountPrefix
 }
 
-func (fs *eosStorage) getStorageForUser(ctx context.Context, u *api.User) api.Storage {
+func (fs *eosStorage) getStorageForUser(ctx context.Context, u *api.User) (api.Storage, string, string) {
 	username := u.AccountId
 	letter := string(username[0])
 	key := fmt.Sprintf("/eos/user/%s/%s", letter, u.AccountId)
 	fs.logger.Debug("migration key", zap.String("key", key))
 
-	ok, err := fs.migrator.IsPathMigrated(ctx, key, username)
-	if err != nil {
-		fs.logger.Error("error calling migrator", zap.Error(err))
-		panic(err)
+	migrated := fs.isUserMigrated(ctx, key)
+
+	if !migrated {
+		fs.logger.Info("forwarding user to oldhome", zap.String("username", username))
+		return fs.oldHome, "oldhome", "/oldhome"
 	}
 
-	if !ok { // user has not been migrated or is a new user
-		fs.logger.Info("forwarding user to old_home", zap.String("username", username))
-		return fs.oldHome
-	}
-
-	s := fs.getStorageForLetter(ctx, letter)
+	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
 	fs.logger.Info("forwarding user to new_home", zap.String("username", username))
-	return s
+	return s, mountID, mountPrefix
 }
 
-func (fs *eosStorage) isKeyMigrated(key string) bool {
-	return false
+func (fs *eosStorage) isUserMigrated(ctx context.Context, key string) bool {
+	defaultUserNotFound := fs.migrator.GetDefaultUserNotFound(ctx)
+	migrated, found := fs.migrator.IsKeyMigrated(ctx, key)
+	if !found {
+		// if not found, we apply the default value
+		if defaultUserNotFound == cbox_api.DefaultUserNotFoundNewProxy {
+			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("home", "newhome"))
+			return true
+		} else {
+			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("home", "oldhome"))
+			return false
+		}
+	}
+	return migrated
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
@@ -100,7 +111,7 @@ func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, re
 		return err
 	}
 
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.SetACL(ctx, path, readOnly, recipient, shareList)
 
 }
@@ -110,7 +121,7 @@ func (fs *eosStorage) UnsetACL(ctx context.Context, path string, recipient *api.
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.UnsetACL(ctx, path, recipient, shareList)
 
 }
@@ -121,29 +132,53 @@ func (fs *eosStorage) UpdateACL(ctx context.Context, path string, readOnly bool,
 		return err
 	}
 
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.UpdateACL(ctx, path, readOnly, recipient, shareList)
 }
 
-func (fs *eosStorage) GetMetadata(ctx context.Context, path string) (*api.Metadata, error) {
+func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	ts := fs.getStorageForUser(ctx, u)
-	return ts.GetMetadata(ctx, path)
+	ts, mountID, mountPrefix := fs.getStorageForUser(ctx, u)
+	md, err := ts.GetMetadata(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	migID := fmt.Sprintf("%s:%s", mountID, md.Id)
+	migPath := path.Join(mountPrefix, md.Path)
+
+	md.MigId = migID
+	md.MigPath = migPath
+
+	return md, nil
 
 }
 
-func (fs *eosStorage) ListFolder(ctx context.Context, path string) ([]*api.Metadata, error) {
+func (fs *eosStorage) ListFolder(ctx context.Context, p string) ([]*api.Metadata, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	ts := fs.getStorageForUser(ctx, u)
-	return ts.ListFolder(ctx, path)
+	ts, mountID, mountPrefix := fs.getStorageForUser(ctx, u)
+	mds, err := ts.ListFolder(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, md := range mds {
+		migID := fmt.Sprintf("%s:%s", mountID, md.Id)
+		migPath := path.Join(mountPrefix, md.Path)
+
+		md.MigId = migID
+		md.MigPath = migPath
+	}
+
+	return mds, nil
 }
 
 func (fs *eosStorage) CreateDir(ctx context.Context, path string) error {
@@ -151,7 +186,7 @@ func (fs *eosStorage) CreateDir(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.CreateDir(ctx, path)
 }
 
@@ -160,7 +195,7 @@ func (fs *eosStorage) Delete(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.Delete(ctx, path)
 }
 
@@ -169,7 +204,7 @@ func (fs *eosStorage) Move(ctx context.Context, oldPath, newPath string) error {
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.Move(ctx, oldPath, newPath)
 }
 
@@ -178,7 +213,7 @@ func (fs *eosStorage) Download(ctx context.Context, path string) (io.ReadCloser,
 	if err != nil {
 		return nil, err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.Download(ctx, path)
 }
 
@@ -187,7 +222,7 @@ func (fs *eosStorage) Upload(ctx context.Context, path string, r io.ReadCloser) 
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.Upload(ctx, path, r)
 }
 
@@ -196,7 +231,7 @@ func (fs *eosStorage) ListRevisions(ctx context.Context, path string) ([]*api.Re
 	if err != nil {
 		return nil, err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.ListRevisions(ctx, path)
 }
 
@@ -205,7 +240,7 @@ func (fs *eosStorage) DownloadRevision(ctx context.Context, path, revisionKey st
 	if err != nil {
 		return nil, err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.DownloadRevision(ctx, path, revisionKey)
 }
 
@@ -214,7 +249,7 @@ func (fs *eosStorage) RestoreRevision(ctx context.Context, path, revisionKey str
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.RestoreRevision(ctx, path, revisionKey)
 }
 
@@ -223,7 +258,7 @@ func (fs *eosStorage) EmptyRecycle(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.EmptyRecycle(ctx, path)
 }
 
@@ -232,7 +267,7 @@ func (fs *eosStorage) ListRecycle(ctx context.Context, path string) ([]*api.Recy
 	if err != nil {
 		return nil, err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.ListRecycle(ctx, path)
 }
 
@@ -241,6 +276,6 @@ func (fs *eosStorage) RestoreRecycleEntry(ctx context.Context, restoreKey string
 	if err != nil {
 		return err
 	}
-	ts := fs.getStorageForUser(ctx, u)
+	ts, _, _ := fs.getStorageForUser(ctx, u)
 	return ts.RestoreRecycleEntry(ctx, restoreKey)
 }

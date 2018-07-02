@@ -248,18 +248,26 @@ func (sm *shareManager) AddFolderShare(ctx context.Context, p string, recipient 
 		return nil, err
 	}
 
-	// TODO(labkode): abort file sharing with user/groups
-
-	itemType := "file"
-	if md.IsDir {
-		itemType = "folder"
+	// TODO(labkode): use another error cde
+	if !md.IsDir {
+		return nil, api.NewError(api.StorageNotSupportedErrorCode)
 	}
+
+	itemType := "folder"
+
 	permissions := 15
 	if readOnly {
 		permissions = 1
 	}
 
-	prefix, itemSource := splitFileID(md.Id)
+	var prefix string
+	var itemSource string
+	if md.MigId != "" {
+		prefix, itemSource = splitFileID(md.MigId)
+	} else {
+		prefix, itemSource = splitFileID(md.Id)
+	}
+
 	fileSource, err := strconv.ParseUint(itemSource, 10, 64)
 	if err != nil {
 		l.Error("", zap.Error(err))
@@ -520,6 +528,7 @@ func (sm *shareManager) convertToFolderShare(ctx context.Context, dbShare *dbSha
 	} else {
 		recipientType = api.ShareRecipient_GROUP
 	}
+
 	path := joinFileID(dbShare.Prefix, dbShare.ItemSource)
 	share := &api.FolderShare{
 		OwnerId:  dbShare.UIDOwner,

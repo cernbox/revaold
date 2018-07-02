@@ -137,6 +137,10 @@ message Metadata {
 
   // Share extended metadata records
   string share_target = 13;
+
+  // Migration extended metadata records
+  string mig_id = 14;
+  string mig_path = 15;
 }
 
 message PathReq {

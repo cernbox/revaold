@@ -863,6 +863,7 @@ func (p *proxy) getMetadata(ctx context.Context, revaPath string) (*reva_api.Met
 	}
 	md := mdRes.Metadata
 	md.Path = p.getOCPath(ctx, md)
+	md.Id = p.getOCId(ctx, md.Id)
 	return md, nil
 }
 
@@ -2099,7 +2100,6 @@ func (p *proxy) receivedFolderShareToOCSShare(ctx context.Context, share *reva_a
 	return ocsShare, nil
 }
 func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.FolderShare) (*OCSShare, error) {
-	fmt.Println("folder share IN", share)
 	// TODO(labkode): harden check
 	user, _ := reva_api.ContextGetUser(ctx)
 	owner := user.AccountId
@@ -2108,7 +2108,6 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 	if err != nil {
 		return nil, err
 	}
-	md.Path = p.getOCPath(ctx, md)
 
 	var itemType ItemType = ItemTypeFolder
 	shareType := ShareTypeUser
@@ -2131,12 +2130,12 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 		ID:                   share.Id,
 		DisplayNameFileOwner: owner,
 		DisplayNameOwner:     owner,
-		FileSource:           share.Path,
-		FileTarget:           share.Path,
-		ItemSource:           share.Path,
+		FileSource:           md.Id,
+		FileTarget:           md.Path,
+		ItemSource:           md.Id,
 		ItemType:             itemType,
 		MimeType:             mimeType,
-		Name:                 share.Path,
+		Name:                 md.Path,
 		Path:                 md.Path,
 		Permissions:          permissions,
 		ShareTime:            int(share.Mtime),
@@ -2146,7 +2145,6 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 		ShareWith:            shareWith,
 		ShareWithDisplayName: shareWith,
 	}
-	fmt.Println("folder share OUT ", ocsShare)
 	return ocsShare, nil
 }
 func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLink) (*OCSShare, error) {
@@ -2158,7 +2156,6 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 	if err != nil {
 		return nil, err
 	}
-	md.Path = p.getOCPath(ctx, md)
 
 	var itemType ItemType
 	if pl.ItemType == reva_api.PublicLink_FOLDER {
@@ -2197,9 +2194,9 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		Token:                pl.Token,
 		DisplayNameFileOwner: owner,
 		DisplayNameOwner:     owner,
-		FileSource:           pl.Path,
-		FileTarget:           pl.Path,
-		ItemSource:           pl.Path,
+		FileSource:           md.Id,
+		FileTarget:           md.Path,
+		ItemSource:           md.Id,
 		ItemType:             itemType,
 		MimeType:             mimeType,
 		Name:                 pl.Token,
@@ -2886,6 +2883,14 @@ func (p *proxy) getPlainOCPath(ctx context.Context, revaPath string) string {
 	return ocPath
 }
 
+func (p *proxy) getOCId(ctx context.Context, id string) string {
+	tokens := strings.Split(id, ":")
+	if tokens[0] == "oldhome" || strings.HasPrefix(tokens[0], "eoshome-") {
+		tokens[0] = "home"
+	}
+	return strings.Join(tokens, ":")
+}
+
 func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 	revaPath := md.Path
 	var ocPath string
@@ -2898,9 +2903,17 @@ func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 		ocPath = path.Join("/", path.Join(tokens...))
 		ocPath = path.Join(p.ownCloudSharePrefix, ocPath)
 	} else {
-		// apply home default
-		ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
-		ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+		if strings.HasPrefix(revaPath, p.revaHomePrefix) {
+			ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
+			ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+		} else {
+			// migration logic, strip /oldhome or /eoshome-l from reva path
+			revaPath = strings.Trim(revaPath, "/")
+			parts := strings.Split(revaPath, "/")
+			parts[0] = ""
+			revaPath = path.Join("/", path.Join(parts...))
+			ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+		}
 	}
 	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
 	return ocPath

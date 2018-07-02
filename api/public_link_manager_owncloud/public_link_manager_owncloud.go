@@ -88,7 +88,13 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 	}
 	token := genToken()
 
-	prefix, itemSource := splitFileID(md.Id)
+	var prefix, itemSource string
+	if md.MigId != "" {
+		prefix, itemSource = splitFileID(md.MigId)
+	} else {
+		prefix, itemSource = splitFileID(md.Id)
+	}
+
 	fileSource, err := strconv.ParseUint(itemSource, 10, 64)
 	if err != nil {
 		l.Error("", zap.Error(err))

@@ -2908,11 +2908,10 @@ func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 			ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
 		} else {
 			// migration logic, strip /oldhome or /eoshome-l from reva path
-			revaPath = strings.Trim(revaPath, "/")
-			parts := strings.Split(revaPath, "/")
+			ocPath = strings.Trim(revaPath, "/")
+			parts := strings.Split(ocPath, "/")
 			parts[0] = ""
-			revaPath = path.Join("/", path.Join(parts...))
-			ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+			ocPath = path.Join("/", p.ownCloudHomePrefix, path.Join(parts...))
 		}
 	}
 	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))

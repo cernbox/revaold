@@ -1,5 +1,0 @@
-tcp-address: 0.0.0.0:9999
-public-link-manager-owncloud-db-username: cernbox_server
-public-link-manager-owncloud-db-password: labkode
-public-link-manager-owncloud-db-name: cernbox
-log-level: debug

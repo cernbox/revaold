@@ -1,0 +1,19 @@
+/var/log/revad/revad_http.log {
+    daily
+    rotate 365
+    copytruncate
+    delaycompress
+    compress
+    notifempty
+    missingok
+}
+
+/var/log/revad/revad_app.log {
+    daily
+    rotate 365
+    copytruncate
+    delaycompress
+    compress
+    notifempty
+    missingok
+}

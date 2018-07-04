@@ -1,0 +1,16 @@
+[Unit]
+Description=REVA gRPC server
+After=syslog.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/var/log/revad
+ExecStart=/usr/local/bin/revad
+StandardOutput=null
+StandardError=syslog
+
+[Install]
+WantedBy=multi-user.target
+

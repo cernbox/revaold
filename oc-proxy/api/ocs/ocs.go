@@ -29,53 +29,59 @@ var shareIDRegexp = regexp.MustCompile(`\(id:.+\)$`)
 
 func (p *proxy) registerRoutes() {
 	// requests targeting a file/folder
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.createShare)).Methods("POST")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.tokenAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.createShare)).Methods("POST")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares", p.tokenAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
 
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.tokenAuth(p.acceptShare)).Methods("POST")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.tokenAuth(p.rejectShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.tokenAuth(p.getRemoteShares)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
-	p.router.HandleFunc("/cernbox/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.tokenAuth(p.acceptShare)).Methods("POST")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/pending/{share_id}", p.tokenAuth(p.rejectShare)).Methods("DELETE")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares", p.tokenAuth(p.getRemoteShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/loadfile", p.tokenAuth(p.loadFile)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_texteditor/ajax/savefile", p.tokenAuth(p.saveFile)).Methods("PUT")
+	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.propfindPublicLink).Methods("PROPFIND")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/download.php", p.tokenAuth(p.downloadArchive)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files/ajax/getstoragestats.php", p.tokenAuth(p.getStorageStats)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_texteditor/ajax/loadfile", p.tokenAuth(p.loadFile)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_texteditor/ajax/savefile", p.tokenAuth(p.saveFile)).Methods("PUT")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/eosinfo/getinfo", p.tokenAuth(p.getEOSInfo)).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/files/ajax/download.php", p.tokenAuth(p.downloadArchive)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files/ajax/getstoragestats.php", p.tokenAuth(p.getStorageStats)).Methods("GET")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/list.php", p.tokenAuth(p.listTrashbin)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eostrashbin/ajax/undelete.php", p.tokenAuth(p.restoreTrashbin)).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/eosinfo/getinfo", p.tokenAuth(p.getEOSInfo)).Methods("POST")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/getVersions.php", p.tokenAuth(p.getVersions)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.tokenAuth(p.rollbackVersion)).Methods("GET")
-	p.router.HandleFunc("/cernbox/index.php/apps/files_eosversions/download.php", p.tokenAuth(p.downloadVersion)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_eostrashbin/ajax/list.php", p.tokenAuth(p.listTrashbin)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_eostrashbin/ajax/undelete.php", p.tokenAuth(p.restoreTrashbin)).Methods("POST")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/gallery/config", p.tokenAuth(p.getGalleryConfig)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_eosversions/ajax/getVersions.php", p.tokenAuth(p.getVersions)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.tokenAuth(p.rollbackVersion)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_eosversions/download.php", p.tokenAuth(p.downloadVersion)).Methods("GET")
+
+	p.router.HandleFunc("/index.php/apps/gallery/config", p.tokenAuth(p.getGalleryConfig)).Methods("GET")
 
 	// avatars
-	p.router.HandleFunc("/cernbox/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
+	p.router.HandleFunc("/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
 
-	p.router.HandleFunc("/cernbox/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
 
 }
 
+func (p *proxy) propfindPublicLink(w http.ResponseWriter, r *http.Request) {
+
+}
 func (p *proxy) getExternalShares(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("[]"))
@@ -2931,4 +2937,24 @@ func (p *proxy) splitRootPath(ctx context.Context, path string) (string, string,
 func (p *proxy) addShareTarget(ctx context.Context, id string, md *reva_api.Metadata) string {
 	return fmt.Sprintf("%s (id:%s)", md.ShareTarget, id)
 
+}
+
+func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
+	/*
+		Content-Security-Policy: default-src 'none';manifest-src 'self';script-src 'self' 'unsafe-eval';style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self';media-src 'self';frame-src 'self' blob:
+		Content-Type: text/html; charset=UTF-8
+		Date: Mon, 02 Jul 2018 07:50:39 GMT
+		Expires: Thu, 19 Nov 1981 08:52:00 GMT
+		Pragma: no-cache
+		Server: nginx/1.6.2
+		X-Content-Type-Options: nosniff
+		X-Download-Options: noopen
+		X-Frame-Options: SAMEORIGIN
+		X-Permitted-Cross-Domain-Policies: none
+		X-Powered-By: PHP/7.1.8
+		X-Robots-Tag: none
+	*/
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	//	w.Header().Set("Content-Security-Policy", "default-src 'none';manifest-src 'self';script-src 'self' 'unsafe-eval';style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self';media-src 'self';frame-src 'self' blob:")
+	w.Write([]byte(publicLinkTemplate))
 }

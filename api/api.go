@@ -94,6 +94,7 @@ type Storage interface {
 	SetACL(ctx context.Context, path string, readOnly bool, recipient *ShareRecipient, shareList []*FolderShare) error
 	UnsetACL(ctx context.Context, path string, recipient *ShareRecipient, shareList []*FolderShare) error
 	UpdateACL(ctx context.Context, path string, readOnly bool, recipient *ShareRecipient, shareList []*FolderShare) error
+	GetQuota(ctx context.Context, path string) (int, int, error)
 }
 
 type PublicLinkOptions struct {

@@ -219,6 +219,15 @@ func (fs *eosStorage) ListFolder(ctx context.Context, path string) ([]*api.Metad
 	return finfos, nil
 }
 
+func (fs *eosStorage) GetQuota(ctx context.Context, path string) (int, int, error) {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	path = fs.getInternalPath(ctx, path)
+	return fs.c.GetQuota(ctx, u.AccountId, path)
+}
+
 func (fs *eosStorage) CreateDir(ctx context.Context, path string) error {
 	u, err := getUserFromContext(ctx)
 	if err != nil {

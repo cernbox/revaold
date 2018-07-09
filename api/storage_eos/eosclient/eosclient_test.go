@@ -45,3 +45,12 @@ func TestListRecycle(t *testing.T) {
 		return
 	}
 }
+func TestQuota(t *testing.T) {
+	max, used, err := client.GetQuota(ctx, username, "/eos/scratch/user/l/labradorsvc/Photos")
+	if err != nil {
+		t.Fatal(err)
+		return
+	}
+	fmt.Println(max, used)
+
+}

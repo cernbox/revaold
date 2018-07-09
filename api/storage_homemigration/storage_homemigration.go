@@ -136,6 +136,15 @@ func (fs *eosStorage) UpdateACL(ctx context.Context, path string, readOnly bool,
 	return ts.UpdateACL(ctx, path, readOnly, recipient, shareList)
 }
 
+func (fs *eosStorage) GetQuota(ctx context.Context, p string) (int, int, error) {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	ts, _, _ := fs.getStorageForUser(ctx, u)
+	return ts.GetQuota(ctx, p)
+
+}
 func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {

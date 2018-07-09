@@ -84,6 +84,11 @@ func (fs *localStorage) UpdateACL(ctx context.Context, path string, readOnly boo
 	return api.NewError(api.StorageNotSupportedErrorCode)
 }
 
+func (fs *localStorage) GetQuota(ctx context.Context, name string) (int, int, error) {
+	// TODO(labkode): add quota check
+	return 0, 0, nil
+}
+
 func (fs *localStorage) CreateDir(ctx context.Context, name string) error {
 	name = fs.addNamespace(name)
 	return os.Mkdir(name, 0644)

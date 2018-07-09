@@ -227,6 +227,18 @@ func (fs *shareStorage) Move(ctx context.Context, oldName, newName string) error
 	return fs.vs.Move(newCtx, oldPath, newPath)
 }
 
+func (fs *shareStorage) GetQuota(ctx context.Context, name string) (int, int, error) {
+	share, p, err := fs.getReceivedShare(ctx, name)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	p = path.Join(share.Path, p)
+	fmt.Println(share.Id + " >>> " + p)
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
+	return fs.vs.GetQuota(newCtx, p)
+
+}
 func (fs *shareStorage) CreateDir(ctx context.Context, name string) error {
 	share, p, err := fs.getReceivedShare(ctx, name)
 	if err != nil {

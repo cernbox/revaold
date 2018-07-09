@@ -140,6 +140,15 @@ func (fs *homeStorage) ListFolder(ctx context.Context, path string) ([]*api.Meta
 	return mds, nil
 }
 
+func (fs *homeStorage) GetQuota(ctx context.Context, path string) (int, int, error) {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	path = fs.getInternalPath(ctx, u, path)
+	return fs.wrappedStorage.GetQuota(ctx, path)
+
+}
 func (fs *homeStorage) CreateDir(ctx context.Context, path string) error {
 	u, err := getUserFromContext(ctx)
 	if err != nil {

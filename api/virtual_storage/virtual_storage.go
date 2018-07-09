@@ -139,6 +139,20 @@ func (v *vfs) UpdateACL(ctx context.Context, path string, readOnly bool, recipie
 	return m.UpdateACL(ctx, derefPath, readOnly, recipient, shareList)
 }
 
+func (v *vfs) GetQuota(ctx context.Context, path string) (int, int, error) {
+	derefPath, err := v.getDereferencedPath(ctx, path)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return 0, 0, err
+	}
+	m, err := v.GetMount(derefPath)
+	if err != nil {
+		v.l.Error("", zap.Error(err))
+		return 0, 0, err
+	}
+	return m.GetQuota(ctx, derefPath)
+}
+
 func (v *vfs) CreateDir(ctx context.Context, path string) error {
 	derefPath, err := v.getDereferencedPath(ctx, path)
 	if err != nil {

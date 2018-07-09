@@ -1567,12 +1567,14 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 	ocPermissions := propertyXML{xml.Name{Space: "", Local: "oc:permissions"},
 		"", []byte(perm)}
 
-	quotaUsedBytes := propertyXML{
-		xml.Name{Space: "", Local: "d:quota-used-bytes"}, "", []byte("0")}
+	/*
+		quotaUsedBytes := propertyXML{
+			xml.Name{Space: "", Local: "d:quota-used-bytes"}, "", []byte("0")}
 
-	quotaAvailableBytes := propertyXML{
-		xml.Name{Space: "", Local: "d:quota-available-bytes"}, "",
-		[]byte("1000000000")}
+		quotaAvailableBytes := propertyXML{
+			xml.Name{Space: "", Local: "d:quota-available-bytes"}, "",
+			[]byte("1000000000")}
+	*/
 
 	getContentLegnth := propertyXML{
 		xml.Name{Space: "", Local: "d:getcontentlength"},
@@ -1618,7 +1620,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *api.Metadata) (*respon
 		"", []byte("")}
 
 	propList = append(propList, getResourceType, getContentLegnth, getContentType, getLastModified, // general WebDAV properties
-		getETag, quotaAvailableBytes, quotaUsedBytes, ocID, ocDownloadURL, ocDC, ocPermissions) // properties needed by ownCloud
+		getETag /*quotaAvailableBytes, quotaUsedBytes,*/, ocID, ocDownloadURL, ocDC, ocPermissions) // properties needed by ownCloud
 
 	// PropStat, only HTTP/1.1 200 is sent.
 	propStatList := []propstatXML{}

@@ -130,22 +130,35 @@ type storageStat struct {
 }
 
 func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	var owner string
 	if user, ok := reva_api.ContextGetUser(r.Context()); ok {
 		owner = user.AccountId
 	}
 
-	// TODO(labkode): add quota method to Storage
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getStorageClient().GetQuota(gCtx, &reva_api.QuotaReq{Path: "/home"})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.Status != reva_api.StatusCode_OK {
+		err := reva_api.NewError(reva_api.UnknownError)
+		p.logger.Error("", zap.Error(err))
+		return
+	}
 	stat := &storageStat{
 		UploadMaxFilesize: 10 * 1024 * 1024 * 1024, // 10 GiB
 		MaxHumanFilesize:  "Upload (max. 10GB)",
-		FreeSpace:         2 * 1024 * 1024 * 1024 * 1024, // 2TiB
-		UsedSpacePercent:  0,
+		FreeSpace:         int(res.TotalBytes), // 2TiB
+		UsedSpacePercent:  int((res.UsedBytes / res.TotalBytes) * 100),
 		Owner:             owner,
 		OwnerDisplayName:  owner,
 	}
-	res := &statRes{Data: stat, Status: "success"}
-	encoded, err := json.Marshal(res)
+	response := &statRes{Data: stat, Status: "success"}
+	encoded, err := json.Marshal(response)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -515,6 +528,7 @@ func (p *proxy) rollbackVersion(w http.ResponseWriter, r *http.Request) {
 	if res.Status != reva_api.StatusCode_OK {
 		err := reva_api.NewError(reva_api.UnknownError)
 		p.logger.Error("", zap.Error(err))
+		p.writeError(res.Status, w, r)
 		return
 	}
 

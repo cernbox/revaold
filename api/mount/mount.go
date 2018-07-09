@@ -44,6 +44,14 @@ func (m *mount) GetMountPointId() string            { return m.mountPointId }
 func (m *mount) GetMountOptions() *api.MountOptions { return m.mountOptions }
 func (m *mount) GetStorage() api.Storage            { return m.storage }
 
+func (m *mount) GetQuota(ctx context.Context, path string) (int, int, error) {
+	p, _, err := m.getInternalPath(ctx, path)
+	if err != nil {
+		return 0, 0, err
+	}
+	return m.storage.GetQuota(ctx, p)
+}
+
 func (m *mount) GetPathByID(ctx context.Context, id string) (string, error) {
 	id, err := m.getInternalIDPath(ctx, id)
 	if err != nil {

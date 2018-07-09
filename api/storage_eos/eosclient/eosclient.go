@@ -228,6 +228,21 @@ func (c *Client) GetFileInfoByPath(ctx context.Context, username, path string) (
 	return c.parseFileInfo(stdout)
 }
 
+// GetQuota gets the quota of a user on the quota node defined by path
+func (c *Client) GetQuota(ctx context.Context, username, path string) (int, int, error) {
+	// setting of the sys.acl is only possible from root user
+	unixUser, err := getUnixUser(rootUser)
+	if err != nil {
+		return 0, 0, err
+	}
+	cmd := exec.Command("/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "quota", "ls", "-u", username, "-m")
+	stdout, _, err := c.execute(cmd)
+	if err != nil {
+		return 0, 0, err
+	}
+	return c.parseQuota(path, stdout)
+}
+
 // CreateDir creates a directory at the given path
 func (c *Client) CreateDir(ctx context.Context, username, path string) error {
 	unixUser, err := getUnixUser(username)
@@ -310,7 +325,7 @@ func (c *Client) Write(ctx context.Context, username, path string, stream io.Rea
 		return err
 	}
 	xrdPath := fmt.Sprintf("%s//%s", c.opt.URL, path)
-	cmd := exec.Command("/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", fd.Name(), xrdPath, fmt.Sprintf("-ODeos.ruid=%s&eos.rgid=%d", unixUser.Uid, unixUser.Gid))
+	cmd := exec.Command("/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", fd.Name(), xrdPath, fmt.Sprintf("-ODeos.ruid=%s&eos.rgid=%s", unixUser.Uid, unixUser.Gid))
 	_, _, err = c.execute(cmd)
 	return err
 }
@@ -461,6 +476,33 @@ func (c *Client) parseFind(dirPath, raw string) ([]*FileInfo, error) {
 		finfos = append(finfos, fi)
 	}
 	return finfos, nil
+}
+
+func (c Client) parseQuotaLine(line string) map[string]string {
+	partsBySpace := strings.Split(line, " ")
+	m := getMap(partsBySpace)
+	return m
+}
+func (c *Client) parseQuota(path, raw string) (int, int, error) {
+	rawLines := strings.Split(raw, "\n")
+	for _, rl := range rawLines {
+		if rl == "" {
+			continue
+		}
+
+		m := c.parseQuotaLine(rl)
+		// map[maxbytes:2000000000000 maxlogicalbytes:1000000000000 percentageusedbytes:0.49 quota:node uid:gonzalhu space:/eos/scratch/user/ usedbytes:9829986500 usedlogicalbytes:4914993250 statusfiles:ok usedfiles:334 maxfiles:1000000 statusbytes:ok]
+
+		space := m["space"]
+		if strings.HasPrefix(path, space) {
+			maxBytesString, _ := m["maxlogicalbytes"]
+			usedBytesString, _ := m["usedlogicalbytes"]
+			maxBytes, _ := strconv.ParseInt(maxBytesString, 10, 64)
+			usedBytes, _ := strconv.ParseInt(usedBytesString, 10, 64)
+			return int(maxBytes), int(usedBytes), nil
+		}
+	}
+	return 0, 0, nil
 }
 
 func (c *Client) parseFileInfo(raw string) (*FileInfo, error) {

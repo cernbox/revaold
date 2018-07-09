@@ -199,6 +199,17 @@ func (fs *linkStorage) Move(ctx context.Context, oldName, newName string) error 
 	return fs.vfs.Move(ctx, oldPath, newPath)
 }
 
+func (fs *linkStorage) GetQuota(ctx context.Context, name string) (int, int, error) {
+	link, p, err := fs.getLink(ctx, name)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	p = path.Join(link.Path, p)
+	fmt.Println(link.Token + " >>> " + p)
+	return fs.vfs.GetQuota(ctx, p)
+}
+
 func (fs *linkStorage) CreateDir(ctx context.Context, name string) error {
 	link, p, err := fs.getLink(ctx, name)
 	if err != nil {

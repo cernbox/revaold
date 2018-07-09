@@ -205,6 +205,19 @@ func (s *svc) ListFolder(req *api.PathReq, stream api.Storage_ListFolderServer) 
 	return nil
 }
 
+func (s *svc) GetQuota(ctx context.Context, req *api.QuotaReq) (*api.QuotaResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	total, used, err := s.vs.GetQuota(ctx, req.Path)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		status := api.GetStatus(err)
+		quotaRes := &api.QuotaResponse{Status: status}
+		return quotaRes, nil
+	}
+	return &api.QuotaResponse{TotalBytes: int64(total), UsedBytes: int64(used)}, nil
+
+}
+
 func (s *svc) CreateDir(ctx context.Context, req *api.PathReq) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	if err := s.vs.CreateDir(ctx, req.Path); err != nil {

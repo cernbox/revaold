@@ -23,6 +23,7 @@ import (
 	"github.com/cernbox/reva/api/storage_local"
 	"github.com/cernbox/reva/api/storage_share"
 	"github.com/cernbox/reva/api/storage_wrapper_home"
+	"github.com/cernbox/reva/api/user_manager_cboxgroupd"
 	//"github.com/cernbox/reva/api/storage_public_link"
 	"github.com/cernbox/reva/api/token_manager_jwt"
 	"github.com/cernbox/reva/api/virtual_storage"
@@ -63,7 +64,10 @@ func main() {
 	gc.Add("tls-enable", false, "Enable TLS for encrypting connections.")
 	gc.Add("mount-table", "/etc/revad/mounts.yaml", "File containing the mounting table.")
 
-	gc.Add("auth-manager", "nop", "Implementation to use for the auth manager")
+	gc.Add("user-manager", "cboxgroupd", "Implementation to use for the user manager")
+	gc.Add("user-manager-cboxgroupd-uri", "http://localhost:2002", "URI of the CERNBox Group Daemon")
+	gc.Add("user-manager-cboxgroupd-secret", "foo", "Secret to talk to the CERNBox Group Daemon")
+
 	gc.Add("token-manager", "jwt", "Implementation to use for the token manager")
 	gc.Add("public-link-manager", "owncloud", "Implementation to use for the public link manager")
 
@@ -94,7 +98,9 @@ func main() {
 	vs := virtual_storage.NewVFS(logger)
 	mountTable := getMountTable(gc)
 
-	shareManager, err := share_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
+	userManagerOpt := &user_manager_cboxgroupd.Options{Logger: logger, CBOXGroupDaemonURI: gc.GetString("user-manager-cboxgroupd-uri"), CBOXGroupDaemonSecret: gc.GetString("user-manager-cboxgroupd-secret")}
+	userManager := user_manager_cboxgroupd.New(userManagerOpt)
+	shareManager, err := share_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs, userManager)
 	publicLinkManager, err := public_link_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
 
 	loadMountTable(logger, vs, mountTable, shareManager)

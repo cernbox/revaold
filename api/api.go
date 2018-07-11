@@ -132,6 +132,9 @@ type ShareManager interface {
 	*/
 }
 
+type UserManager interface {
+	GetUserGroups(ctx context.Context, username string) ([]string, error)
+}
 type AuthManager interface {
 	Authenticate(ctx context.Context, clientID, clientPassword string) (*User, error)
 }

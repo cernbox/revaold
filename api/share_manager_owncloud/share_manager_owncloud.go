@@ -16,19 +16,19 @@ import (
 	"go.uber.org/zap"
 )
 
-func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, vfs api.VirtualStorage) (api.ShareManager, error) {
-	fmt.Println(dbUsername)
+func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, vfs api.VirtualStorage, um api.UserManager) (api.ShareManager, error) {
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbUsername, dbPassword, dbHost, dbPort, dbName))
 	if err != nil {
 		return nil, err
 	}
 
-	return &shareManager{db: db, vfs: vfs}, nil
+	return &shareManager{db: db, vfs: vfs, um: um}, nil
 }
 
 type shareManager struct {
 	db  *sql.DB
 	vfs api.VirtualStorage
+	um  api.UserManager
 }
 
 func (sm *shareManager) GetReceivedFolderShare(ctx context.Context, id string) (*api.FolderShare, error) {
@@ -377,9 +377,22 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 		fileTarget  string
 	)
 
-	query := "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where share_with=? and id=?"
+	groups, err := sm.um.GetUserGroups(ctx, accountID)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	var groupsPlaceHolder string
+	if len(groups) > 1 {
+		groupsPlaceHolder = "'"
+		groupsPlaceHolder = strings.Join(groups, "','")
+		groupsPlaceHolder += "'"
+	}
+
+	query := fmt.Sprintf("select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where id=? and (share_with=? or share_with in (%s))", groupsPlaceHolder)
+
 	l.Debug(fmt.Sprintf("%s => (%s, %d)", query, accountID, id))
-	if err := sm.db.QueryRow(query, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget); err != nil {
+	if err := sm.db.QueryRow(query, id, accountID).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
 		}
@@ -391,8 +404,28 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 }
 
 func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string) ([]*dbShare, error) {
-	query := "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where share_with=? and (share_type=? or share_type=?) "
-	rows, err := sm.db.Query(query, accountID, 0, 1)
+	l := ctx_zap.Extract(ctx)
+	groups, err := sm.um.GetUserGroups(ctx, accountID)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	queryArgs := []interface{}{0, 1, accountID}
+	groupArgs := []interface{}{}
+	for _, v := range groups {
+		groupArgs = append(groupArgs, v)
+	}
+
+	var query string
+
+	if len(groups) > 1 {
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
+		queryArgs = append(queryArgs, groupArgs...)
+	} else {
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and (share_with=?)"
+	}
+	fmt.Println(query, queryArgs)
+	rows, err := sm.db.Query(query, queryArgs...)
 	if err != nil {
 		return nil, err
 	}

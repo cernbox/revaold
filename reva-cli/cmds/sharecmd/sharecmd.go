@@ -486,7 +486,7 @@ func listReceivedShares(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	lines := []string{"#ID|ReadOnly|Type|From|Modified|Path"}
+	lines := []string{"#ID|ReadOnly|Type|From|To|Modified|Path"}
 	for {
 		res, err := stream.Recv()
 		if err == io.EOF {
@@ -500,7 +500,7 @@ func listReceivedShares(c *cli.Context) error {
 		}
 		share := res.Share
 		recipientType := getRecipientTypeHuman(share.Recipient.Type)
-		line := fmt.Sprintf("%s|%t|%s|%s|%d|%s", share.Id, share.ReadOnly, recipientType, share.OwnerId, share.Mtime, share.Path)
+		line := fmt.Sprintf("%s|%t|%s|%s|%s|%d|%s", share.Id, share.ReadOnly, recipientType, share.OwnerId, share.Recipient.Identity, share.Mtime, share.Path)
 		lines = append(lines, line)
 	}
 	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))

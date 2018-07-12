@@ -31,7 +31,7 @@ func ContextSetAccessToken(ctx context.Context, token string) context.Context {
 }
 
 type MountOptions struct {
-	ReadOnly bool
+	ReadOnly bool `json:"read_only"`
 }
 
 // Mount contains the information about a mount.

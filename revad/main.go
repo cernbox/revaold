@@ -22,6 +22,7 @@ import (
 	"github.com/cernbox/reva/api/storage_homemigration"
 	"github.com/cernbox/reva/api/storage_local"
 	"github.com/cernbox/reva/api/storage_share"
+	"github.com/cernbox/reva/api/storage_usermigration"
 	"github.com/cernbox/reva/api/storage_wrapper_home"
 	"github.com/cernbox/reva/api/user_manager_cboxgroupd"
 	//"github.com/cernbox/reva/api/storage_public_link"
@@ -154,8 +155,38 @@ func main() {
 		panic(err)
 	}
 
-	mount := mount.New("home", "/home", &api.MountOptions{}, storage)
-	vs.AddMount(context.Background(), mount)
+	oldUserMount, err := vs.GetMount("/old/user")
+	if err != nil {
+		panic(err)
+	}
+
+	newUserMap := map[string]api.Storage{}
+	//for _, l := range "abcdefghilmnopqrstuvwxyz" {
+	for _, l := range "l" {
+		letter := string(l)
+		m, err := vs.GetMount(fmt.Sprintf("/new/user/%s", letter))
+		if err != nil {
+			panic(err)
+		}
+		newUserMap[letter] = m.GetStorage()
+	}
+
+	opts2 := &storage_usermigration.Options{
+		OldUser:    oldUserMount.GetStorage(),
+		Logger:     logger,
+		NewUserMap: newUserMap,
+		Migrator:   migrator,
+	}
+
+	userStorage, err := storage_usermigration.New(opts2)
+	if err != nil {
+		panic(err)
+	}
+
+	homeMount := mount.New("home", "/home", &api.MountOptions{}, storage)
+	userMount := mount.New("user", "/eos/user", &api.MountOptions{}, userStorage)
+	vs.AddMount(context.Background(), homeMount)
+	vs.AddMount(context.Background(), userMount)
 	/* END Migration stuff */
 
 	tokenManager := token_manager_jwt.New(gc.GetString("token-manager-jwt-secret"))

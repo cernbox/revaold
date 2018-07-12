@@ -2953,21 +2953,6 @@ func (p *proxy) addShareTarget(ctx context.Context, id string, md *reva_api.Meta
 }
 
 func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
-	/*
-		Content-Security-Policy: default-src 'none';manifest-src 'self';script-src 'self' 'unsafe-eval';style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self';media-src 'self';frame-src 'self' blob:
-		Content-Type: text/html; charset=UTF-8
-		Date: Mon, 02 Jul 2018 07:50:39 GMT
-		Expires: Thu, 19 Nov 1981 08:52:00 GMT
-		Pragma: no-cache
-		Server: nginx/1.6.2
-		X-Content-Type-Options: nosniff
-		X-Download-Options: noopen
-		X-Frame-Options: SAMEORIGIN
-		X-Permitted-Cross-Domain-Policies: none
-		X-Powered-By: PHP/7.1.8
-		X-Robots-Tag: none
-	*/
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	//	w.Header().Set("Content-Security-Policy", "default-src 'none';manifest-src 'self';script-src 'self' 'unsafe-eval';style-src 'self' 'unsafe-inline';img-src 'self' data: blob:;font-src 'self';connect-src 'self';media-src 'self';frame-src 'self' blob:")
 	w.Write([]byte(publicLinkTemplate))
 }

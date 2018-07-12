@@ -33,8 +33,8 @@ type Options struct {
 	Logger   *zap.Logger
 	Migrator cbox_api.Migrator
 
-	OldHome    api.Storage
-	NewHomeMap map[string]api.Storage
+	OldUser    api.Storage
+	NewUserMap map[string]api.Storage
 }
 
 func (opt *Options) init() {
@@ -49,8 +49,8 @@ func New(opt *Options) (api.Storage, error) {
 
 	eosStorage := &eosStorage{
 		logger:     opt.Logger,
-		oldUser:    opt.OldHome,
-		newUserMap: opt.NewHomeMap,
+		oldUser:    opt.OldUser,
+		newUserMap: opt.NewUserMap,
 		migrator:   opt.Migrator,
 	}
 	return eosStorage, nil
@@ -67,12 +67,12 @@ func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (a
 	if !ok {
 		panic("storage not found for letter: " + letter)
 	}
-	mountID := fmt.Sprintf("eoshome-%s", letter)
-	mountPrefix := "/" + mountID
+	mountID := fmt.Sprintf("newuser-%s", letter)
+	mountPrefix := fmt.Sprintf("/new/user/%s", letter)
 	return s, mountID, mountPrefix
 }
 
-func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) (api.Storage, string, string) {
+func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) (api.Storage, string, string, string) {
 	var key, letter string
 	tokens := strings.Split(strings.TrimPrefix(letterPath, "/"), "/")
 	if len(tokens) > 1 {
@@ -88,18 +88,22 @@ func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) 
 		key = path.Join(key, tokens[0])
 	}
 
+	// add /eos/user to the key
+	key = path.Join("/eos/user", key)
+
 	fs.logger.Debug("migration key", zap.String("key", key))
 
 	migrated := fs.isPathMigrated(ctx, key)
 
 	if !migrated {
 		fs.logger.Info("forwarding to olduser", zap.String("path", letterPath))
-		return fs.oldUser, "olduser", "/old/user"
+		return fs.oldUser, "olduser", "/old/user", letterPath
 	}
 
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
 	fs.logger.Info("forwarding to newuser", zap.String("path", letterPath))
-	return s, mountID, mountPrefix
+	// remove letter as /new/user/l mount already contains letter info
+	return s, mountID, mountPrefix, strings.TrimPrefix(letterPath, fmt.Sprintf("/%s", letter))
 }
 
 func (fs *eosStorage) isPathMigrated(ctx context.Context, key string) bool {
@@ -124,7 +128,7 @@ func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, re
 		return err
 	}
 
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.SetACL(ctx, path, readOnly, recipient, shareList)
 
 }
@@ -134,7 +138,7 @@ func (fs *eosStorage) UnsetACL(ctx context.Context, path string, recipient *api.
 	if err != nil {
 		return err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.UnsetACL(ctx, path, recipient, shareList)
 
 }
@@ -145,7 +149,7 @@ func (fs *eosStorage) UpdateACL(ctx context.Context, path string, readOnly bool,
 		return err
 	}
 
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.UpdateACL(ctx, path, readOnly, recipient, shareList)
 }
 
@@ -154,7 +158,7 @@ func (fs *eosStorage) GetQuota(ctx context.Context, p string) (int, int, error) 
 	if err != nil {
 		return 0, 0, err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, p)
+	ts, _, _, p := fs.getStorageForPath(ctx, p)
 	return ts.GetQuota(ctx, p)
 
 }
@@ -164,12 +168,13 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata,
 		return nil, err
 	}
 
-	ts, mountID, mountPrefix := fs.getStorageForPath(ctx, p)
+	ts, mountID, mountPrefix, p := fs.getStorageForPath(ctx, p)
 	md, err := ts.GetMetadata(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 
+	md.Path = fs.getTargetMetadataPath(mountPrefix, p)
 	migID := fmt.Sprintf("%s:%s", mountID, md.Id)
 	migPath := path.Join(mountPrefix, md.Path)
 
@@ -180,22 +185,31 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata,
 
 }
 
+func (fs *eosStorage) getTargetMetadataPath(mountPrefix, p string) string {
+	fmt.Println("getTargetMetadataPath", mountPrefix, p)
+	if strings.HasPrefix(mountPrefix, "/new/user/") {
+		return path.Join(strings.TrimPrefix(mountPrefix, "/new/user/"), p)
+	}
+	return p
+}
+
 func (fs *eosStorage) ListFolder(ctx context.Context, p string) ([]*api.Metadata, error) {
 	_, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	ts, mountID, mountPrefix := fs.getStorageForPath(ctx, p)
+	ts, mountID, mountPrefix, p := fs.getStorageForPath(ctx, p)
 	mds, err := ts.ListFolder(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, md := range mds {
+		md.Path = fs.getTargetMetadataPath(mountPrefix, md.Path)
+
 		migID := fmt.Sprintf("%s:%s", mountID, md.Id)
 		migPath := path.Join(mountPrefix, md.Path)
-
 		md.MigId = migID
 		md.MigPath = migPath
 	}
@@ -208,7 +222,7 @@ func (fs *eosStorage) CreateDir(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.CreateDir(ctx, path)
 }
 
@@ -217,7 +231,7 @@ func (fs *eosStorage) Delete(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.Delete(ctx, path)
 }
 
@@ -226,7 +240,8 @@ func (fs *eosStorage) Move(ctx context.Context, oldPath, newPath string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, oldPath)
+	ts, _, _, oldPath := fs.getStorageForPath(ctx, oldPath)
+	ts, _, _, newPath = fs.getStorageForPath(ctx, newPath)
 	return ts.Move(ctx, oldPath, newPath)
 }
 
@@ -235,7 +250,7 @@ func (fs *eosStorage) Download(ctx context.Context, path string) (io.ReadCloser,
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.Download(ctx, path)
 }
 
@@ -244,7 +259,7 @@ func (fs *eosStorage) Upload(ctx context.Context, path string, r io.ReadCloser) 
 	if err != nil {
 		return err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.Upload(ctx, path, r)
 }
 
@@ -253,7 +268,7 @@ func (fs *eosStorage) ListRevisions(ctx context.Context, path string) ([]*api.Re
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.ListRevisions(ctx, path)
 }
 
@@ -262,7 +277,7 @@ func (fs *eosStorage) DownloadRevision(ctx context.Context, path, revisionKey st
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.DownloadRevision(ctx, path, revisionKey)
 }
 
@@ -271,7 +286,7 @@ func (fs *eosStorage) RestoreRevision(ctx context.Context, path, revisionKey str
 	if err != nil {
 		return err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.RestoreRevision(ctx, path, revisionKey)
 }
 
@@ -280,7 +295,7 @@ func (fs *eosStorage) EmptyRecycle(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.EmptyRecycle(ctx, path)
 }
 
@@ -289,7 +304,7 @@ func (fs *eosStorage) ListRecycle(ctx context.Context, path string) ([]*api.Recy
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _ := fs.getStorageForPath(ctx, path)
+	ts, _, _, path := fs.getStorageForPath(ctx, path)
 	return ts.ListRecycle(ctx, path)
 }
 
@@ -299,6 +314,6 @@ func (fs *eosStorage) RestoreRecycleEntry(ctx context.Context, restoreKey string
 		return err
 	}
 	// TODO(labkode): get mount/storage from restore key?
-	ts, _, _ := fs.getStorageForPath(ctx, "")
+	ts, _, _, _ := fs.getStorageForPath(ctx, "")
 	return ts.RestoreRecycleEntry(ctx, restoreKey)
 }

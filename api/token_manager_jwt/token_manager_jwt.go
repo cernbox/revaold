@@ -20,7 +20,7 @@ type tokenManager struct {
 	signSecret string
 }
 
-func (tm *tokenManager) ForgeToken(ctx context.Context, user *api.User) (string, error) {
+func (tm *tokenManager) ForgeUserToken(ctx context.Context, user *api.User) (string, error) {
 	l := ctx_zap.Extract(ctx)
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
 	claims := token.Claims.(jwt.MapClaims)
@@ -35,7 +35,7 @@ func (tm *tokenManager) ForgeToken(ctx context.Context, user *api.User) (string,
 	return tokenString, nil
 }
 
-func (tm *tokenManager) VerifyToken(ctx context.Context, token string) (*api.User, error) {
+func (tm *tokenManager) DismantleUserToken(ctx context.Context, token string) (*api.User, error) {
 	l := ctx_zap.Extract(ctx)
 	rawToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
 		return []byte(tm.signSecret), nil
@@ -76,4 +76,45 @@ func (tm *tokenManager) VerifyToken(ctx context.Context, token string) (*api.Use
 		Groups:    groups,
 	}
 	return user, nil
+}
+
+func (tm *tokenManager) ForgePublicLinkToken(ctx context.Context, pl *api.PublicLink) (string, error) {
+	l := ctx_zap.Extract(ctx)
+	token := jwt.New(jwt.GetSigningMethod("HS256"))
+	claims := token.Claims.(jwt.MapClaims)
+	claims["token"] = pl.Token
+	claims["exp"] = time.Now().Add(time.Second * time.Duration(3600))
+	tokenString, err := token.SignedString([]byte(tm.signSecret))
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return "", err
+	}
+	return tokenString, nil
+}
+
+func (tm *tokenManager) DismantlePublicLinkToken(ctx context.Context, token string) (*api.PublicLink, error) {
+	l := ctx_zap.Extract(ctx)
+	rawToken, err := jwt.Parse(token, func(token *jwt.Token) (interface{}, error) {
+		return []byte(tm.signSecret), nil
+	})
+	if err != nil {
+		l.Error("invalid token", zap.Error(err), zap.String("token", token))
+		return nil, err
+	}
+	if !rawToken.Valid {
+		l.Error("invalid token", zap.Error(err), zap.String("token", token))
+		return nil, err
+
+	}
+
+	claims := rawToken.Claims.(jwt.MapClaims)
+	token, ok := claims["token"].(string)
+	if !ok {
+		return nil, errors.New("token claim is not a string")
+	}
+
+	pl := &api.PublicLink{
+		Token: token,
+	}
+	return pl, nil
 }

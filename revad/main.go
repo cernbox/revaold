@@ -214,7 +214,7 @@ func main() {
 	grpc_prometheus.Register(server)
 	http.Handle("/metrics", promhttp.Handler())
 
-	api.RegisterAuthServer(server, authsvc.New(authManager, tokenManager))
+	api.RegisterAuthServer(server, authsvc.New(authManager, tokenManager, publicLinkManager))
 	api.RegisterStorageServer(server, storagesvc.New(vs))
 	api.RegisterShareServer(server, sharesvc.New(publicLinkManager, shareManager))
 	api.RegisterPreviewServer(server, previewsvc.New())
@@ -392,21 +392,41 @@ func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTabl
 
 func getAuthFunc(tm api.TokenManager) func(context.Context) (context.Context, error) {
 	return func(ctx context.Context) (context.Context, error) {
-		token, err := grpc_auth.AuthFromMD(ctx, "bearer")
-		if err != nil {
-			return nil, err
+
+		// check for user token
+		token, err := grpc_auth.AuthFromMD(ctx, "user-bearer")
+		if err == nil {
+			user, err := tm.DismantleUserToken(ctx, token)
+			if err != nil {
+				return nil, grpc.Errorf(codes.Unauthenticated, "invalid user auth token: %v", err)
+			}
+
+			grpc_ctxtags.Extract(ctx).Set("auth.accountid", user.AccountId)
+			uuid, _ := uuid.NewV4()
+			tid := uuid.String()
+			grpc_ctxtags.Extract(ctx).Set("tid", tid)
+			newCtx := api.ContextSetUser(ctx, user)
+			return newCtx, nil
+
 		}
 
-		user, err := tm.VerifyToken(ctx, token)
-		if err != nil {
-			return nil, grpc.Errorf(codes.Unauthenticated, "invalid auth token: %v", err)
+		// check for public link token
+		token, err = grpc_auth.AuthFromMD(ctx, "pl-bearer")
+		if err == nil {
+			pl, err := tm.DismantlePublicLinkToken(ctx, token)
+			if err != nil {
+				return nil, grpc.Errorf(codes.Unauthenticated, "invalid pl auth token: %v", err)
+			}
+
+			grpc_ctxtags.Extract(ctx).Set("auth.accountid", pl.Token)
+			uuid, _ := uuid.NewV4()
+			tid := uuid.String()
+			grpc_ctxtags.Extract(ctx).Set("tid", tid)
+			newCtx := api.ContextSetPublicLink(ctx, pl)
+			return newCtx, nil
+
 		}
 
-		grpc_ctxtags.Extract(ctx).Set("auth.accountid", user.AccountId)
-		uuid, _ := uuid.NewV4()
-		tid := uuid.String()
-		grpc_ctxtags.Extract(ctx).Set("tid", tid)
-		newCtx := api.ContextSetUser(ctx, user)
-		return newCtx, nil
+		return nil, err
 	}
 }

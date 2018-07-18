@@ -172,7 +172,7 @@ func inspectPublicLink(c *cli.Context) error {
 	link := linkRes.PublicLink
 	modified := time.Unix(int64(link.Mtime), 0).Format(time.RFC3339)
 	expires := time.Unix(int64(link.Expires), 0).Format(time.RFC3339)
-	fmt.Fprintf(c.App.Writer, "Token: %s\nProtected: %t\nReadOnly: %t\nModify: %s Timestamp: %d\nExpires: %s Timestamp: %d\nPath: %s\n", link.Token, link.Protected, link.ReadOnly, modified, link.Mtime, expires, link.Expires, link.Path)
+	fmt.Fprintf(c.App.Writer, "ID: %s\nToken: %s\nProtected: %t\nReadOnly: %t\nModify: %s Timestamp: %d\nExpires: %s Timestamp: %d\nPath: %s\n", link.Id, link.Token, link.Protected, link.ReadOnly, modified, link.Mtime, expires, link.Expires, link.Path)
 	return nil
 }
 
@@ -248,7 +248,7 @@ func listPublicLinks(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	lines := []string{"#Token|Protected|Expires|ReadOnly|Modified|Path"}
+	lines := []string{"#ID|Token|Protected|Expires|ReadOnly|Modified|Path"}
 	for {
 		linkRes, err := stream.Recv()
 		if err == io.EOF {
@@ -261,7 +261,7 @@ func listPublicLinks(c *cli.Context) error {
 			return cli.NewExitError(linkRes.Status, 1)
 		}
 		link := linkRes.PublicLink
-		line := fmt.Sprintf("%s|%t|%d|%t|%d|%s", link.Token, link.Protected, link.Expires, link.ReadOnly, link.Mtime, link.Path)
+		line := fmt.Sprintf("%s|%s|%t|%d|%t|%d|%s", link.Id, link.Token, link.Protected, link.Expires, link.ReadOnly, link.Mtime, link.Path)
 		lines = append(lines, line)
 	}
 	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))

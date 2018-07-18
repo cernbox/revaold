@@ -2,6 +2,7 @@ package public_link_manager_owncloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -39,7 +40,6 @@ func checkPasswordHash(password, hash string) bool {
 }
 
 func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, vfs api.VirtualStorage) (api.PublicLinkManager, error) {
-	fmt.Println(dbUsername)
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbUsername, dbPassword, dbHost, dbPort, dbName))
 	if err != nil {
 		return nil, err
@@ -63,6 +63,45 @@ func splitFileID(fileID string) (string, string) {
 // joinFileID concatenates the prefix and the inode to form a valid fileID.
 func joinFileID(prefix, inode string) string {
 	return strings.Join([]string{prefix, inode}, ":")
+}
+
+func (lm *linkManager) AuthenticatePublicLink(ctx context.Context, token, password string) (*api.PublicLink, error) {
+	l := ctx_zap.Extract(ctx)
+	dbShare, err := lm.getDBShareByToken(ctx, token)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	pb, err := lm.convertToPublicLink(ctx, dbShare)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
+	if pb.Protected {
+		hashedPassword := strings.TrimPrefix(dbShare.ShareWith, "1|")
+		ok := checkPasswordHash(password, hashedPassword)
+		if !ok {
+			return nil, errors.New("password invalid")
+		}
+	}
+
+	return pb, nil
+}
+
+func (lm *linkManager) IsPublicLinkProtected(ctx context.Context, token string) (bool, error) {
+	l := ctx_zap.Extract(ctx)
+	dbShare, err := lm.getDBShareByToken(ctx, token)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return false, err
+	}
+	pb, err := lm.convertToPublicLink(ctx, dbShare)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return false, err
+	}
+	return pb.Protected, nil
 }
 
 func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *api.PublicLinkOptions) (*api.PublicLink, error) {
@@ -338,6 +377,30 @@ type dbShare struct {
 	STime       int
 	ItemType    string
 	Permissions int
+}
+
+func (lm *linkManager) getDBShareByToken(ctx context.Context, token string) (*dbShare, error) {
+	var (
+		id          int
+		prefix      string
+		itemSource  string
+		shareWith   string
+		expiration  string
+		stime       int
+		permissions int
+		itemType    string
+	)
+
+	query := "select id, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and token=?"
+	if err := lm.db.QueryRow(query, 3, token).Scan(&id, &shareWith, &prefix, &itemSource, &token, &expiration, &stime, &permissions, &itemType); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, api.NewError(api.PublicLinkNotFoundErrorCode)
+		}
+		return nil, err
+	}
+	dbShare := &dbShare{ID: id, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
+	return dbShare, nil
+
 }
 
 func (lm *linkManager) getDBShare(ctx context.Context, accountID, id string) (*dbShare, error) {

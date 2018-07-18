@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"mime"
@@ -80,8 +81,11 @@ func (p *proxy) registerRoutes() {
 }
 
 func (p *proxy) propfindPublicLink(w http.ResponseWriter, r *http.Request) {
+	//ctx := r.Context()
+	//gCtx := GetContextWithPublicLinkAuth(ctx)
 
 }
+
 func (p *proxy) getExternalShares(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("[]"))
@@ -346,7 +350,7 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		authCookie, err := r.Cookie("oc_sessionpassphrase")
 		if err == nil {
 			token := authCookie.Value
-			userRes, err := authClient.VerifyToken(ctx, &reva_api.VerifyTokenReq{Token: token})
+			userRes, err := authClient.DismantleUserToken(ctx, &reva_api.TokenReq{Token: token})
 			if err != nil {
 				p.logger.Error("", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
@@ -379,8 +383,8 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// try to authenticate user with username and password
-		gReq := &reva_api.CreateTokenReq{ClientId: username, ClientSecret: password}
-		gTokenRes, err := authClient.CreateToken(ctx, gReq)
+		gReq := &reva_api.ForgeUserTokenReq{ClientId: username, ClientSecret: password}
+		gTokenRes, err := authClient.ForgeUserToken(ctx, gReq)
 		if err != nil {
 			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -394,10 +398,10 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		token := gTokenRes.Token
-		p.logger.Info("token created", zap.String("token", token.Token))
+		p.logger.Info("token created", zap.String("token", token))
 
-		gReq2 := &reva_api.VerifyTokenReq{Token: token.Token}
-		userRes, err := authClient.VerifyToken(ctx, gReq2)
+		gReq2 := &reva_api.TokenReq{Token: token}
+		userRes, err := authClient.DismantleUserToken(ctx, gReq2)
 		if err != nil {
 			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -413,13 +417,13 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		// save token into cookie for further requests
 		cookie := &http.Cookie{}
 		cookie.Name = "oc_sessionpassphrase"
-		cookie.Value = token.Token
+		cookie.Value = token
 		cookie.MaxAge = 3600
 		http.SetCookie(w, cookie)
 
 		user := userRes.User
 		ctx = reva_api.ContextSetUser(ctx, user)
-		ctx = reva_api.ContextSetAccessToken(ctx, token.Token)
+		ctx = reva_api.ContextSetAccessToken(ctx, token)
 		r = r.WithContext(ctx)
 
 		p.logger.Info("request is authenticated", zap.String("account_id", user.AccountId))
@@ -2713,7 +2717,13 @@ func getUserFromContext(ctx context.Context) (*reva_api.User, error) {
 
 func GetContextWithAuth(ctx context.Context) context.Context {
 	token, _ := reva_api.ContextGetAccessToken(ctx)
-	header := metadata.New(map[string]string{"authorization": "bearer " + token})
+	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
+	return metadata.NewOutgoingContext(context.Background(), header)
+}
+
+func GetContextWithPublicLinkAuth(ctx context.Context) context.Context {
+	token, _ := reva_api.ContextGetPublicLinkToken(ctx)
+	header := metadata.New(map[string]string{"authorization": "pl-bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)
 }
 
@@ -2845,7 +2855,7 @@ func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		userRes, err := authClient.VerifyToken(ctx, &reva_api.VerifyTokenReq{Token: token})
+		userRes, err := authClient.DismantleUserToken(ctx, &reva_api.TokenReq{Token: token})
 		if err != nil {
 			p.logger.Warn("", zap.Error(err), zap.String("token", token))
 			w.WriteHeader(http.StatusUnauthorized)
@@ -2953,6 +2963,35 @@ func (p *proxy) addShareTarget(ctx context.Context, id string, md *reva_api.Meta
 }
 
 func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	token := mux.Vars(r)["token"]
+
+	client := p.getAuthClient()
+	res, err := client.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: ""})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.Status != reva_api.StatusCode_OK {
+		// TODO(labkode): render password or expired template
+		p.writeError(res.Status, w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
-	w.Write([]byte(publicLinkTemplate))
+	data := struct {
+		Token string
+		Note  string
+	}{Token: res.Token, Note: "TODO(labkode): customize golang templates"}
+
+	tpl, err := template.New("public_link").Parse(publicLinkTemplate)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		p.logger.Error("", zap.Error(err))
+		return
+	}
+
+	tpl.Execute(w, data)
 }

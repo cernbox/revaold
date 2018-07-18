@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -78,6 +79,13 @@ func SetAccessToken(token string) {
 	}
 }
 
+func SavePublicLinkAccessToken(token, accessToken string) {
+	p := path.Join(ConfigDir, fmt.Sprintf("public-link-access-token-for-%s", token))
+	if err := ioutil.WriteFile(p, []byte(accessToken), 0600); err != nil {
+		log.Fatalln(err)
+	}
+}
+
 func getConn() (*grpc.ClientConn, error) {
 	cfg := GetConfig()
 	return grpc.Dial(cfg.ServerURL, grpc.WithInsecure())
@@ -117,6 +125,6 @@ func GetPreviewClient() (api.PreviewClient, error) {
 
 func GetContextWithAuth() context.Context {
 	token := GetAccessToken()
-	header := metadata.New(map[string]string{"authorization": "bearer " + token})
+	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)
 }

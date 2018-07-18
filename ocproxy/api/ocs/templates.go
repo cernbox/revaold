@@ -125,7 +125,7 @@ var publicLinkTemplate string = `
 		})(jQuery, OC);
 		</script>
 	<body id="body-public">
-	<data key="cernboxauthtoken" x-access-token="test" />
+	<data key="cernboxauthtoken" x-access-token="{{ .Token }}" />
 	<noscript>
 	<div id="nojavascript">
 	<div> This application requires JavaScript for correct operation. Please <a href="http://enable-javascript.com/" target="_blank" rel="noreferrer">enable JavaScript</a> and reload the page.</div>
@@ -250,7 +250,7 @@ var publicLinkTemplate string = `
 		</div>
 		<footer>
 			<p class="info">
-				<a href="https://owncloud.org" target="_blank" rel="noreferrer">ownCloud</a> ÃÂ¢ÃÂÃÂ A safe home for all your data		</p>
+				<a href="https://owncloud.org" target="_blank" rel="noreferrer">ownCloud</a>{{ .Note }}</p>
 		</footer>
 	</div>
 	</body>

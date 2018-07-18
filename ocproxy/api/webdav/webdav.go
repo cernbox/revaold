@@ -1703,7 +1703,7 @@ func getUserFromContext(ctx context.Context) (*api.User, error) {
 
 func GetContextWithAuth(ctx context.Context) context.Context {
 	token, _ := api.ContextGetAccessToken(ctx)
-	header := metadata.New(map[string]string{"authorization": "bearer " + token})
+	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)
 }
 
@@ -1967,7 +1967,7 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		authCookie, err := r.Cookie("oc_sessionpassphrase")
 		if err == nil {
 			token := authCookie.Value
-			userRes, err := authClient.VerifyToken(ctx, &api.VerifyTokenReq{Token: token})
+			userRes, err := authClient.DismantleUserToken(ctx, &api.TokenReq{Token: token})
 			if err != nil {
 				p.logger.Error("", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
@@ -2000,8 +2000,8 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// try to authenticate user with username and password
-		gReq := &api.CreateTokenReq{ClientId: username, ClientSecret: password}
-		gTokenRes, err := authClient.CreateToken(ctx, gReq)
+		gReq := &api.ForgeUserTokenReq{ClientId: username, ClientSecret: password}
+		gTokenRes, err := authClient.ForgeUserToken(ctx, gReq)
 		if err != nil {
 			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -2015,10 +2015,10 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		token := gTokenRes.Token
-		p.logger.Info("token created", zap.String("token", token.Token))
+		p.logger.Info("token created", zap.String("token", token))
 
-		gReq2 := &api.VerifyTokenReq{Token: token.Token}
-		userRes, err := authClient.VerifyToken(ctx, gReq2)
+		gReq2 := &api.TokenReq{Token: token}
+		userRes, err := authClient.DismantleUserToken(ctx, gReq2)
 		if err != nil {
 			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -2034,13 +2034,13 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 		// save token into cookie for further requests
 		cookie := &http.Cookie{}
 		cookie.Name = "oc_sessionpassphrase"
-		cookie.Value = token.Token
+		cookie.Value = token
 		cookie.MaxAge = 3600
 		http.SetCookie(w, cookie)
 
 		user := userRes.User
 		ctx = api.ContextSetUser(ctx, user)
-		ctx = api.ContextSetAccessToken(ctx, token.Token)
+		ctx = api.ContextSetAccessToken(ctx, token)
 		r = r.WithContext(ctx)
 
 		p.logger.Info("request is authenticated", zap.String("account_id", user.AccountId))
@@ -2068,7 +2068,7 @@ func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		userRes, err := authClient.VerifyToken(ctx, &api.VerifyTokenReq{Token: token})
+		userRes, err := authClient.DismantleUserToken(ctx, &api.TokenReq{Token: token})
 		if err != nil {
 			p.logger.Warn("", zap.Error(err), zap.String("token", token))
 			w.WriteHeader(http.StatusUnauthorized)

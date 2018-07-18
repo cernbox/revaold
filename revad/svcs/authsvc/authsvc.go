@@ -7,16 +7,17 @@ import (
 	"golang.org/x/net/context"
 )
 
-func New(am api.AuthManager, tm api.TokenManager) api.AuthServer {
-	return &svc{am: am, tm: tm}
+func New(am api.AuthManager, tm api.TokenManager, lm api.PublicLinkManager) api.AuthServer {
+	return &svc{am: am, tm: tm, lm: lm}
 }
 
 type svc struct {
 	am api.AuthManager
 	tm api.TokenManager
+	lm api.PublicLinkManager
 }
 
-func (s *svc) CreateToken(ctx context.Context, req *api.CreateTokenReq) (*api.TokenResponse, error) {
+func (s *svc) ForgeUserToken(ctx context.Context, req *api.ForgeUserTokenReq) (*api.TokenResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	user, err := s.am.Authenticate(ctx, req.ClientId, req.ClientSecret)
 	if err != nil {
@@ -24,25 +25,53 @@ func (s *svc) CreateToken(ctx context.Context, req *api.CreateTokenReq) (*api.To
 		return nil, err
 	}
 
-	token, err := s.tm.ForgeToken(ctx, user)
+	token, err := s.tm.ForgeUserToken(ctx, user)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	t := &api.Token{Token: token}
-	tokenResponse := &api.TokenResponse{Token: t}
+	tokenResponse := &api.TokenResponse{Token: token}
 	return tokenResponse, nil
 }
 
-func (s *svc) VerifyToken(ctx context.Context, req *api.VerifyTokenReq) (*api.UserResponse, error) {
+func (s *svc) DismantleUserToken(ctx context.Context, req *api.TokenReq) (*api.UserResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	token := req.Token
-	u, err := s.tm.VerifyToken(ctx, token)
+	u, err := s.tm.DismantleUserToken(ctx, token)
 	if err != nil {
 		l.Error("token invalid", zap.Error(err))
 		return nil, api.NewError(api.TokenInvalidErrorCode).WithMessage(err.Error())
 	}
 	userRes := &api.UserResponse{User: u}
+	return userRes, nil
+}
+
+func (s *svc) ForgePublicLinkToken(ctx context.Context, req *api.ForgePublicLinkTokenReq) (*api.TokenResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	user, err := s.lm.AuthenticatePublicLink(ctx, req.Token, req.Password)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
+	token, err := s.tm.ForgePublicLinkToken(ctx, user)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	tokenResponse := &api.TokenResponse{Token: token}
+	return tokenResponse, nil
+}
+
+func (s *svc) DismantlePublicLinkToken(ctx context.Context, req *api.TokenReq) (*api.PublicLinkResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	token := req.Token
+	u, err := s.tm.DismantlePublicLinkToken(ctx, token)
+	if err != nil {
+		l.Error("token invalid", zap.Error(err))
+		return nil, api.NewError(api.TokenInvalidErrorCode).WithMessage(err.Error())
+	}
+	userRes := &api.PublicLinkResponse{PublicLink: u}
 	return userRes, nil
 }
 

@@ -35,6 +35,17 @@ func (s *svc) ListReceivedShares(req *api.EmptyReq, stream api.Share_ListReceive
 	return nil
 }
 
+func (s *svc) IsPublicLinkProtected(ctx context.Context, req *api.PublicLinkTokenReq) (*api.IsPublicLinkProtectedResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	ok, err := s.linkManager.IsPublicLinkProtected(ctx, req.Token)
+	if err != nil {
+		l.Error("error checking if public link is protected", zap.Error(err))
+		return nil, err
+	}
+	res := &api.IsPublicLinkProtectedResponse{Protected: ok}
+	return res, nil
+}
+
 func (s *svc) MountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
 	return &api.EmptyResponse{}, nil
 }

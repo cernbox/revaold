@@ -4,8 +4,10 @@ syntax = "proto3";
 package api;
 
 service Auth {
-	rpc CreateToken(CreateTokenReq) returns (TokenResponse) {}
-	rpc VerifyToken(VerifyTokenReq) returns (UserResponse) {}
+	rpc ForgeUserToken(ForgeUserTokenReq) returns (TokenResponse) {}
+	rpc DismantleUserToken(TokenReq) returns (UserResponse) {}
+	rpc ForgePublicLinkToken(ForgePublicLinkTokenReq) returns (TokenResponse) {}
+	rpc DismantlePublicLinkToken(TokenReq) returns (PublicLinkResponse) {}
 }
 
 
@@ -32,18 +34,21 @@ service Storage {
 }
 
 service Share {
+	// with user context, relative to the user logged in
 	rpc CreatePublicLink(NewLinkReq) returns (PublicLinkResponse) {}
 	rpc UpdatePublicLink(UpdateLinkReq) returns  (PublicLinkResponse) {}
 	rpc InspectPublicLink(ShareIDReq) returns (PublicLinkResponse) {}
 	rpc RevokePublicLink(ShareIDReq) returns  (EmptyResponse) {}
 	rpc ListPublicLinks(EmptyReq) returns (stream PublicLinkResponse) {}
-
+	
+	// with user context, relative to user logged in
 	rpc AddFolderShare(NewFolderShareReq) returns (FolderShareResponse) {}
 	rpc UpdateFolderShare(UpdateFolderShareReq) returns (FolderShareResponse) {}
 	rpc ListFolderShares(ListFolderSharesReq) returns (stream FolderShareResponse) {}
 	rpc UnshareFolder(UnshareFolderReq) returns (EmptyResponse) {}
 	rpc GetFolderShare(ShareIDReq) returns (FolderShareResponse) {}
 
+	// with user context, relative to the user logged in, in this case, the receiver
 	rpc ListReceivedShares(EmptyReq) returns (stream ReceivedShareResponse) {}
 	rpc MountReceivedShare(ReceivedShareReq) returns (EmptyResponse) {}
 	rpc UnmountReceivedShare(ReceivedShareReq) returns (EmptyResponse) {} 
@@ -53,6 +58,29 @@ service Preview {
 	rpc ReadPreview(PathReq) returns (stream DataChunkResponse) {}
 }
 
+message IsPublicLinkProtectedResponse {
+	StatusCode status = 1;
+	bool protected = 2;
+}
+
+message ForgePublicLinkTokenReq {
+	string token  = 1;
+	string password = 2;
+}
+
+message ForgePublicLinkTokenResponse {
+	StatusCode status = 1;
+	bool valid = 2;
+}
+
+message VerifyPublicLinkTokenReq {
+	string token  = 1;
+}
+
+message VerifyPublicLinkTokenResponse {
+	StatusCode status = 1;
+	PublicLink public_link = 2;
+}
 
 message EmptyResponse {
 	StatusCode status = 1;
@@ -106,7 +134,7 @@ message TxInfo {
 	string tx_id = 1;
 }
 
-message CreateTokenReq {
+message ForgeUserTokenReq {
 	string client_id = 1;
 	string client_secret = 2;
 }
@@ -114,14 +142,10 @@ message CreateTokenReq {
 
 message TokenResponse {
 	StatusCode status = 1;
-	Token token = 2;
+	string token = 2;
 }
 
-message Token {
-	string token = 1;
-}
-
-message  VerifyTokenReq {
+message  TokenReq {
 	string token = 1;
 }
 
@@ -294,7 +318,7 @@ message PublicLink {
 	}
 }
 
-message TokenReq {
+message PublicLinkTokenReq {
 	string token = 1;
 
 }

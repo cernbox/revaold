@@ -70,7 +70,7 @@ var AuthCommands = cli.Command{
 	Name:  "auth",
 	Usage: "Auth commands",
 	Subcommands: []cli.Command{
-		authcmd.CreateTokenCommand,
+		authcmd.ForgePublicLinkTokenCommand,
 		authcmd.VerifyTokenCommand,
 	},
 }
@@ -110,8 +110,8 @@ func login(c *cli.Context) {
 		os.Exit(1)
 	}
 
-	req := &api.CreateTokenReq{ClientId: username, ClientSecret: password}
-	tokenRes, err := authClient.CreateToken(context.Background(), req)
+	req := &api.ForgeUserTokenReq{ClientId: username, ClientSecret: password}
+	tokenRes, err := authClient.ForgeUserToken(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -121,6 +121,6 @@ func login(c *cli.Context) {
 		os.Exit(1)
 	}
 	token := tokenRes.Token
-	util.SetAccessToken(token.Token)
+	util.SetAccessToken(token)
 	fmt.Println("Access token saved in: ", util.AccessTokenFile)
 }

@@ -83,6 +83,7 @@ func (tm *tokenManager) ForgePublicLinkToken(ctx context.Context, pl *api.Public
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
 	claims := token.Claims.(jwt.MapClaims)
 	claims["token"] = pl.Token
+	claims["owner"] = pl.OwnerId
 	claims["exp"] = time.Now().Add(time.Second * time.Duration(3600))
 	tokenString, err := token.SignedString([]byte(tm.signSecret))
 	if err != nil {
@@ -112,9 +113,14 @@ func (tm *tokenManager) DismantlePublicLinkToken(ctx context.Context, token stri
 	if !ok {
 		return nil, errors.New("token claim is not a string")
 	}
+	owner, ok := claims["owner"].(string)
+	if !ok {
+		return nil, errors.New("owner claim is not a string")
+	}
 
 	pl := &api.PublicLink{
-		Token: token,
+		Token:   token,
+		OwnerId: owner,
 	}
 	return pl, nil
 }

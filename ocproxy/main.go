@@ -1,17 +1,14 @@
 package main
 
 import (
-	"net/http"
-
 	"fmt"
-	"github.com/gorilla/mux"
+	"net/http"
 	"strings"
 
 	"github.com/cernbox/gohub/goconfig"
 	"github.com/cernbox/gohub/gologger"
-
-	"github.com/cernbox/reva/ocproxy/api/ocs"
-	"github.com/cernbox/reva/ocproxy/api/webdav"
+	"github.com/cernbox/reva/ocproxy/api"
+	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
 
@@ -31,7 +28,7 @@ func init() {
 
 	gc.Add("data-chunks-folder", "", "folder where to store data chunks before they are commited to REVA.")
 	gc.Add("temporary-folder", "", "folder where to store temporary data. Empty means use the OS temporary folder.")
-	gc.Add("max-upload-file-size", 1024*1024*1024*8, "maximum file size for upload files.")
+	gc.Add("max-upload-file-size", 8589934592, "maximum file size for upload files.")
 	gc.Add("jwt-sign-key", "bar", "secret to sign JWT tokens.")
 	gc.Add("reva-tcp-address", "localhost:9999", "tcp address of the REVA server.")
 	gc.Add("cboxgroupd-http-address", "http://localhost:2002", "http(s) address of the CERNBox Group Daemon (cboxgroupd).")
@@ -47,29 +44,18 @@ func main() {
 
 	router := mux.NewRouter()
 
-	opts := &webdav.Options{
-		Router:            router,
-		TemporaryFolder:   gc.GetString("temporary-folder"),
-		ChunksFolder:      gc.GetString("data-chunks-folder"),
-		REVAHost:          gc.GetString("reva-tcp-address"),
-		MaxUploadFileSize: uint64(gc.GetInt("max-upload-file-size")),
-		Logger:            logger,
-	}
-
-	_, err := webdav.New(opts)
-	if err != nil {
-		logger.Error("", zap.Error(err))
-		panic(err)
-	}
-
-	ocsOpts := &ocs.Options{
-		Logger:                logger,
-		REVAHost:              gc.GetString("reva-tcp-address"),
-		CBOXGroupDaemonSecret: gc.GetString("cboxgroupd-http-address"),
-		CBOXGroupDaemonURI:    gc.GetString("cboxgroupd-shared-secret"),
+	opts := &api.Options{
 		Router:                router,
+		TemporaryFolder:       gc.GetString("temporary-folder"),
+		ChunksFolder:          gc.GetString("data-chunks-folder"),
+		REVAHost:              gc.GetString("reva-tcp-address"),
+		MaxUploadFileSize:     uint64(gc.GetInt("max-upload-file-size")),
+		Logger:                logger,
+		CBOXGroupDaemonURI:    gc.GetString("cboxgroupd-http-address"),
+		CBOXGroupDaemonSecret: gc.GetString("cboxgroupd-shared-secret"),
 	}
-	_, err = ocs.New(ocsOpts)
+
+	_, err := api.New(opts)
 	if err != nil {
 		logger.Error("", zap.Error(err))
 		panic(err)

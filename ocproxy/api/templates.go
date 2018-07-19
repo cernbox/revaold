@@ -1,4 +1,4 @@
-package ocs
+package api
 
 var publicLinkTemplate string = `
 <!DOCTYPE html>

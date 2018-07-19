@@ -234,7 +234,7 @@ func (v *vfs) GetMetadata(ctx context.Context, path string) (*api.Metadata, erro
 	}
 	md, err := m.GetMetadata(ctx, derefPath)
 	if err != nil {
-		v.l.Error("", zap.Error(err))
+		v.l.Error("error getting md", zap.Error(err))
 		return nil, err
 	}
 	return md, nil

@@ -111,7 +111,7 @@ func inspect(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	mdRes, err := client.Inspect(util.GetContextWithAuth(), req)
+	mdRes, err := client.Inspect(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -143,7 +143,7 @@ func listFolder(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	stream, err := client.ListFolder(util.GetContextWithAuth(), req)
+	stream, err := client.ListFolder(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -198,7 +198,7 @@ func download(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	stream, err := client.ReadFile(util.GetContextWithAuth(), req)
+	stream, err := client.ReadFile(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -255,7 +255,7 @@ func upload(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	ctx := util.GetContextWithAuth()
+	ctx := util.GetContextWithAllAuths(path)
 	txInfoRes, err := client.StartWriteTx(ctx, &api.EmptyReq{})
 	if err != nil {
 		return cli.NewExitError(err, 1)
@@ -332,7 +332,7 @@ func move(c *cli.Context) error {
 	}
 
 	req := &api.MoveReq{OldPath: oldPath, NewPath: newPath}
-	_, err = client.Move(util.GetContextWithAuth(), req)
+	_, err = client.Move(util.GetContextWithAllAuths(oldPath), req)
 	if err != nil {
 		return err
 	}
@@ -351,7 +351,7 @@ func deleteEntry(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	_, err = client.Delete(util.GetContextWithAuth(), req)
+	_, err = client.Delete(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -369,7 +369,7 @@ func emptyRecycle(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	_, err = client.EmptyRecycle(util.GetContextWithAuth(), req)
+	_, err = client.EmptyRecycle(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -387,7 +387,7 @@ func listRecycle(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	stream, err := client.ListRecycle(util.GetContextWithAuth(), req)
+	stream, err := client.ListRecycle(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -430,7 +430,7 @@ func restoreRecycleEntry(c *cli.Context) error {
 	}
 
 	req := &api.RecycleEntryReq{RestoreKey: restoreKey}
-	_, err = client.RestoreRecycleEntry(util.GetContextWithAuth(), req)
+	_, err = client.RestoreRecycleEntry(util.GetContextWithAllAuths(""), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -450,7 +450,7 @@ func listRevisions(c *cli.Context) error {
 	}
 
 	req := &api.PathReq{Path: path}
-	stream, err := client.ListRevisions(util.GetContextWithAuth(), req)
+	stream, err := client.ListRevisions(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -512,7 +512,7 @@ func downloadRevision(c *cli.Context) error {
 	}
 
 	req := &api.RevisionReq{Path: path, RevKey: revKey}
-	stream, err := client.ReadRevision(util.GetContextWithAuth(), req)
+	stream, err := client.ReadRevision(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}
@@ -562,7 +562,7 @@ func restoreRevision(c *cli.Context) error {
 	}
 
 	req := &api.RevisionReq{Path: path, RevKey: revKey}
-	_, err = client.RestoreRevision(util.GetContextWithAuth(), req)
+	_, err = client.RestoreRevision(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}

@@ -21,6 +21,9 @@ type Options struct {
 }
 
 func (opt *Options) init() {
+	if opt.Logger == nil {
+		opt.Logger, _ = zap.NewProduction()
+	}
 	if opt.CBOXGroupDaemonURI == "" {
 		opt.CBOXGroupDaemonURI = "http://localhost:2002"
 	}
@@ -32,7 +35,7 @@ func New(opt *Options) api.UserManager {
 	}
 
 	opt.init()
-	return &userManager{cboxGroupDaemonSecret: opt.CBOXGroupDaemonSecret, cboxGroupDaemonURI: opt.CBOXGroupDaemonURI}
+	return &userManager{logger: opt.Logger, cboxGroupDaemonSecret: opt.CBOXGroupDaemonSecret, cboxGroupDaemonURI: opt.CBOXGroupDaemonURI}
 }
 
 type userManager struct {

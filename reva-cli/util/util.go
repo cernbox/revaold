@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/user"
 	"path"
+	"strings"
 
 	"github.com/cernbox/reva/api"
 	"golang.org/x/net/context"
@@ -86,6 +87,16 @@ func SavePublicLinkAccessToken(token, accessToken string) {
 	}
 }
 
+func LoadPublicLinkAccessToken(token string) (string, error) {
+	p := path.Join(ConfigDir, fmt.Sprintf("public-link-access-token-for-%s", token))
+	data, err := ioutil.ReadFile(p)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+
+}
+
 func getConn() (*grpc.ClientConn, error) {
 	cfg := GetConfig()
 	return grpc.Dial(cfg.ServerURL, grpc.WithInsecure())
@@ -124,6 +135,23 @@ func GetPreviewClient() (api.PreviewClient, error) {
 }
 
 func GetContextWithAuth() context.Context {
+	token := GetAccessToken()
+	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
+	return metadata.NewOutgoingContext(context.Background(), header)
+}
+
+func GetContextWithAllAuths(path string) context.Context {
+	if strings.HasPrefix(path, "/public-links/") {
+		plToken := strings.Split(strings.TrimPrefix(path, "/public-links/"), "/")[0]
+		fmt.Println(plToken)
+		plAccessToken, err := LoadPublicLinkAccessToken(plToken)
+		if err != nil {
+			fmt.Println("error: cannot load public link access token: " + err.Error())
+		}
+		header := metadata.New(map[string]string{"authorization": "pl-bearer " + plAccessToken})
+		return metadata.NewOutgoingContext(context.Background(), header)
+	}
+
 	token := GetAccessToken()
 	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)

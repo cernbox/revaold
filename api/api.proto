@@ -311,6 +311,7 @@ message PublicLink {
 	bool read_only = 6;
 	uint64 mtime = 7;
 	ItemType item_type = 8;
+	string owner_id = 9;
 
 	enum ItemType {
 		FILE = 0;

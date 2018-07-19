@@ -19,21 +19,45 @@ type linkStorage struct {
 	logger      *zap.Logger
 }
 
-func NewLinkFS(vfs api.VirtualStorage, lm api.PublicLinkManager, logger *zap.Logger) api.Storage {
+type Options struct {
+}
+
+func New(opt *Options, vfs api.VirtualStorage, lm api.PublicLinkManager, logger *zap.Logger) api.Storage {
 	return &linkStorage{vfs, lm, logger}
 }
-func (fs *linkStorage) getLink(ctx context.Context, name string) (*api.PublicLink, string, error) {
+
+func getPublicLinkFromContext(ctx context.Context) (*api.PublicLink, error) {
+	pl, ok := api.ContextGetPublicLink(ctx)
+	if !ok {
+		return nil, api.NewError(api.ContextUserRequiredError)
+	}
+	return pl, nil
+}
+func (fs *linkStorage) getLink(ctx context.Context, name string) (*api.PublicLink, string, context.Context, error) {
 	// path is /016633a5-22d0-478c-a148-be3000f15d62/Photos/Test
 	fs.logger.Debug("get link for path", zap.String("path", name))
 
 	items := strings.Split(name, "/")
 	if len(items) < 2 {
-		return nil, "", api.NewError(api.StorageNotFoundErrorCode)
+		return nil, "", nil, api.NewError(api.StorageNotFoundErrorCode)
 	}
 	token := items[1]
-	link, err := fs.linkManager.InspectPublicLink(ctx, token)
+
+	pl, err := getPublicLinkFromContext(ctx)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
+	}
+
+	if token != pl.Token {
+		return nil, "", nil, api.NewError(api.ContextUserRequiredError).WithMessage("pl access token does not match requested path")
+	}
+
+	fmt.Printf("eeeee %+v\n", pl)
+	ctx = api.ContextSetUser(ctx, &api.User{AccountId: pl.OwnerId, Groups: []string{}})
+
+	link, err := fs.linkManager.InspectPublicLinkByToken(ctx, token)
+	if err != nil {
+		return nil, "", nil, err
 	}
 
 	var relativePath string
@@ -42,12 +66,12 @@ func (fs *linkStorage) getLink(ctx context.Context, name string) (*api.PublicLin
 	}
 
 	fs.logger.Debug("resolve link path", zap.String("path", name), zap.String("relativepath", relativePath), zap.String("linkpath", link.Path), zap.String("linktoken", link.Token))
-	return link, relativePath, nil
+	return link, relativePath, ctx, nil
 }
 
 func (fs *linkStorage) GetPathByID(ctx context.Context, id string) (string, error) {
 	path := "/" + id
-	_, _, err := fs.getLink(ctx, path)
+	_, _, ctx, err := fs.getLink(ctx, path)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +109,7 @@ func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata
 			IsDir: true,
 		}, nil
 	}
-	link, linkRelativePath, err := fs.getLink(ctx, p)
+	link, linkRelativePath, ctx, err := fs.getLink(ctx, p)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +156,7 @@ func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Meta
 		return fs.listRoot(ctx)
 	}
 
-	link, linkRelativePath, err := fs.getLink(ctx, name)
+	link, linkRelativePath, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +184,7 @@ func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Meta
 }
 
 func (fs *linkStorage) Download(ctx context.Context, name string) (io.ReadCloser, error) {
-	link, p, err := fs.getLink(ctx, name)
+	link, p, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +195,7 @@ func (fs *linkStorage) Download(ctx context.Context, name string) (io.ReadCloser
 }
 
 func (fs *linkStorage) Upload(ctx context.Context, name string, r io.ReadCloser) error {
-	link, p, err := fs.getLink(ctx, name)
+	link, p, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -182,11 +206,11 @@ func (fs *linkStorage) Upload(ctx context.Context, name string, r io.ReadCloser)
 }
 
 func (fs *linkStorage) Move(ctx context.Context, oldName, newName string) error {
-	oldLink, oldPath, err := fs.getLink(ctx, oldName)
+	oldLink, oldPath, ctx, err := fs.getLink(ctx, oldName)
 	if err != nil {
 		return err
 	}
-	newLink, newPath, err := fs.getLink(ctx, newName)
+	newLink, newPath, ctx, err := fs.getLink(ctx, newName)
 	if err != nil {
 		return err
 	}
@@ -200,7 +224,7 @@ func (fs *linkStorage) Move(ctx context.Context, oldName, newName string) error 
 }
 
 func (fs *linkStorage) GetQuota(ctx context.Context, name string) (int, int, error) {
-	link, p, err := fs.getLink(ctx, name)
+	link, p, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -211,7 +235,7 @@ func (fs *linkStorage) GetQuota(ctx context.Context, name string) (int, int, err
 }
 
 func (fs *linkStorage) CreateDir(ctx context.Context, name string) error {
-	link, p, err := fs.getLink(ctx, name)
+	link, p, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -222,7 +246,7 @@ func (fs *linkStorage) CreateDir(ctx context.Context, name string) error {
 }
 
 func (fs *linkStorage) Delete(ctx context.Context, name string) error {
-	link, p, err := fs.getLink(ctx, name)
+	link, p, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return err
 	}

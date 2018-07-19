@@ -21,12 +21,12 @@ import (
 	"github.com/cernbox/reva/api/storage_eos"
 	"github.com/cernbox/reva/api/storage_homemigration"
 	"github.com/cernbox/reva/api/storage_local"
+	"github.com/cernbox/reva/api/storage_public_link"
 	"github.com/cernbox/reva/api/storage_share"
 	"github.com/cernbox/reva/api/storage_usermigration"
 	"github.com/cernbox/reva/api/storage_wrapper_home"
-	"github.com/cernbox/reva/api/user_manager_cboxgroupd"
-	//"github.com/cernbox/reva/api/storage_public_link"
 	"github.com/cernbox/reva/api/token_manager_jwt"
+	"github.com/cernbox/reva/api/user_manager_cboxgroupd"
 	"github.com/cernbox/reva/api/virtual_storage"
 
 	"github.com/cernbox/reva/revad/svcs/authsvc"
@@ -67,7 +67,7 @@ func main() {
 
 	gc.Add("user-manager", "cboxgroupd", "Implementation to use for the user manager")
 	gc.Add("user-manager-cboxgroupd-uri", "http://localhost:2002", "URI of the CERNBox Group Daemon")
-	gc.Add("user-manager-cboxgroupd-secret", "foo", "Secret to talk to the CERNBox Group Daemon")
+	gc.Add("user-manager-cboxgroupd-secret", "bar", "Secret to talk to the CERNBox Group Daemon")
 
 	gc.Add("token-manager", "jwt", "Implementation to use for the token manager")
 	gc.Add("public-link-manager", "owncloud", "Implementation to use for the public link manager")
@@ -104,7 +104,7 @@ func main() {
 	shareManager, err := share_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs, userManager)
 	publicLinkManager, err := public_link_manager_owncloud.New(gc.GetString("public-link-manager-owncloud-db-username"), gc.GetString("public-link-manager-owncloud-db-password"), gc.GetString("public-link-manager-owncloud-db-hostname"), gc.GetInt("public-link-manager-owncloud-db-port"), gc.GetString("public-link-manager-owncloud-db-name"), vs)
 
-	loadMountTable(logger, vs, mountTable, shareManager)
+	loadMountTable(logger, vs, mountTable, shareManager, publicLinkManager)
 
 	/* MIGRATION THINGIES */
 
@@ -263,7 +263,7 @@ func applyStorageWrappers(s api.Storage, storageWrappers []*api.StorageWrapper) 
 	return s, nil
 }
 
-func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTable, sm api.ShareManager) error {
+func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTable, sm api.ShareManager, lm api.PublicLinkManager) error {
 	mounts := []api.Mount{}
 	for _, mte := range mt.Mounts {
 		storageDriver := mte.StorageDriver
@@ -319,6 +319,26 @@ func loadMountTable(logger *zap.Logger, vs api.VirtualStorage, mt *api.MountTabl
 				panic(err)
 			}
 			storage := storage_share.New(opts, vs, sm, logger)
+
+			storage, err = applyStorageWrappers(storage, mte.StorageWrappers)
+			if err != nil {
+				panic(err)
+			}
+
+			mount := mount.New(mte.MountID, mte.MountPoint, mte.MountOptions, storage)
+			mounts = append(mounts, mount)
+
+		case "public_link":
+			bytes, err := json.Marshal(mte.StorageOptions)
+			if err != nil {
+				panic(err)
+			}
+			opts := &storage_public_link.Options{}
+			err = json.Unmarshal(bytes, opts)
+			if err != nil {
+				panic(err)
+			}
+			storage := storage_public_link.New(opts, vs, lm, logger)
 
 			storage, err = applyStorageWrappers(storage, mte.StorageWrappers)
 			if err != nil {
@@ -397,17 +417,14 @@ func getAuthFunc(tm api.TokenManager) func(context.Context) (context.Context, er
 		token, err := grpc_auth.AuthFromMD(ctx, "user-bearer")
 		if err == nil {
 			user, err := tm.DismantleUserToken(ctx, token)
-			if err != nil {
-				return nil, grpc.Errorf(codes.Unauthenticated, "invalid user auth token: %v", err)
+			if err == nil {
+				grpc_ctxtags.Extract(ctx).Set("auth.accountid", user.AccountId)
+				uuid, _ := uuid.NewV4()
+				tid := uuid.String()
+				grpc_ctxtags.Extract(ctx).Set("tid", tid)
+				newCtx := api.ContextSetUser(ctx, user)
+				return newCtx, nil
 			}
-
-			grpc_ctxtags.Extract(ctx).Set("auth.accountid", user.AccountId)
-			uuid, _ := uuid.NewV4()
-			tid := uuid.String()
-			grpc_ctxtags.Extract(ctx).Set("tid", tid)
-			newCtx := api.ContextSetUser(ctx, user)
-			return newCtx, nil
-
 		}
 
 		// check for public link token

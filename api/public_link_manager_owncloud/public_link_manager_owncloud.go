@@ -18,6 +18,7 @@ import (
 	"math/rand"
 )
 
+//TODO(labkode): add owner_id to other public link queries when consulting db
 const tokenLength = 15
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
@@ -102,6 +103,22 @@ func (lm *linkManager) IsPublicLinkProtected(ctx context.Context, token string) 
 		return false, err
 	}
 	return pb.Protected, nil
+}
+
+func (lm *linkManager) InspectPublicLinkByToken(ctx context.Context, token string) (*api.PublicLink, error) {
+	l := ctx_zap.Extract(ctx)
+	dbShare, err := lm.getDBShareByToken(ctx, token)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	pb, err := lm.convertToPublicLink(ctx, dbShare)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	return pb, nil
+
 }
 
 func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *api.PublicLinkOptions) (*api.PublicLink, error) {
@@ -377,6 +394,7 @@ type dbShare struct {
 	STime       int
 	ItemType    string
 	Permissions int
+	Owner       string
 }
 
 func (lm *linkManager) getDBShareByToken(ctx context.Context, token string) (*dbShare, error) {
@@ -389,16 +407,17 @@ func (lm *linkManager) getDBShareByToken(ctx context.Context, token string) (*db
 		stime       int
 		permissions int
 		itemType    string
+		uidOwner    string
 	)
 
-	query := "select id, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type from oc_share where share_type=? and token=?"
-	if err := lm.db.QueryRow(query, 3, token).Scan(&id, &shareWith, &prefix, &itemSource, &token, &expiration, &stime, &permissions, &itemType); err != nil {
+	query := "select id, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type, uid_owner from oc_share where share_type=? and token=?"
+	if err := lm.db.QueryRow(query, 3, token).Scan(&id, &shareWith, &prefix, &itemSource, &token, &expiration, &stime, &permissions, &itemType, &uidOwner); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.PublicLinkNotFoundErrorCode)
 		}
 		return nil, err
 	}
-	dbShare := &dbShare{ID: id, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
+	dbShare := &dbShare{ID: id, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType, Owner: uidOwner}
 	return dbShare, nil
 
 }
@@ -433,7 +452,7 @@ func (lm *linkManager) getDBShare(ctx context.Context, accountID, id string) (*d
 
 		return nil, err
 	}
-	dbShare := &dbShare{ID: int(intID), Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
+	dbShare := &dbShare{ID: int(intID), Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType, Owner: accountID}
 	return dbShare, nil
 
 }
@@ -464,7 +483,7 @@ func (lm *linkManager) getDBShares(ctx context.Context, accountID string) ([]*db
 		if err != nil {
 			return nil, err
 		}
-		dbShare := &dbShare{ID: id, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType}
+		dbShare := &dbShare{ID: id, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, Token: token, Expiration: expiration, STime: stime, Permissions: permissions, ItemType: itemType, Owner: accountID}
 		dbShares = append(dbShares, dbShare)
 
 	}
@@ -504,6 +523,7 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		Expires:   expires,
 		ReadOnly:  dbShare.Permissions == 1,
 		ItemType:  itemType,
+		OwnerId:   dbShare.Owner,
 	}
 	return publicLink, nil
 

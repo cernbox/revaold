@@ -40,7 +40,7 @@ func (fs *homeStorage) getInternalPath(ctx context.Context, user *api.User, p st
 	return internalPath
 }
 
-func (fs *homeStorage) removeNamespace(ctx context.Context, user *api.User, np string) string {
+func (fs *homeStorage) removeNamespace(ctx context.Context, user *api.User, np string) (string, error) {
 	l := ctx_zap.Extract(ctx)
 	homePath := fs.getHomePath(ctx, user)
 	if strings.HasPrefix(np, homePath) {
@@ -49,11 +49,11 @@ func (fs *homeStorage) removeNamespace(ctx context.Context, user *api.User, np s
 			p = "/"
 		}
 		l.Debug("path conversion: internal => external", zap.String("internal", np), zap.String("external", p))
-		return p
+		return p, nil
 	}
 	err := errors.New("internal path does not start with home prefix")
 	l.Error("", zap.Error(err), zap.String("internal", np), zap.String("home_prefix", homePath))
-	panic(err)
+	return "", err
 }
 
 func (fs *homeStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
@@ -104,8 +104,7 @@ func (fs *homeStorage) GetPathByID(ctx context.Context, id string) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return fs.removeNamespace(ctx, u, path), nil
-
+	return fs.removeNamespace(ctx, u, path)
 }
 
 func (fs *homeStorage) GetMetadata(ctx context.Context, path string) (*api.Metadata, error) {
@@ -119,7 +118,11 @@ func (fs *homeStorage) GetMetadata(ctx context.Context, path string) (*api.Metad
 	if err != nil {
 		return nil, err
 	}
-	md.Path = fs.removeNamespace(ctx, u, md.Path)
+	path, err = fs.removeNamespace(ctx, u, md.Path)
+	if err != nil {
+		return nil, err
+	}
+	md.Path = path
 	return md, nil
 }
 
@@ -135,7 +138,12 @@ func (fs *homeStorage) ListFolder(ctx context.Context, path string) ([]*api.Meta
 		return nil, err
 	}
 	for i := 0; i < len(mds); i++ {
-		mds[i].Path = fs.removeNamespace(ctx, u, mds[i].Path)
+		p, err := fs.removeNamespace(ctx, u, mds[i].Path)
+		if err != nil {
+			//omit this entry
+			continue
+		}
+		mds[i].Path = p
 	}
 	return mds, nil
 }
@@ -240,7 +248,12 @@ func (fs *homeStorage) ListRecycle(ctx context.Context, path string) ([]*api.Rec
 		return nil, err
 	}
 	for i := 0; i < len(entries); i++ {
-		entries[i].RestorePath = fs.removeNamespace(ctx, u, entries[i].RestorePath)
+		p, err := fs.removeNamespace(ctx, u, entries[i].RestorePath)
+		if err != nil {
+			// omit entry
+			continue
+		}
+		entries[i].RestorePath = p
 	}
 	return entries, nil
 }

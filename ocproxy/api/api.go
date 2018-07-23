@@ -379,12 +379,6 @@ func New(opt *Options) (http.Handler, error) {
 		temporaryFolder: opt.TemporaryFolder,
 	}
 
-	conn, err := grpc.Dial(proxy.revaHost, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
-	proxy.grpcConn = conn
-
 	proxy.registerRoutes()
 	return proxy, nil
 
@@ -398,7 +392,6 @@ type proxy struct {
 	authClient        reva_api.AuthClient
 	storageClient     reva_api.StorageClient
 	revaHost          string
-	grpcConn          *grpc.ClientConn
 	logger            *zap.Logger
 
 	ownCloudHomePrefix string
@@ -414,16 +407,31 @@ type proxy struct {
 	cboxGroupDaemonSecret string
 }
 
+func (p *proxy) getConn() (*grpc.ClientConn, error) {
+	return grpc.Dial(p.revaHost, grpc.WithInsecure())
+}
 func (p *proxy) getStorageClient() reva_api.StorageClient {
-	return reva_api.NewStorageClient(p.grpcConn)
+	conn, err := p.getConn()
+	if err != nil {
+		panic(err)
+	}
+	return reva_api.NewStorageClient(conn)
 }
 
 func (p *proxy) getShareClient() reva_api.ShareClient {
-	return reva_api.NewShareClient(p.grpcConn)
+	conn, err := p.getConn()
+	if err != nil {
+		panic(err)
+	}
+	return reva_api.NewShareClient(conn)
 }
 
 func (p *proxy) getAuthClient() reva_api.AuthClient {
-	return reva_api.NewAuthClient(p.grpcConn)
+	conn, err := p.getConn()
+	if err != nil {
+		panic(err)
+	}
+	return reva_api.NewAuthClient(conn)
 }
 
 func (p *proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -1489,7 +1497,13 @@ func (p *proxy) restoreTrashbin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	res := &restoreResponse{Status: "success", Data: &restoreData{Success: restoredEntries}}
+	var statusMsg string = "success"
+	var errorMsg string = ""
+	if len(failedEntries) > 0 {
+		statusMsg = "error"
+		errorMsg = "Cannot restore file(s)"
+	}
+	res := &restoreResponse{Status: statusMsg, Data: &restoreData{Message: errorMsg, Success: restoredEntries, Error: failedEntries}}
 	encoded, err := json.Marshal(res)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -1549,7 +1563,9 @@ type restoreResponse struct {
 }
 
 type restoreData struct {
+	Message string           `json:"message"`
 	Success []*restoredEntry `json:"success"`
+	Error   []*restoredEntry `json:"error"`
 }
 
 type restoredEntry struct {

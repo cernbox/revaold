@@ -2,7 +2,6 @@ package public_link_manager_owncloud
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -83,7 +82,7 @@ func (lm *linkManager) AuthenticatePublicLink(ctx context.Context, token, passwo
 		hashedPassword := strings.TrimPrefix(dbShare.ShareWith, "1|")
 		ok := checkPasswordHash(password, hashedPassword)
 		if !ok {
-			return nil, errors.New("password invalid")
+			return nil, api.NewError(api.PublicLinkInvalidPasswordErrorCode)
 		}
 	}
 

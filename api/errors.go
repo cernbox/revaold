@@ -27,6 +27,8 @@ const (
 
 	PublicLinkInvalidExpireDateErrorCode ErrorCode = "PUBLIC_LINK_INVALID_EXPIRE_DATE"
 
+	PublicLinkInvalidPasswordErrorCode ErrorCode = "PUBLIC_LINK_INVALID_PASSWORD"
+
 	// FolderShareNotFoundErrorCode is used when a resource is not found.
 	FolderShareNotFoundErrorCode ErrorCode = "FOLDER_SHARE_NOT_FOUND"
 

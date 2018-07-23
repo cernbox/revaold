@@ -5,7 +5,7 @@ var publicLinkTemplate string = `
 <html class="ng-csp" data-placeholder-focus="false" lang="en" >
 	<head>
 		<meta charset="utf-8">
-		<title> ownCloud</title>
+		<title> CERNBox</title>
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="referrer" content="never">
 		<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
@@ -35,7 +35,7 @@ var publicLinkTemplate string = `
 		<link rel="stylesheet" href="/apps/files_sharing/css/mobile.css">
 		<link rel="stylesheet" href="/apps/files/css/files.css">
 		<link rel="stylesheet" href="/apps/files/css/upload.css">
-
+    		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -80,7 +80,6 @@ var publicLinkTemplate string = `
 		<script src="/core/js/share.js"></script>
 		<script src="/core/js/files/fileinfo.js"></script>
 		<script src="/core/js/files/client.js"></script>
-		<script src="/apps/federatedfilesharing/js/public.js"></script>
 		<script src="/apps/files/js/file-upload.js"></script>
 		<script src="/apps/files_sharing/js/public.js"></script>
 		<script src="/apps/files/js/fileactions.js"></script>
@@ -125,7 +124,7 @@ var publicLinkTemplate string = `
 		})(jQuery, OC);
 		</script>
 	<body id="body-public">
-	<data key="cernboxauthtoken" x-access-token="{{ .Token }}" />
+	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
 	<noscript>
 	<div id="nojavascript">
 	<div> This application requires JavaScript for correct operation. Please <a href="http://enable-javascript.com/" target="_blank" rel="noreferrer">enable JavaScript</a> and reload the page.</div>
@@ -139,8 +138,8 @@ var publicLinkTemplate string = `
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
 	<input type="hidden" name="dir" value="/" id="dir">
-	<input type="hidden" name="downloadURL" value="https://localhost:4443/index.php/s/jIKrtrkXCIXwg1y/download" id="downloadURL">
-	<input type="hidden" name="sharingToken" value="jIKrtrkXCIXwg1y" id="sharingToken">
+	<input type="hidden" name="downloadURL" value="https://localhost:4443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
+	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
 	<input type="hidden" name="filename" value="Test folder" id="filename">
 	<input type="hidden" name="mimetype" value="httpd/unix-directory" id="mimetype">
 	<input type="hidden" name="previewSupported" value="false" id="previewSupported">
@@ -152,14 +151,13 @@ var publicLinkTemplate string = `
 		<div id="header" class="share-folder" data-protected="false"
 			 data-owner-display-name="admin" data-owner="admin" data-name="Test folder">
 			<a href="/index.php" title="" id="owncloud">
-				<h1 class="logo-icon">
-					ownCloud			</h1>
+				<h1 class="logo-icon"></h1>
 			</a>
 
 			<div id="logo-claim" style="display:none;"></div>
 					<div class="header-right">
 				<span id="details">
-					<a href="https://localhost:4443/index.php/s/jIKrtrkXCIXwg1y/download" id="download" class="button">
+					<a href="https://localhost:4443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="download" class="button">
 						<img class="svg" alt="" src="/core/img/actions/download.svg"/>
 						<span id="download-text">Download</span>
 					</a>
@@ -181,11 +179,11 @@ var publicLinkTemplate string = `
 			</div>
 			<div id="file_action_panel"></div>
 			<div class="notCreatable notPublic hidden">
-				You donÃÂ¢ÃÂÃÂt have permission to upload or create files here		</div>
+				You don't have permission to upload or create files here</div>
 			<input type="hidden" name="permissions" value="" id="permissions">
 		<input type="hidden" id="free_space" value="INF">
 			<input type="hidden" id="publicUploadRequestToken" name="requesttoken" value="PTUadAJrOx8NOxZGNCEpEQtoAA0wQBMbCWcRT3ROFB8=:WcL6HZXeYsbiDDAfGGyhq9jJe7V7B7Xi3kzHJUmTs/g=" />
-		<input type="hidden" id="dirToken" name="dirToken" value="jIKrtrkXCIXwg1y" />
+		<input type="hidden" id="dirToken" name="dirToken" value="{{ .Token }}" />
 			<input type="hidden" class="max_human_file_size"
 			   value="(max INF PB)">
 	</div>
@@ -250,9 +248,268 @@ var publicLinkTemplate string = `
 		</div>
 		<footer>
 			<p class="info">
-				<a href="https://owncloud.org" target="_blank" rel="noreferrer">ownCloud</a>{{ .Note }}</p>
+				<a href="https://cernbox.web.cern.ch" target="_blank" rel="noreferrer">CERNBox</a> &ndash; {{ .Note }}</p>
 		</footer>
 	</div>
 	</body>
+</html>
+`
+
+var publicLinkTemplatePassword = `
+<!DOCTYPE html>
+<html class="ng-csp" data-placeholder-focus="false" lang="en" >
+  <head data-requesttoken="GxEhFD47HA8bZlM1MyQfGChWczklBDM4KyQVO18ATHE=:hvNGFqhLL7cYAVIiqo+qr1KMyTWijp62F95Hkn7Nxs0=">
+    <meta charset="utf-8">
+    <title>
+      CERNBox		
+    </title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="referrer" content="never">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
+    <meta name="apple-itunes-app" content="app-id=543672169">
+    <meta name="theme-color" content="#1d2d44">
+    <link rel="icon" href="/core/img/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="/core/img/favicon-touch.png">
+    <link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
+    <link rel="stylesheet" href="/core/vendor/select2/select2.css">
+    <link rel="stylesheet" href="/core/css/styles.css">
+    <link rel="stylesheet" href="/core/css/inputs.css">
+    <link rel="stylesheet" href="/core/css/header.css">
+    <link rel="stylesheet" href="/core/css/icons.css">
+    <link rel="stylesheet" href="/core/css/fonts.css">
+    <link rel="stylesheet" href="/core/css/apps.css">
+    <link rel="stylesheet" href="/core/css/global.css">
+    <link rel="stylesheet" href="/core/css/fixes.css">
+    <link rel="stylesheet" href="/core/css/multiselect.css">
+    <link rel="stylesheet" href="/core/css/mobile.css">
+    <link rel="stylesheet" href="/core/vendor/jquery-ui/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="/core/css/jquery-ui-fixes.css">
+    <link rel="stylesheet" href="/core/css/tooltip.css">
+    <link rel="stylesheet" href="/core/css/share.css">
+    <link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
+    <link rel="stylesheet" href="/apps/files_versions/css/versions.css">
+    <link rel="stylesheet" href="/apps/files_videoplayer/css/style.css">
+    <link rel="stylesheet" href="/apps/firstrunwizard/css/colorbox.css">
+    <link rel="stylesheet" href="/apps/firstrunwizard/css/firstrunwizard.css">
+    <link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
+    <link rel="stylesheet" href="/apps/files_sharing/css/authenticate.css">
+    <script src="/index.php/core/js/oc.js"></script>
+    <script src="/core/vendor/jquery/dist/jquery.min.js"></script>
+    <script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
+    <script src="/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
+    <script src="/core/vendor/underscore/underscore.js"></script>
+    <script src="/core/vendor/moment/min/moment-with-locales.js"></script>
+    <script src="/core/vendor/handlebars/handlebars.js"></script>
+    <script src="/core/vendor/blueimp-md5/js/md5.js"></script>
+    <script src="/core/vendor/bootstrap/js/tooltip.js"></script>
+    <script src="/core/vendor/backbone/backbone.js"></script>
+    <script src="/core/vendor/es6-promise/dist/es6-promise.js"></script>
+    <script src="/core/vendor/davclient.js/lib/client.js"></script>
+    <script src="/core/vendor/clipboard/dist/clipboard.js"></script>
+    <script src="/core/vendor/bowser/src/bowser.js"></script>
+    <script src="/core/js/jquery.ocdialog.js"></script>
+    <script src="/core/js/oc-dialogs.js"></script>
+    <script src="/core/js/js.js"></script>
+    <script src="/core/js/l10n.js"></script>
+    <script src="/core/js/octemplate.js"></script>
+    <script src="/core/js/eventsource.js"></script>
+    <script src="/core/js/config.js"></script>
+    <script src="/core/search/js/search.js"></script>
+    <script src="/core/js/oc-requesttoken.js"></script>
+    <script src="/core/js/apps.js"></script>
+    <script src="/core/js/mimetype.js"></script>
+    <script src="/core/js/mimetypelist.js"></script>
+    <script src="/core/vendor/snapjs/dist/latest/snap.js"></script>
+    <script src="/core/vendor/select2/select2.js"></script>
+    <script src="/core/js/oc-backbone.js"></script>
+    <script src="/core/js/placeholder.js"></script>
+    <script src="/core/js/jquery.avatar.js"></script>
+    <script src="/core/js/backgroundjobs.js"></script>
+    <script src="/core/js/shareconfigmodel.js"></script>
+    <script src="/core/js/sharemodel.js"></script>
+    <script src="/core/js/sharescollection.js"></script>
+    <script src="/core/js/shareitemmodel.js"></script>
+    <script src="/core/js/sharedialogresharerinfoview.js"></script>
+    <script src="/core/js/sharedialoglinklistview.js"></script>
+    <script src="/core/js/sharedialoglinkshareview.js"></script>
+    <script src="/core/js/sharedialogmailview.js"></script>
+    <script src="/core/js/sharedialoglinksocialview.js"></script>
+    <script src="/core/js/sharedialogexpirationview.js"></script>
+    <script src="/core/js/sharedialogshareelistview.js"></script>
+    <script src="/core/js/sharedialogview.js"></script>
+    <script src="/core/js/share.js"></script>
+    <script src="/core/js/files/fileinfo.js"></script>
+    <script src="/core/js/files/client.js"></script>
+    <script src="/apps/files_sharing/js/authenticate.js"></script>
+  </head>
+  <body id="body-login">
+    <noscript>
+      <div id="nojavascript">
+        <div>
+          This application requires JavaScript for correct operation. Please <a href="http://enable-javascript.com/" target="_blank" rel="noreferrer">enable JavaScript</a> and reload the page.		
+        </div>
+      </div>
+    </noscript>
+    <div class="wrapper">
+      <div class="v-align">
+        <header role="banner">
+          <div id="header">
+            <div class="logo">
+              <h1 class="hidden-visually">
+              </h1>
+            </div>
+            <div id="logo-claim" style="display:none;"></div>
+          </div>
+        </header>
+        <form method="post">
+          <fieldset>
+            <div class="warning-info">This share is password-protected</div>
+            <p>
+              <label for="password" class="infield">Password</label>
+              <input type="hidden" name="requesttoken" value="GxEhFD47HA8bZlM1MyQfGChWczklBDM4KyQVO18ATHE=:hvNGFqhLL7cYAVIiqo+qr1KMyTWijp62F95Hkn7Nxs0=" />
+              <input type="password" name="password" id="password"
+                placeholder="Password" value=""
+                autocomplete="off" autocapitalize="off" autocorrect="off"
+                autofocus />
+              <input type="submit" id="password-submit" 
+                class="svg icon-confirm input-button-inline" value="" disabled="disabled" />
+            </p>
+          </fieldset>
+        </form>
+        <div class="push"></div>
+        <!-- for sticky footer -->
+      </div>
+    </div>
+    <footer role="contentinfo">
+      <p class="info">
+        <a href="https://cernbox.web.cern.ch" target="_blank" rel="noreferrer">CERNBox</a> &ndash; The CERN Cloud Storage</p>
+    </footer>
+  </body>
+</html>
+`
+
+var publicLinkTemplateNotFound string = `
+<!DOCTYPE html>
+<html class="ng-csp" data-placeholder-focus="false" lang="en" >
+  <head data-requesttoken="bwE2RRwgGDM2KRF9OwpBURgTVVlxJlojGy9kDghjIw4=:VMwtwFJuWYP7hl57ijm/CB3zOn0o01fZRmuxPp/xxTI=">
+    <meta charset="utf-8">
+    <title>
+      CERNBox		
+    </title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="referrer" content="never">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
+    <meta name="apple-itunes-app" content="app-id=543672169">
+    <meta name="theme-color" content="#1d2d44">
+    <link rel="icon" href="/core/img/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="/core/img/favicon-touch.png">
+    <link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
+    <link rel="stylesheet" href="/core/vendor/select2/select2.css">
+    <link rel="stylesheet" href="/core/css/styles.css">
+    <link rel="stylesheet" href="/core/css/inputs.css">
+    <link rel="stylesheet" href="/core/css/header.css">
+    <link rel="stylesheet" href="/core/css/icons.css">
+    <link rel="stylesheet" href="/core/css/fonts.css">
+    <link rel="stylesheet" href="/core/css/apps.css">
+    <link rel="stylesheet" href="/core/css/global.css">
+    <link rel="stylesheet" href="/core/css/fixes.css">
+    <link rel="stylesheet" href="/core/css/multiselect.css">
+    <link rel="stylesheet" href="/core/css/mobile.css">
+    <link rel="stylesheet" href="/core/vendor/jquery-ui/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="/core/css/jquery-ui-fixes.css">
+    <link rel="stylesheet" href="/core/css/tooltip.css">
+    <link rel="stylesheet" href="/core/css/share.css">
+    <link rel="stylesheet" href="/apps/files_versions/css/versions.css">
+    <link rel="stylesheet" href="/apps/files_videoplayer/css/style.css">
+    <link rel="stylesheet" href="/apps/firstrunwizard/css/colorbox.css">
+    <link rel="stylesheet" href="/apps/firstrunwizard/css/firstrunwizard.css">
+    <link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
+    <link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
+    <script src="/index.php/core/js/oc.js"></script>
+    <script src="/core/vendor/jquery/dist/jquery.min.js"></script>
+    <script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
+    <script src="/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
+    <script src="/core/vendor/underscore/underscore.js"></script>
+    <script src="/core/vendor/moment/min/moment-with-locales.js"></script>
+    <script src="/core/vendor/handlebars/handlebars.js"></script>
+    <script src="/core/vendor/blueimp-md5/js/md5.js"></script>
+    <script src="/core/vendor/bootstrap/js/tooltip.js"></script>
+    <script src="/core/vendor/backbone/backbone.js"></script>
+    <script src="/core/vendor/es6-promise/dist/es6-promise.js"></script>
+    <script src="/core/vendor/davclient.js/lib/client.js"></script>
+    <script src="/core/vendor/clipboard/dist/clipboard.js"></script>
+    <script src="/core/vendor/bowser/src/bowser.js"></script>
+    <script src="/core/js/jquery.ocdialog.js"></script>
+    <script src="/core/js/oc-dialogs.js"></script>
+    <script src="/core/js/js.js"></script>
+    <script src="/core/js/l10n.js"></script>
+    <script src="/core/js/octemplate.js"></script>
+    <script src="/core/js/eventsource.js"></script>
+    <script src="/core/js/config.js"></script>
+    <script src="/core/search/js/search.js"></script>
+    <script src="/core/js/oc-requesttoken.js"></script>
+    <script src="/core/js/apps.js"></script>
+    <script src="/core/js/mimetype.js"></script>
+    <script src="/core/js/mimetypelist.js"></script>
+    <script src="/core/vendor/snapjs/dist/latest/snap.js"></script>
+    <script src="/core/vendor/select2/select2.js"></script>
+    <script src="/core/js/oc-backbone.js"></script>
+    <script src="/core/js/placeholder.js"></script>
+    <script src="/core/js/jquery.avatar.js"></script>
+    <script src="/core/js/backgroundjobs.js"></script>
+    <script src="/core/js/shareconfigmodel.js"></script>
+    <script src="/core/js/sharemodel.js"></script>
+    <script src="/core/js/sharescollection.js"></script>
+    <script src="/core/js/shareitemmodel.js"></script>
+    <script src="/core/js/sharedialogresharerinfoview.js"></script>
+    <script src="/core/js/sharedialoglinklistview.js"></script>
+    <script src="/core/js/sharedialoglinkshareview.js"></script>
+    <script src="/core/js/sharedialogmailview.js"></script>
+    <script src="/core/js/sharedialoglinksocialview.js"></script>
+    <script src="/core/js/sharedialogexpirationview.js"></script>
+    <script src="/core/js/sharedialogshareelistview.js"></script>
+    <script src="/core/js/sharedialogview.js"></script>
+    <script src="/core/js/share.js"></script>
+    <script src="/apps/files_videoplayer/js/viewer.js"></script>
+    <script src="/apps/firstrunwizard/js/jquery.colorbox.js"></script>
+    <script src="/apps/firstrunwizard/js/firstrunwizard.js"></script>
+    <script src="/core/js/files/fileinfo.js"></script>
+    <script src="/core/js/files/client.js"></script>
+  </head>
+  <body id="body-login">
+    <noscript>
+      <div id="nojavascript">
+        <div>
+          This application requires JavaScript for correct operation. Please <a href="http://enable-javascript.com/" target="_blank" rel="noreferrer">enable JavaScript</a> and reload the page.		
+        </div>
+      </div>
+    </noscript>
+    <div class="wrapper">
+      <div class="v-align">
+        <header role="banner">
+          <div id="header">
+            <div class="logo">
+              <h1 class="hidden-visually">
+              </h1>
+            </div>
+            <div id="logo-claim" style="display:none;"></div>
+          </div>
+        </header>
+        <ul>
+          <li class="error">
+            File not found or expired<br>
+            <p class="hint">The specified document has not been found on the server or it has expired.</p>
+            <p class="hint"><a href="/index.php">You can click here to return to CERNBox.</a></p>
+          </li>
+        </ul>
+        <div class="push"></div>
+        <!-- for sticky footer -->
+      </div>
+    </div>
+    <footer role="contentinfo">
+      <p class="info">
+        <a href="https://cernbox.web.cern.ch" target="_blank" rel="noreferrer">CERNBox</a> The CERN Cloud Storage</p>
+    </footer>
+  </body>
 </html>
 `

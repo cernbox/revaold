@@ -69,6 +69,19 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
 	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
+	// public link webdav access
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
+
 	// gallery app routes
 	p.router.HandleFunc("/index.php/apps/gallery/preview/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
 
@@ -96,8 +109,9 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/remote_shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
 
-	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.propfindPublicLink)).Methods("PROPFIND")
+	// public link routes
+	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET", "POST")
+	p.router.HandleFunc("/index.php/s/{token}/download", p.tokenAuth(p.downloadArchivePL)).Methods("GET")
 
 	p.router.HandleFunc("/index.php/apps/files_texteditor/ajax/loadfile", p.tokenAuth(p.loadFile)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_texteditor/ajax/savefile", p.tokenAuth(p.saveFile)).Methods("PUT")
@@ -120,12 +134,6 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
 
 	p.router.HandleFunc("/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
-
-}
-
-func (p *proxy) propfindPublicLink(w http.ResponseWriter, r *http.Request) {
-	//ctx := r.Context()
-	//gCtx := GetContextWithPublicLinkAuth(ctx)
 
 }
 
@@ -293,6 +301,9 @@ type Options struct {
 	OwnCloudSharePrefix string
 	RevaSharePrefix     string
 
+	OwnCloudPublicLinkPrefix string
+	RevaPublicLinkPrefix     string
+
 	CBOXGroupDaemonURI    string
 	CBOXGroupDaemonSecret string
 }
@@ -322,18 +333,8 @@ func (opt *Options) init() {
 		opt.RevaSharePrefix = "/shared-with-me"
 	}
 
-	if opt.OwnCloudHomePrefix == "" {
-		opt.OwnCloudHomePrefix = "/"
-	}
-	if opt.RevaHomePrefix == "" {
-		opt.RevaHomePrefix = "/home"
-	}
-
-	if opt.OwnCloudSharePrefix == "" {
-		opt.OwnCloudSharePrefix = "/__myshares"
-	}
-	if opt.RevaSharePrefix == "" {
-		opt.RevaSharePrefix = "/shared-with-me"
+	if opt.RevaPublicLinkPrefix == "" {
+		opt.RevaPublicLinkPrefix = "/public-links"
 	}
 
 }
@@ -370,8 +371,12 @@ func New(opt *Options) (http.Handler, error) {
 
 		ownCloudSharePrefix: opt.OwnCloudSharePrefix,
 		revaSharePrefix:     opt.RevaSharePrefix,
-		chunksFolder:        opt.ChunksFolder,
-		temporaryFolder:     opt.TemporaryFolder,
+
+		ownCloudPublicLinkPrefix: opt.OwnCloudPublicLinkPrefix,
+		revaPublicLinkPrefix:     opt.RevaPublicLinkPrefix,
+
+		chunksFolder:    opt.ChunksFolder,
+		temporaryFolder: opt.TemporaryFolder,
 	}
 
 	conn, err := grpc.Dial(proxy.revaHost, grpc.WithInsecure())
@@ -399,8 +404,12 @@ type proxy struct {
 	ownCloudHomePrefix string
 	revaHomePrefix     string
 
-	ownCloudSharePrefix   string
-	revaSharePrefix       string
+	ownCloudSharePrefix string
+	revaSharePrefix     string
+
+	ownCloudPublicLinkPrefix string
+	revaPublicLinkPrefix     string
+
 	cboxGroupDaemonURI    string
 	cboxGroupDaemonSecret string
 }
@@ -975,17 +984,156 @@ func (p *proxy) getMetadata(ctx context.Context, revaPath string) (*reva_api.Met
 }
 
 /*
+GET https://labradorbox.cern.ch/index.php/s/jIKrtrkXCIXwg1y/download?path=%2FHugo&files=Intrinsico&downloadStartSecret=twusiwio300f6c6nkhs9n3ik9&x-access-token=<token>
+Creates a TAR archive from public link
+*/
+func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	dir := r.URL.Query().Get("path")
+	files := []string{}
+
+	if r.URL.Query().Get("files") != "" {
+		fullPath := path.Join(dir, r.URL.Query().Get("files"))
+		files = append(files, fullPath)
+	} else {
+		fileList := r.URL.Query()["files[]"]
+		for _, fn := range fileList {
+			fullPath := path.Join(dir, fn)
+			fullPath = p.getRevaPath(ctx, fullPath)
+			files = append(files, fullPath)
+
+		}
+	}
+
+	// if only one file, trigger normal download
+	if len(files) == 1 {
+		mux.Vars(r)["path"] = files[0]
+		p.get(w, r)
+		return
+	}
+
+	// if files is empty means that we need to download the whole content of dir
+	if len(files) == 0 {
+		revaPath := p.getRevaPath(ctx, dir)
+		files = append(files, revaPath)
+	}
+
+	// TODO(labkode): add request ID to the archive name so we can trace back archive.
+	archiveName := "download.tar"
+	if len(files) == 1 && dir != "/" {
+		archiveName = path.Base(files[0]) + ".tar"
+	}
+
+	p.logger.Debug("archive name: " + archiveName)
+
+	// TODO(labkode): check for size because once the data is being written to the client we cannot override the headers.
+
+	// if downloadStartSecret is set in the query param we need to set the cookie ocDownloadStarted with same value.
+	if r.URL.Query().Get("downloadStartSecret") != "" {
+		http.SetCookie(w, &http.Cookie{
+			Name:    "ocDownloadStarted",
+			Value:   r.URL.Query().Get("downloadStartSecret"),
+			Path:    "/",
+			Expires: time.Now().Add(time.Second * 30)})
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", archiveName))
+	w.Header().Set("Content-Transfer-Encoding", "binary")
+	w.WriteHeader(http.StatusOK)
+
+	gCtx := GetContextWithAuth(ctx)
+
+	tw := tar.NewWriter(w)
+	defer tw.Close()
+	for _, fn := range files {
+		err := p.Walk(ctx, fn, func(path string, md *reva_api.Metadata, err error) error {
+			if err != nil {
+				return err
+			}
+
+			p.logger.Debug("walking", zap.String("filename", path))
+			hdr := &tar.Header{
+				Name:    md.Path,
+				Mode:    0600,
+				Size:    int64(md.Size),
+				ModTime: time.Unix(int64(md.Mtime), 0),
+			}
+
+			if md.IsDir {
+				hdr.Typeflag = tar.TypeDir
+				hdr.Mode = 0755
+			}
+
+			if err := tw.WriteHeader(hdr); err != nil {
+				p.logger.Error("", zap.Error(err), zap.String("fn", fn))
+				return err
+			}
+
+			// if file, write file contents into the tar archive
+			if !md.IsDir {
+
+				revaPath := p.getRevaPath(ctx, md.Path)
+				stream, err := p.getStorageClient().ReadFile(gCtx, &reva_api.PathReq{Path: revaPath})
+				if err != nil {
+					p.logger.Error("", zap.Error(err))
+					return err
+				}
+
+				for {
+					dcRes, err := stream.Recv()
+					if err == io.EOF {
+						return nil
+					}
+					if err != nil {
+						p.logger.Error("", zap.Error(err))
+						return err
+					}
+					if dcRes.Status != reva_api.StatusCode_OK {
+						p.logger.Error("", zap.Int("status", int(dcRes.Status)))
+						return reva_api.NewError(reva_api.StorageNotSupportedErrorCode)
+					}
+
+					dc := dcRes.DataChunk
+
+					if dc != nil {
+						if dc.Length > 0 {
+							if _, err := tw.Write(dc.Data); err != nil {
+								p.logger.Error("", zap.Error(err))
+								return err
+							}
+						}
+					}
+				}
+
+			} else {
+				return nil
+
+			}
+		})
+
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+		}
+	}
+
+}
+
+/*
 GET http://labradorbox.cern.ch/cernbox/index.php/apps/files/ajax/download.php?dir=/&files[]=welcome.txt&files[]=signed contract.pdf&files[]=peter.txt&downloadStartSecret=k9ubkisonib HTTP/1.1
 Creates a TAR archive
 */
 func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	dir := r.URL.Query().Get("dir")
+	plPath := r.URL.Query().Get("path")
 	files := []string{}
 
 	if dir == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		if plPath == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		dir = plPath
 	}
 
 	if r.URL.Query().Get("files") != "" {
@@ -2800,26 +2948,6 @@ func getUserFromContext(ctx context.Context) (*reva_api.User, error) {
 	return u, nil
 }
 
-func GetContextWithAuth(ctx context.Context) context.Context {
-	token, _ := reva_api.ContextGetAccessToken(ctx)
-	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
-	return metadata.NewOutgoingContext(context.Background(), header)
-}
-
-func GetContextWithPublicLinkAuth(ctx context.Context) context.Context {
-	token, _ := reva_api.ContextGetPublicLinkToken(ctx)
-	header := metadata.New(map[string]string{"authorization": "pl-bearer " + token})
-	return metadata.NewOutgoingContext(context.Background(), header)
-}
-
-func (p *proxy) detectMimeType(isDir bool, pa string) string {
-	if isDir {
-		return "httpd/unix-directory"
-	}
-	ext := path.Ext(pa)
-	return mime.TypeByExtension(ext)
-}
-
 type ShareType int
 type Permission int
 type ItemType string
@@ -2921,168 +3049,47 @@ var (
 	LDAPAccountTypeUndefined LDAPAccountType = "undefined"
 )
 
-func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		normalizedPath := mux.Vars(r)["path"]
-		normalizedPath = path.Join("/", path.Clean(normalizedPath))
-		mux.Vars(r)["path"] = normalizedPath
-
-		authClient := p.getAuthClient()
-
-		token := r.Header.Get("X-Access-Token")
-		if token == "" {
-			token = r.URL.Query().Get("x-access-token")
-		}
-		if token == "" {
-			p.logger.Warn("auth token not provided", zap.String("X-Access-Token", token))
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		// try with user token
-		userRes, err := authClient.DismantleUserToken(ctx, &reva_api.TokenReq{Token: token})
-		if err == nil && userRes.Status == reva_api.StatusCode_OK {
-			user := userRes.User
-			ctx = reva_api.ContextSetUser(ctx, user)
-			ctx = reva_api.ContextSetAccessToken(ctx, token)
-			r = r.WithContext(ctx)
-			p.logger.Info("user authenticated with token", zap.String("account_id", user.AccountId))
-			h(w, r)
-			return
-		}
-
-		// try with public link token
-		res, err := authClient.DismantlePublicLinkToken(ctx, &reva_api.TokenReq{Token: token})
-		if err != nil {
-			p.logger.Warn("", zap.Error(err), zap.String("token", token))
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		if res.Status != reva_api.StatusCode_OK {
-			p.logger.Warn("token is invalid or not longer valid", zap.Error(err))
-		}
-
-		pl := res.PublicLink
-		ctx = reva_api.ContextSetPublicLink(ctx, pl)
-		ctx = reva_api.ContextSetPublicLinkToken(ctx, token)
-		r = r.WithContext(ctx)
-		p.logger.Info("authenticated with public link token", zap.String("token", pl.Token))
-		h(w, r)
-		return
-	})
-}
-
-func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
-	var revaPath string
-
-	if strings.HasPrefix(ocPath, p.ownCloudSharePrefix) {
-		revaPath = strings.TrimPrefix(ocPath, p.ownCloudSharePrefix)
-		// remove file target before contacting reva
-		revaPath = strings.TrimPrefix(revaPath, "/")
-		tokens := strings.Split(revaPath, "/")
-		_, id, err := p.splitRootPath(ctx, tokens[0])
-		if err != nil {
-			p.logger.Error("error removing file target from ocPath", zap.Error(err), zap.String("ocPath", ocPath))
-		}
-		revaPath = path.Join("/", id)
-		if len(tokens) > 1 {
-			revaPath = path.Join(revaPath, path.Join(tokens[1:]...))
-		}
-
-		revaPath = path.Join(p.revaSharePrefix, revaPath)
-	} else {
-		// apply home default
-		revaPath = strings.TrimPrefix(ocPath, p.ownCloudHomePrefix)
-		revaPath = path.Join(p.revaHomePrefix, revaPath)
-	}
-
-	p.logger.Debug(fmt.Sprintf("owncloud path conversion: oc(%s) => reva(%s)", ocPath, revaPath))
-	return revaPath
-}
-
-func (p *proxy) getPlainOCPath(ctx context.Context, revaPath string) string {
-	var ocPath string
-	ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
-	ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
-	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
-	return ocPath
-}
-
-func (p *proxy) getOCId(ctx context.Context, id string) string {
-	tokens := strings.Split(id, ":")
-	if tokens[0] == "oldhome" || strings.HasPrefix(tokens[0], "eoshome-") {
-		tokens[0] = "home"
-	}
-	return strings.Join(tokens, ":")
-}
-
-func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
-	revaPath := md.Path
-	var ocPath string
-
-	if strings.HasPrefix(revaPath, p.revaSharePrefix) {
-		ocPath = strings.TrimPrefix(revaPath, p.revaSharePrefix)
-		ocPath = strings.TrimPrefix(ocPath, "/")
-		tokens := strings.Split(ocPath, "/")
-		tokens[0] = p.addShareTarget(ctx, tokens[0], md)
-		ocPath = path.Join("/", path.Join(tokens...))
-		ocPath = path.Join(p.ownCloudSharePrefix, ocPath)
-	} else {
-		if strings.HasPrefix(revaPath, p.revaHomePrefix) {
-			ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
-			ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
-		} else {
-			// migration logic, strip /oldhome or /eoshome-l from reva path
-			ocPath = strings.Trim(revaPath, "/")
-			parts := strings.Split(ocPath, "/")
-			parts[0] = ""
-			ocPath = path.Join("/", p.ownCloudHomePrefix, path.Join(parts...))
-		}
-	}
-	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
-	return ocPath
-}
-
-func (p *proxy) splitRootPath(ctx context.Context, path string) (string, string, error) {
-	loc := shareIDRegexp.FindStringIndex(path)
-	if loc == nil {
-		return "", "", errors.New(fmt.Sprintf("path(%s) does not match regexp", path))
-	}
-	shareID := path[loc[0]+4 : loc[1]-1]
-	targetName := path[0:loc[0]]
-	return targetName, shareID, nil
-}
-
-func (p *proxy) addShareTarget(ctx context.Context, id string, md *reva_api.Metadata) string {
-	return fmt.Sprintf("%s (id:%s)", md.ShareTarget, id)
-
-}
-
 func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	token := mux.Vars(r)["token"]
 
+	var password string
+	if r.Method == "POST" { // password has been set in password form
+		if err := r.ParseForm(); err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		password = r.Form.Get("password")
+	}
+
 	client := p.getAuthClient()
-	res, err := client.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: ""})
+	res, err := client.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: password})
 	if err != nil {
+		// render link not found template
 		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(publicLinkTemplateNotFound))
 		return
 	}
 
 	if res.Status != reva_api.StatusCode_OK {
-		// TODO(labkode): render password or expired template
-		p.writeError(res.Status, w, r)
+		tpl, err := template.New("public_link_password").Parse(publicLinkTemplatePassword)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			p.logger.Error("", zap.Error(err))
+			return
+		}
+
+		tpl.Execute(w, nil)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 	data := struct {
-		Token string
-		Note  string
-	}{Token: res.Token, Note: "TODO(labkode): customize golang templates"}
+		Token       string
+		AccessToken string
+		Note        string
+	}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage"}
 
 	tpl, err := template.New("public_link").Parse(publicLinkTemplate)
 	if err != nil {
@@ -3786,6 +3793,10 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 	var destinationPath string
 	if strings.HasPrefix(destinationURL.Path, "remote.php/webdav") {
 		davPrefix := "remote.php/webdav"
+		index := strings.Index(destinationURL.Path, davPrefix)
+		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
+	} else if strings.HasPrefix(destinationURL.Path, "public.php/webdav") {
+		davPrefix := "public.php/webdav"
 		index := strings.Index(destinationURL.Path, davPrefix)
 		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
 	} else { // url is /remote.php/dav/gonzalhu/files
@@ -4636,10 +4647,16 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata) (*r
 	response := responseXML{}
 
 	// TODO(labkode): harden check for user
-	user, _ := reva_api.ContextGetUser(ctx)
-	response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
-	if md.IsDir {
-		response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path) + "/"
+	if user, ok := reva_api.ContextGetUser(ctx); ok {
+		response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+		if md.IsDir {
+			response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path) + "/"
+		}
+	} else { // public link access
+		response.Href = path.Join("/public.php/webdav", md.Path)
+		if md.IsDir {
+			response.Href = path.Join("/public.php/webdav", md.Path) + "/"
+		}
 	}
 
 	response.Propstat = propStatList
@@ -4764,4 +4781,179 @@ func getMD5Hash(text string) string {
 	hasher := md5.New()
 	hasher.Write([]byte(text))
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func GetContextWithAuth(ctx context.Context) context.Context {
+	if token, ok := reva_api.ContextGetPublicLinkToken(ctx); ok && token != "" {
+		header := metadata.New(map[string]string{"authorization": "pl-bearer " + token})
+		return metadata.NewOutgoingContext(context.Background(), header)
+	}
+
+	token, _ := reva_api.ContextGetAccessToken(ctx)
+	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
+	return metadata.NewOutgoingContext(context.Background(), header)
+}
+
+func (p *proxy) detectMimeType(isDir bool, pa string) string {
+	if isDir {
+		return "httpd/unix-directory"
+	}
+	ext := path.Ext(pa)
+	return mime.TypeByExtension(ext)
+}
+
+func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		normalizedPath := mux.Vars(r)["path"]
+		normalizedPath = path.Join("/", path.Clean(normalizedPath))
+		mux.Vars(r)["path"] = normalizedPath
+
+		authClient := p.getAuthClient()
+
+		token := r.Header.Get("X-Access-Token")
+		if token == "" {
+			token = r.URL.Query().Get("x-access-token")
+		}
+		if token == "" {
+			p.logger.Warn("auth token not provided", zap.String("X-Access-Token", token))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		// try with user token
+		userRes, err := authClient.DismantleUserToken(ctx, &reva_api.TokenReq{Token: token})
+		if err == nil && userRes.Status == reva_api.StatusCode_OK {
+			user := userRes.User
+			ctx = reva_api.ContextSetUser(ctx, user)
+			ctx = reva_api.ContextSetAccessToken(ctx, token)
+			r = r.WithContext(ctx)
+			p.logger.Info("user authenticated with token", zap.String("account_id", user.AccountId))
+			h(w, r)
+			return
+		}
+
+		// try with public link token
+		res, err := authClient.DismantlePublicLinkToken(ctx, &reva_api.TokenReq{Token: token})
+		if err != nil {
+			p.logger.Warn("", zap.Error(err), zap.String("token", token))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if res.Status != reva_api.StatusCode_OK {
+			p.logger.Warn("token is invalid or not longer valid", zap.Error(err))
+		}
+
+		pl := res.PublicLink
+		ctx = reva_api.ContextSetPublicLink(ctx, pl)
+		ctx = reva_api.ContextSetPublicLinkToken(ctx, token)
+		r = r.WithContext(ctx)
+		p.logger.Info("authenticated with public link token", zap.String("token", pl.Token))
+		h(w, r)
+		return
+	})
+}
+
+func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
+	var revaPath string
+
+	if token, ok := reva_api.ContextGetPublicLinkToken(ctx); ok && token != "" {
+		if pl, ok := reva_api.ContextGetPublicLink(ctx); ok {
+			// apply  public link
+			revaPath = strings.TrimPrefix(ocPath, p.ownCloudPublicLinkPrefix)
+			revaPath = path.Join(p.revaPublicLinkPrefix, pl.Token, revaPath)
+		}
+	} else {
+		if strings.HasPrefix(ocPath, p.ownCloudSharePrefix) {
+			revaPath = strings.TrimPrefix(ocPath, p.ownCloudSharePrefix)
+			// remove file target before contacting reva
+			revaPath = strings.TrimPrefix(revaPath, "/")
+			tokens := strings.Split(revaPath, "/")
+			_, id, err := p.splitRootPath(ctx, tokens[0])
+			if err != nil {
+				p.logger.Error("error removing file target from ocPath", zap.Error(err), zap.String("ocPath", ocPath))
+			}
+			revaPath = path.Join("/", id)
+			if len(tokens) > 1 {
+				revaPath = path.Join(revaPath, path.Join(tokens[1:]...))
+			}
+
+			revaPath = path.Join(p.revaSharePrefix, revaPath)
+		} else {
+			// apply home default
+			revaPath = strings.TrimPrefix(ocPath, p.ownCloudHomePrefix)
+			revaPath = path.Join(p.revaHomePrefix, revaPath)
+		}
+
+	}
+
+	p.logger.Debug(fmt.Sprintf("owncloud path conversion: oc(%s) => reva(%s)", ocPath, revaPath))
+	return revaPath
+}
+
+func (p *proxy) getPlainOCPath(ctx context.Context, revaPath string) string {
+	var ocPath string
+	ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
+	ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
+	return ocPath
+}
+
+func (p *proxy) getOCId(ctx context.Context, id string) string {
+	tokens := strings.Split(id, ":")
+	if tokens[0] == "oldhome" || strings.HasPrefix(tokens[0], "eoshome-") {
+		tokens[0] = "home"
+	}
+	return strings.Join(tokens, ":")
+}
+
+func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
+	revaPath := md.Path
+	var ocPath string
+
+	if token, ok := reva_api.ContextGetPublicLinkToken(ctx); ok && token != "" {
+		ocPath = strings.TrimPrefix(revaPath, p.revaPublicLinkPrefix)
+		ocPath = strings.TrimPrefix(ocPath, "/")
+		// vals is ["<token>", "photos", "..."]
+		vals := strings.Split(ocPath, "/")
+		ocPath = path.Join(p.ownCloudPublicLinkPrefix, path.Join(vals[1:]...))
+	} else {
+		if strings.HasPrefix(revaPath, p.revaSharePrefix) {
+			ocPath = strings.TrimPrefix(revaPath, p.revaSharePrefix)
+			ocPath = strings.TrimPrefix(ocPath, "/")
+			tokens := strings.Split(ocPath, "/")
+			tokens[0] = p.addShareTarget(ctx, tokens[0], md)
+			ocPath = path.Join("/", path.Join(tokens...))
+			ocPath = path.Join(p.ownCloudSharePrefix, ocPath)
+		} else {
+			if strings.HasPrefix(revaPath, p.revaHomePrefix) {
+				ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
+				ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+			} else {
+				// migration logic, strip /oldhome or /eoshome-l from reva path
+				ocPath = strings.Trim(revaPath, "/")
+				parts := strings.Split(ocPath, "/")
+				parts[0] = ""
+				ocPath = path.Join("/", p.ownCloudHomePrefix, path.Join(parts...))
+			}
+		}
+	}
+	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
+	return ocPath
+}
+
+func (p *proxy) splitRootPath(ctx context.Context, path string) (string, string, error) {
+	loc := shareIDRegexp.FindStringIndex(path)
+	if loc == nil {
+		return "", "", errors.New(fmt.Sprintf("path(%s) does not match regexp", path))
+	}
+	shareID := path[loc[0]+4 : loc[1]-1]
+	targetName := path[0:loc[0]]
+	return targetName, shareID, nil
+}
+
+func (p *proxy) addShareTarget(ctx context.Context, id string, md *reva_api.Metadata) string {
+	return fmt.Sprintf("%s (id:%s)", md.ShareTarget, id)
+
 }

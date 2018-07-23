@@ -85,6 +85,7 @@ func (fs *linkStorage) getLinkMetadata(ctx context.Context, link *api.PublicLink
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
+	finfo.IsReadOnly = link.ReadOnly
 	return finfo, nil
 }
 
@@ -126,8 +127,9 @@ func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata
 		return nil, err
 	}
 
+	md.IsReadOnly = linkMetadata.IsReadOnly
 	md.Path = path.Join("/", link.Token, strings.TrimPrefix(md.Path, linkMetadata.Path))
-	md.Id = link.Token
+	md.Id = link.Token // no id for this storage
 	return md, nil
 }
 
@@ -176,6 +178,7 @@ func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Meta
 		originalPath := md.Path
 		p := path.Join(link.Token, strings.TrimPrefix(md.Path, linkMetadata.Path))
 		md.Path = path.Join("/", p)
+		md.IsReadOnly = linkMetadata.IsReadOnly
 		md.Id = p
 		fs.logger.Debug("children entry", zap.String("childpath", md.Path), zap.String("originalchildmd.path", originalPath), zap.String("childmd.path", md.Path), zap.String("parentmd.path", linkMetadata.Path), zap.String("strings", strings.TrimPrefix(originalPath, linkMetadata.Path)))
 	}

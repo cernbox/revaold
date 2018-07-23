@@ -372,7 +372,12 @@ func (c *Client) PurgeDeletedEntries(ctx context.Context, username string) error
 func (c *Client) ListVersions(ctx context.Context, username, p string) ([]*FileInfo, error) {
 	basename := path.Base(p)
 	versionFolder := path.Join(path.Dir(p), versionPrefix+basename)
-	return c.List(ctx, username, versionFolder)
+	finfos, err := c.List(ctx, username, versionFolder)
+	if err != nil {
+		// we send back an empty list
+		return []*FileInfo{}, nil
+	}
+	return finfos, nil
 }
 
 // RollbackToVersion rollbacks a file to a previous version.

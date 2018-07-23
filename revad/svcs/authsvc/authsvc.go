@@ -50,6 +50,9 @@ func (s *svc) ForgePublicLinkToken(ctx context.Context, req *api.ForgePublicLink
 	l := ctx_zap.Extract(ctx)
 	user, err := s.lm.AuthenticatePublicLink(ctx, req.Token, req.Password)
 	if err != nil {
+		if api.IsErrorCode(err, api.PublicLinkInvalidPasswordErrorCode) {
+			return &api.TokenResponse{Status: api.StatusCode_PUBLIC_LINK_INVALID_PASSWORD}, nil
+		}
 		l.Error("", zap.Error(err))
 		return nil, err
 	}

@@ -21,6 +21,21 @@ import (
 //TODO(labkode): add owner_id to other public link queries when consulting db
 const tokenLength = 15
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+const versionPrefix = ".sys.v#."
+
+func getFileIDFromVersionFolder(p string) string {
+	basename := gopath.Base(p)
+	basename = strings.TrimPrefix(basename, "/")
+	basename = strings.TrimPrefix(basename, versionPrefix)
+	filename := gopath.Join(gopath.Dir(p), basename)
+	return filename
+}
+
+func getVersionFolder(p string) string {
+	basename := gopath.Base(p)
+	versionFolder := gopath.Join(gopath.Dir(p), versionPrefix+basename)
+	return versionFolder
+}
 
 func genToken() string {
 	b := make([]byte, tokenLength)
@@ -121,6 +136,21 @@ func (lm *linkManager) InspectPublicLinkByToken(ctx context.Context, token strin
 
 }
 
+func (lm *linkManager) getVersionFolderID(ctx context.Context, p string) (string, error) {
+	versionFolder := getVersionFolder(p)
+	md, err := lm.vfs.GetMetadata(ctx, versionFolder)
+	if err != nil {
+		if err := lm.vfs.CreateDir(ctx, versionFolder); err != nil {
+			return "", err
+		}
+		md, err = lm.vfs.GetMetadata(ctx, versionFolder)
+		if err != nil {
+			return "", err
+		}
+	}
+	return md.Id, nil
+}
+
 func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *api.PublicLinkOptions) (*api.PublicLink, error) {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
@@ -134,22 +164,33 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 		return nil, err
 	}
 
-	itemType := "file"
-	if md.IsDir {
-		itemType = "folder"
-	}
-	permissions := 15
-	if opt.ReadOnly {
-		permissions = 1
-	}
-	token := genToken()
-
 	var prefix, itemSource string
 	if md.MigId != "" {
 		prefix, itemSource = splitFileID(md.MigId)
 	} else {
 		prefix, itemSource = splitFileID(md.Id)
 	}
+
+	itemType := "file"
+	if md.IsDir {
+		itemType = "folder"
+	} else {
+		// if link points to a file we need to use the versions folder inode.
+		if !md.IsDir {
+			versionFolderID, err := lm.getVersionFolderID(ctx, md.Path)
+			_, itemSource = splitFileID(versionFolderID)
+			if err != nil {
+				l.Error("", zap.Error(err))
+				return nil, err
+			}
+		}
+
+	}
+	permissions := 15
+	if opt.ReadOnly {
+		permissions = 1
+	}
+	token := genToken()
 
 	fileSource, err := strconv.ParseUint(itemSource, 10, 64)
 	if err != nil {
@@ -158,6 +199,7 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 	}
 
 	shareName := gopath.Base(path)
+
 	stmtString := "insert into oc_share set share_type=?,uid_owner=?,uid_initiator=?,item_type=?,fileid_prefix=?,item_source=?,file_source=?,permissions=?,stime=?,token=?,share_name=?"
 	stmtValues := []interface{}{3, u.AccountId, u.AccountId, itemType, prefix, itemSource, fileSource, permissions, time.Now().Unix(), token, shareName}
 
@@ -510,15 +552,37 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		expires = uint64(t.Unix())
 	}
 
+	fileID := joinFileID(dbShare.Prefix, dbShare.ItemSource)
+
 	var itemType api.PublicLink_ItemType
 	if dbShare.ItemType == "folder" {
 		itemType = api.PublicLink_FOLDER
 	} else {
-
 		itemType = api.PublicLink_FILE
+		// the share points to the version folder id, we
+		// need to point to the file id, so in the UI the share info
+		// appears on the latest file version.
+		newCtx := api.ContextSetUser(ctx, &api.User{AccountId: dbShare.Owner})
+		p, err := lm.vfs.GetPathByID(newCtx, fileID)
+		if err != nil {
+			return nil, err
+		}
+		md, err := lm.vfs.GetMetadata(newCtx, p)
+		if err != nil {
+			return nil, err
+		}
+
+		versionFolder := md.Path
+		filename := getFileIDFromVersionFolder(versionFolder)
+
+		md, err = lm.vfs.GetMetadata(newCtx, filename)
+		if err != nil {
+			return nil, err
+		}
+		_, id := splitFileID(md.Id)
+		fileID = joinFileID(dbShare.Prefix, id)
 	}
 
-	fileID := joinFileID(dbShare.Prefix, dbShare.ItemSource)
 	publicLink := &api.PublicLink{
 		Id:        fmt.Sprintf("%d", dbShare.ID),
 		Token:     dbShare.Token,

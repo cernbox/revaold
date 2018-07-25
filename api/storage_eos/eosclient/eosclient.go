@@ -368,6 +368,12 @@ func (c *Client) PurgeDeletedEntries(ctx context.Context, username string) error
 	return err
 }
 
+func getVersionFolder(p string) string {
+	basename := path.Base(p)
+	versionFolder := path.Join(path.Dir(p), versionPrefix+basename)
+	return versionFolder
+}
+
 // ListVersions list all the versions for a given file.
 func (c *Client) ListVersions(ctx context.Context, username, p string) ([]*FileInfo, error) {
 	basename := path.Base(p)

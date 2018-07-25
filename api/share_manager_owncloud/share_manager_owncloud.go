@@ -382,17 +382,24 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	var groupsPlaceHolder string
-	if len(groups) > 1 {
-		groupsPlaceHolder = "'"
-		groupsPlaceHolder = strings.Join(groups, "','")
-		groupsPlaceHolder += "'"
+	queryArgs := []interface{}{id, accountID}
+	groupArgs := []interface{}{}
+	for _, v := range groups {
+		groupArgs = append(groupArgs, v)
 	}
 
-	query := fmt.Sprintf("select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where id=? and (share_with=? or share_with in (%s))", groupsPlaceHolder)
+	var query string
 
-	l.Debug(fmt.Sprintf("%s => (%s, %d)", query, accountID, id))
-	if err := sm.db.QueryRow(query, id, accountID).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget); err != nil {
+	if len(groups) > 1 {
+		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where id=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
+		queryArgs = append(queryArgs, groupArgs...)
+	} else {
+		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where id=? and (share_with=?)"
+	}
+
+	fmt.Println(query, queryArgs)
+
+	if err := sm.db.QueryRow(query, queryArgs...).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
 		}

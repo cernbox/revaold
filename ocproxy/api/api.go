@@ -403,8 +403,21 @@ type proxy struct {
 	cboxGroupDaemonSecret string
 }
 
+// TODO(labkode): store this global var inside the proxy
+var globalConn *grpc.ClientConn
+
+// See https://github.com/grpc/grpc/blob/master/doc/connectivity-semantics-and-api.md
+// One grpc conn spans multiple TCP conns
 func (p *proxy) getConn() (*grpc.ClientConn, error) {
-	return grpc.Dial(p.revaHost, grpc.WithInsecure())
+	if globalConn != nil {
+		return globalConn, nil
+	}
+	conn, err := grpc.Dial(p.revaHost, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+	globalConn = conn
+	return conn, nil
 }
 func (p *proxy) getStorageClient() reva_api.StorageClient {
 	conn, err := p.getConn()

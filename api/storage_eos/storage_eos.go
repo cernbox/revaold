@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
+	gopath "path"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )
+
+var hiddenReg = regexp.MustCompile(`\.sys\..#.`)
 
 func getUserFromContext(ctx context.Context) (*api.User, error) {
 	u, ok := api.ContextGetUser(ctx)
@@ -24,9 +27,10 @@ func getUserFromContext(ctx context.Context) (*api.User, error) {
 }
 
 type eosStorage struct {
-	c          *eosclient.Client
-	mountpoint string
-	logger     *zap.Logger
+	c             *eosclient.Client
+	mountpoint    string
+	logger        *zap.Logger
+	showHiddenSys bool
 }
 
 type Options struct {
@@ -58,10 +62,14 @@ type Options struct {
 	// Enables logging of the commands executed
 	// Defaults to false
 	EnableLogging bool `json:"enable_logging"`
+
+	// ShowHiddenSysFiles shows internal EOS files like
+	// .sys.v# and .sys.a# files.
+	ShowHiddenSysFiles bool `json:"show_hidden_sys_files"`
 }
 
 func (opt *Options) init() {
-	opt.Namespace = path.Clean(opt.Namespace)
+	opt.Namespace = gopath.Clean(opt.Namespace)
 	if !strings.HasPrefix(opt.Namespace, "/") {
 		opt.Namespace = "/"
 	}
@@ -109,17 +117,18 @@ func New(opt *Options) (api.Storage, error) {
 	}
 
 	eosStorage := &eosStorage{
-		c:          eosClient,
-		logger:     opt.Logger,
-		mountpoint: opt.Namespace,
+		c:             eosClient,
+		logger:        opt.Logger,
+		mountpoint:    opt.Namespace,
+		showHiddenSys: opt.ShowHiddenSysFiles,
 	}
 	return eosStorage, nil
 }
 
-func (fs *eosStorage) getInternalPath(ctx context.Context, p string) string {
+func (fs *eosStorage) getInternalPath(ctx context.Context, path string) string {
 	l := ctx_zap.Extract(ctx)
-	internalPath := path.Join(fs.mountpoint, p)
-	l.Debug("path conversion: external => internal", zap.String("external", p), zap.String("internal", internalPath))
+	internalPath := gopath.Join(fs.mountpoint, path)
+	l.Debug("path conversion: external => internal", zap.String("external", path), zap.String("internal", internalPath))
 	return internalPath
 }
 
@@ -214,6 +223,14 @@ func (fs *eosStorage) ListFolder(ctx context.Context, path string) ([]*api.Metad
 	}
 	finfos := []*api.Metadata{}
 	for _, eosFileInfo := range eosFileInfos {
+		// filter out sys files
+		if !fs.showHiddenSys {
+			base := gopath.Base(eosFileInfo.File)
+			if hiddenReg.MatchString(base) {
+				continue
+			}
+
+		}
 		finfos = append(finfos, fs.convertToMetadata(eosFileInfo))
 	}
 	return finfos, nil
@@ -357,7 +374,7 @@ func (fs *eosStorage) convertToRecycleEntry(eosDeletedEntry *eosclient.DeletedEn
 func (fs *eosStorage) convertToRevision(eosFileInfo *eosclient.FileInfo) *api.Revision {
 	md := fs.convertToMetadata(eosFileInfo)
 	revision := &api.Revision{
-		RevKey: path.Base(md.Path),
+		RevKey: gopath.Base(md.Path),
 		Size:   md.Size,
 		Mtime:  md.Mtime,
 		IsDir:  md.IsDir,
@@ -378,5 +395,6 @@ func (fs *eosStorage) convertToMetadata(eosFileInfo *eosclient.FileInfo) *api.Me
 	}
 	finfo.EosFile = eosFileInfo.File
 	finfo.EosInstance = eosFileInfo.Instance
+	finfo.Mime = api.DetectMimeType(finfo.IsDir, finfo.Path)
 	return finfo
 }

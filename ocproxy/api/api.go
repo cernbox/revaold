@@ -57,30 +57,30 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
 	// user-relative routes
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/remote.php/webdav/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
 	// public link webdav access
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/public.php/webdav/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
 	// gallery app routes
 	p.router.HandleFunc("/index.php/apps/gallery/preview/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
@@ -112,27 +112,23 @@ func (p *proxy) registerRoutes() {
 	// public link routes
 	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET", "POST")
 	p.router.HandleFunc("/index.php/s/{token}/download", p.tokenAuth(p.downloadArchivePL)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/files_sharing/ajax/publicpreview.php", p.tokenAuth(p.getPublicPreview)).Methods("GET")
 
+	// app routes
 	p.router.HandleFunc("/index.php/apps/files_texteditor/ajax/loadfile", p.tokenAuth(p.loadFile)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_texteditor/ajax/savefile", p.tokenAuth(p.saveFile)).Methods("PUT")
-
 	p.router.HandleFunc("/index.php/apps/files/ajax/download.php", p.tokenAuth(p.downloadArchive)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files/ajax/getstoragestats.php", p.tokenAuth(p.getStorageStats)).Methods("GET")
-
 	p.router.HandleFunc("/index.php/apps/eosinfo/getinfo", p.tokenAuth(p.getEOSInfo)).Methods("POST")
-
 	p.router.HandleFunc("/index.php/apps/files_eostrashbin/ajax/list.php", p.tokenAuth(p.listTrashbin)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_eostrashbin/ajax/undelete.php", p.tokenAuth(p.restoreTrashbin)).Methods("POST")
-
 	p.router.HandleFunc("/index.php/apps/files_eosversions/ajax/getVersions.php", p.tokenAuth(p.getVersions)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.tokenAuth(p.rollbackVersion)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_eosversions/download.php", p.tokenAuth(p.downloadVersion)).Methods("GET")
-
 	p.router.HandleFunc("/index.php/apps/gallery/config", p.tokenAuth(p.getGalleryConfig)).Methods("GET")
 
 	// avatars
 	p.router.HandleFunc("/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
-
 	p.router.HandleFunc("/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
 
 }
@@ -1020,10 +1016,24 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// if files is empty means that we need to download the whole content of dir
+	// if files is empty means that we need to download the whole content of dir or
+	// if it is a file, only the file
 	if len(files) == 0 {
 		revaPath := p.getRevaPath(ctx, dir)
-		files = append(files, revaPath)
+		md, err := p.getMetadata(ctx, revaPath)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		fmt.Println(md)
+		if md.IsDir {
+			files = append(files, revaPath)
+		} else {
+			mux.Vars(r)["path"] = dir
+			p.get(w, r)
+			return
+		}
 	}
 
 	// TODO(labkode): add request ID to the archive name so we can trace back archive.
@@ -1416,7 +1426,7 @@ func (p *proxy) listTrashbin(w http.ResponseWriter, r *http.Request) {
 			Path:        e.RestorePath,
 			Permissions: 0,
 			Name:        path.Base(e.RestorePath),
-			Mimetype:    p.detectMimeType(e.IsDir, e.RestorePath),
+			Mimetype:    reva_api.DetectMimeType(e.IsDir, e.RestorePath),
 			Mtime:       int(e.DelMtime) * 1000, // oc expects 13 digit
 			Size:        int(e.Size),
 			// TODO(labkode): refactor trashbin app to not rely on these attributes.
@@ -1805,11 +1815,10 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO(labkode): specify permission at the metadata response
-	mime := p.detectMimeType(md.IsDir, fullPath)
 	res := &LoadFileResponse{
 		FileContents: string(fileContents),
 		MTime:        int(md.Mtime),
-		Mime:         mime,
+		Mime:         md.Mime,
 		Writable:     true,
 	}
 
@@ -2122,6 +2131,23 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 		}
 		expiration = t.Unix()
 	}
+
+	// check that path exists
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getStorageClient().Inspect(gCtx, &reva_api.PathReq{Path: newShare.Path})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.Status != reva_api.StatusCode_OK {
+		p.writeError(res.Status, w, r)
+		return
+	}
+
+	md := res.Metadata
+	newShare.Name = path.Base(md.Path)
 
 	if newShare.ShareType == ShareTypePublicLink {
 		p.createPublicLinkShare(newShare, readOnly, expiration, w, r)
@@ -2440,7 +2466,7 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 	if pl.ItemType == reva_api.PublicLink_FOLDER {
 		mimeType = "httpd/unix-directory"
 	} else {
-		mimeType = mime.TypeByExtension(path.Ext(pl.Path))
+		mimeType = mime.TypeByExtension(path.Ext(pl.Name))
 	}
 	var permissions Permission
 	if pl.ReadOnly {
@@ -2471,7 +2497,7 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		ItemSource:           md.Id,
 		ItemType:             itemType,
 		MimeType:             mimeType,
-		Name:                 pl.Token,
+		Name:                 pl.Name,
 		Path:                 md.Path,
 		Permissions:          permissions,
 		ShareTime:            int(pl.Mtime),
@@ -3100,14 +3126,65 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	res2, err := client.DismantlePublicLinkToken(ctx, &reva_api.TokenReq{Token: res.Token})
+	if err != nil {
+		// render link not found template
+		p.logger.Error("", zap.Error(err))
+		w.Write([]byte(publicLinkTemplateNotFound))
+		return
+	}
+	if res.Status != reva_api.StatusCode_OK {
+		// render link not found template
+		p.logger.Error("", zap.Error(err))
+		w.Write([]byte(publicLinkTemplateNotFound))
+		return
+	}
+
+	pl := res2.PublicLink
+	ctx = reva_api.ContextSetPublicLink(ctx, pl)
+	ctx = reva_api.ContextSetPublicLinkToken(ctx, res.Token)
+
+	revaPath := p.getRevaPath(ctx, "/")
+	fmt.Println(revaPath)
+
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.Write([]byte(publicLinkTemplateNotFound))
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+
+	if pl.ItemType == reva_api.PublicLink_FOLDER {
+		data := struct {
+			Token       string
+			AccessToken string
+			Note        string
+		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage"}
+
+		tpl, err := template.New("public_link").Parse(publicLinkTemplate)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			p.logger.Error("", zap.Error(err))
+			return
+		}
+
+		tpl.Execute(w, data)
+		return
+
+	}
+
 	data := struct {
 		Token       string
 		AccessToken string
-		Note        string
-	}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage"}
+		ShareName   string
+		Size        int
+		Mime        string
+	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime}
+	fmt.Println(data)
 
-	tpl, err := template.New("public_link").Parse(publicLinkTemplate)
+	tpl, err := template.New("public_link_file").Parse(publicLinkTemplateFile)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		p.logger.Error("", zap.Error(err))
@@ -3125,7 +3202,6 @@ func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
 
 	version := fmt.Sprintf("%s.%s.%s.4", major, minor, micro)
 	versionString := fmt.Sprintf("%s.%s.%s", major, minor, micro)
-
 	status := &struct {
 		Installed     bool   `json:"installed"`
 		Maintenance   bool   `json:"maintenance"`
@@ -3185,6 +3261,12 @@ func (p *proxy) capabilities(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(capabilities))
+}
+
+func (p *proxy) getPublicPreview(w http.ResponseWriter, r *http.Request) {
+	v, _ := url.QueryUnescape(r.URL.Query().Get("file"))
+	mux.Vars(r)["path"] = path.Clean(v)
+	p.getPreview(w, r)
 }
 
 // TODO(labkode): refactor getGalleryPreview and getPreview
@@ -3247,7 +3329,7 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.Header().Set("Content-Type", p.detectMimeType(md.IsDir, md.Path))
+		w.Header().Set("Content-Type", md.Mime)
 		w.Header().Set("ETag", md.Etag)
 		w.Header().Set("OC-FileId", md.Id)
 		w.Header().Set("OC-ETag", md.Etag)
@@ -3355,7 +3437,7 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	fd.Close()
 	// TODO(labkode): use a multi-writer to write to respone and to disk at same time
 
-	w.Header().Set("Content-Type", p.detectMimeType(md.IsDir, md.Path))
+	w.Header().Set("Content-Type", md.Mime)
 	w.Header().Set("ETag", md.Etag)
 	w.Header().Set("OC-FileId", md.Id)
 	w.Header().Set("OC-ETag", md.Etag)
@@ -3376,7 +3458,7 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	p.logger.Info("get request for preview")
 	ctx := r.Context()
-	reqPath := mux.Vars(r)["path"]
+	reqPath := path.Clean(mux.Vars(r)["path"])
 	//etag := r.URL.Query().Get("c")
 	widthString := r.URL.Query().Get("x")
 	heightString := r.URL.Query().Get("y")
@@ -3432,7 +3514,7 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		w.Header().Set("Content-Type", p.detectMimeType(md.IsDir, md.Path))
+		w.Header().Set("Content-Type", md.Mime)
 		w.Header().Set("ETag", md.Etag)
 		w.Header().Set("OC-FileId", md.Id)
 		w.Header().Set("OC-ETag", md.Etag)
@@ -3481,7 +3563,16 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
 	basename := path.Base(reqPath)
+	if token, ok := reva_api.ContextGetPublicLinkToken(ctx); ok && token != "" {
+		if pl, ok := reva_api.ContextGetPublicLink(ctx); ok {
+			fmt.Println("reqPath: ", reqPath)
+			if reqPath == "/" { // preview for file pl
+				basename = pl.Name
+			}
+		}
+	}
 
 	format, err := imaging.FormatFromFilename(basename)
 	if err != nil {
@@ -3540,7 +3631,7 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	fd.Close()
 	// TODO(labkode): use a multi-writer to write to respone and to disk at same time
 
-	w.Header().Set("Content-Type", p.detectMimeType(md.IsDir, md.Path))
+	w.Header().Set("Content-Type", md.Mime)
 	w.Header().Set("ETag", md.Etag)
 	w.Header().Set("OC-FileId", md.Id)
 	w.Header().Set("OC-ETag", md.Etag)
@@ -3581,7 +3672,9 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
+	fmt.Printf("hey %+v\n", md)
 	md.Path = p.getOCPath(ctx, md)
+	fmt.Printf("hey 2 %+v\n", md)
 	if md.IsDir {
 		p.logger.Warn("file is a folder")
 		w.WriteHeader(http.StatusNotImplemented)
@@ -3595,7 +3688,7 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", p.detectMimeType(md.IsDir, md.Path))
+	w.Header().Set("Content-Type", md.Mime)
 	w.Header().Set("ETag", md.Etag)
 	w.Header().Set("OC-FileId", md.Id)
 	w.Header().Set("OC-ETag", md.Etag)
@@ -3614,7 +3707,9 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 			Expires: time.Now().Add(time.Second * 30)})
 	}
 
-	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(md.Path))
+	//w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(md.Path))
+	// TODO(labkode): when accesing a file pl, the path is empty, so the download appears as download, using the eos info is more friendly
+	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(md.EosFile))
 	w.WriteHeader(http.StatusOK)
 
 	var reader io.Reader
@@ -3667,7 +3762,7 @@ func (p *proxy) head(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	md := mdRes.Metadata
-	w.Header().Set("Content-Type", p.detectMimeType(md.IsDir, md.Path))
+	w.Header().Set("Content-Type", md.Mime)
 	w.Header().Set("ETag", md.Etag)
 	w.Header().Set("OC-FileId", md.Id)
 	w.Header().Set("OC-ETag", md.Etag)
@@ -4025,7 +4120,7 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 	}
 	modifiedMd := modifiedMdRes.Metadata
 
-	w.Header().Add("Content-Type", p.detectMimeType(modifiedMd.IsDir, modifiedMd.Path))
+	w.Header().Add("Content-Type", md.Mime)
 	w.Header().Set("ETag", modifiedMd.Etag)
 	w.Header().Set("OC-FileId", modifiedMd.Id)
 	w.Header().Set("OC-ETag", modifiedMd.Etag)
@@ -4343,7 +4438,7 @@ func (p *proxy) putChunked(w http.ResponseWriter, r *http.Request) {
 	}
 
 	modifiedMd := modifiedMdRes.Metadata
-	w.Header().Add("Content-Type", p.detectMimeType(modifiedMd.IsDir, modifiedMd.Path))
+	w.Header().Add("Content-Type", md.Mime)
 	w.Header().Set("ETag", modifiedMd.Etag)
 	w.Header().Set("OC-FileId", modifiedMd.Id)
 	w.Header().Set("OC-ETag", modifiedMd.Etag)
@@ -4619,7 +4714,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata) (*r
 	} else {
 		getContentType = propertyXML{
 			xml.Name{Space: "", Local: "d:getcontenttype"},
-			"", []byte(p.detectMimeType(md.IsDir, md.Path))}
+			"", []byte(md.Mime)}
 
 	}
 
@@ -4808,14 +4903,6 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 	token, _ := reva_api.ContextGetAccessToken(ctx)
 	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
 	return metadata.NewOutgoingContext(context.Background(), header)
-}
-
-func (p *proxy) detectMimeType(isDir bool, pa string) string {
-	if isDir {
-		return "httpd/unix-directory"
-	}
-	ext := path.Ext(pa)
-	return mime.TypeByExtension(ext)
 }
 
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {

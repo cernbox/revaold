@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"io"
+	"mime"
+	gopath "path"
 )
 
 type key int
@@ -205,4 +207,12 @@ func GetStatus(err error) StatusCode {
 	default:
 		return StatusCode_UNKNOWN
 	}
+}
+
+func DetectMimeType(isDir bool, path string) string {
+	if isDir {
+		return "httpd/unix-directory"
+	}
+	ext := gopath.Ext(path)
+	return mime.TypeByExtension(ext)
 }

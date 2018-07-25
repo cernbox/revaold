@@ -165,18 +165,19 @@ message Metadata {
 	string checksum = 7;
 	string deref_path = 8;
 	bool is_read_only = 9;
-	bytes sys = 10; // sys is for storing arbitrary data
+	string mime = 10;
+	bytes sys = 11; // sys is for storing arbitrary data
 
 	// EOS filesytem extended metadata records
-	string eos_file = 11;
-	string eos_instance = 12;
+	string eos_file = 12;
+	string eos_instance = 13;
 
 	// Share extended metadata records
-	string share_target = 13;
+	string share_target = 14;
 
 	// Migration extended metadata records
-	string mig_id = 14;
-	string mig_path = 15;
+	string mig_id = 15;
+	string mig_path = 16;
 }
 
 message PathReq {
@@ -313,6 +314,7 @@ message PublicLink {
 	uint64 mtime = 7;
 	ItemType item_type = 8;
 	string owner_id = 9;
+	string name = 10;
 
 	enum ItemType {
 		FILE = 0;

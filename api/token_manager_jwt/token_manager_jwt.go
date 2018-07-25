@@ -84,6 +84,14 @@ func (tm *tokenManager) ForgePublicLinkToken(ctx context.Context, pl *api.Public
 	claims := token.Claims.(jwt.MapClaims)
 	claims["token"] = pl.Token
 	claims["owner"] = pl.OwnerId
+	claims["id"] = pl.Id
+	claims["path"] = pl.Path
+	claims["protected"] = pl.Protected
+	claims["expires"] = pl.Expires
+	claims["read_only"] = pl.ReadOnly
+	claims["mtime"] = pl.Mtime
+	claims["item_type"] = pl.ItemType
+	claims["share_name"] = pl.Name
 	claims["exp"] = time.Now().Add(time.Second * time.Duration(3600))
 	tokenString, err := token.SignedString([]byte(tm.signSecret))
 	if err != nil {
@@ -108,6 +116,18 @@ func (tm *tokenManager) DismantlePublicLinkToken(ctx context.Context, token stri
 
 	}
 
+	/*
+		"exp": "2018-07-24T10:11:11.827901148+02:00",
+		"expires": 0,
+		"id": "103",
+		"item_type": 0,
+		"mtime": 1532362779,
+		"owner": "gonzalhu",
+		"path": "oldhome:22510091102060544",
+		"protected": false,
+		"read_only": true,
+		"token": "fgDsc2WD8F2qNfH"
+	*/
 	claims := rawToken.Claims.(jwt.MapClaims)
 	token, ok := claims["token"].(string)
 	if !ok {
@@ -117,10 +137,40 @@ func (tm *tokenManager) DismantlePublicLinkToken(ctx context.Context, token stri
 	if !ok {
 		return nil, errors.New("owner claim is not a string")
 	}
+	readOnly, ok := claims["read_only"].(bool)
+	if !ok {
+		return nil, errors.New("read_only claim is not a bool")
+	}
+	path, ok := claims["path"].(string)
+	if !ok {
+		return nil, errors.New("path claim is not a string")
+	}
+	protected, ok := claims["protected"].(bool)
+	if !ok {
+		return nil, errors.New("protected claim is not a bool")
+	}
+	mtime, ok := claims["mtime"].(float64)
+	if !ok {
+		return nil, errors.New("mtime claim is not a float64")
+	}
+	itemType, ok := claims["item_type"].(float64)
+	if !ok {
+		return nil, errors.New("item_type claim is not a float64")
+	}
+	shareName, ok := claims["share_name"].(string)
+	if !ok {
+		return nil, errors.New("share_name claim is not a string")
+	}
 
 	pl := &api.PublicLink{
-		Token:   token,
-		OwnerId: owner,
+		Token:     token,
+		OwnerId:   owner,
+		ReadOnly:  readOnly,
+		Path:      path,
+		Protected: protected,
+		Mtime:     uint64(mtime),
+		ItemType:  api.PublicLink_ItemType(itemType),
+		Name:      shareName,
 	}
 	return pl, nil
 }

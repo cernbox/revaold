@@ -69,6 +69,10 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
+	// route to get the favorites list
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.getFav)).Methods("REPORT")
+	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.getFav)).Methods("REPORT")
+
 	// public link webdav access
 	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
 	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
@@ -131,6 +135,100 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
 
+}
+
+func (p *proxy) getTagsForKey(ctx context.Context, key string) ([]*reva_api.Tag, error) {
+	gCtx := GetContextWithAuth(ctx)
+	stream, err := p.getTagClient().GetTags(gCtx, &reva_api.TagReq{TagKey: "fav"})
+	if err != nil {
+		return nil, err
+	}
+
+	tags := []*reva_api.Tag{}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+		if res.Status != reva_api.StatusCode_OK {
+			return nil, reva_api.NewError(reva_api.UnknownError)
+		}
+		tags = append(tags, res.Tag)
+	}
+	return tags, nil
+}
+
+func (p *proxy) getFav(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	favs, err := p.getTagsForKey(ctx, "fav")
+	if err != nil {
+		p.logger.Error("error getting favs", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	mds := p.favsToMD(ctx, favs)
+	xmlFavs, err := p.favMDToXML(ctx, mds)
+	if err != nil {
+		p.logger.Error("error converting fav map to xml", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusMultiStatus)
+	w.Write(xmlFavs)
+}
+
+func (p *proxy) favsToMD(ctx context.Context, tags []*reva_api.Tag) []*reva_api.Metadata {
+	mds := []*reva_api.Metadata{}
+	for _, tag := range tags {
+		fileid := tag.FileIdPrefix + ":" + tag.FileId
+		md, err := p.getMetadata(ctx, fileid)
+		if err != nil {
+			// TODO(labkode): mark non accessible tags as orphans
+			p.logger.Warn("fav is not accessible", zap.Error(err))
+			continue
+		}
+		mds = append(mds, md)
+	}
+
+	return mds
+}
+
+func (p *proxy) favMDToXML(ctx context.Context, mds []*reva_api.Metadata) ([]byte, error) {
+	responses := []*responseXML{}
+
+	for _, md := range mds {
+		favProp := p.getFavXMLProp()
+		res, err := p.mdToPropResponse(ctx, md, favProp)
+		if err != nil {
+			p.logger.Error("error converting tag md to xml", zap.Error(err))
+			continue
+		}
+		responses = append(responses, res)
+	}
+
+	responsesXML, err := xml.Marshal(&responses)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := `<?xml version="1.0" encoding="utf-8"?><d:multistatus xmlns:d="DAV:" `
+	msg += `xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns">`
+	msg += string(responsesXML) + `</d:multistatus>`
+	return []byte(msg), nil
+}
+
+func (p *proxy) getFavXMLProp() propertyXML {
+	prop := propertyXML{
+		xml.Name{Space: "", Local: "oc:favorite"},
+		"", []byte("1")}
+	return prop
 }
 
 func (p *proxy) getExternalShares(w http.ResponseWriter, r *http.Request) {
@@ -418,6 +516,14 @@ func (p *proxy) getConn() (*grpc.ClientConn, error) {
 	}
 	globalConn = conn
 	return conn, nil
+}
+
+func (p *proxy) getTagClient() reva_api.TaggerClient {
+	conn, err := p.getConn()
+	if err != nil {
+		panic(err)
+	}
+	return reva_api.NewTaggerClient(conn)
 }
 func (p *proxy) getStorageClient() reva_api.StorageClient {
 	conn, err := p.getConn()
@@ -4690,7 +4796,7 @@ func (p *proxy) mdsToXML(ctx context.Context, mds []*reva_api.Metadata) (string,
 	return msg, nil
 }
 
-func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata) (*responseXML, error) {
+func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, props ...propertyXML) (*responseXML, error) {
 	propList := []propertyXML{}
 
 	getETag := propertyXML{
@@ -4759,6 +4865,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata) (*r
 
 	propList = append(propList, getResourceType, getContentLegnth, getContentType, getLastModified, // general WebDAV properties
 		getETag /*quotaAvailableBytes, quotaUsedBytes,*/, ocID, ocDownloadURL, ocDC, ocPermissions) // properties needed by ownCloud
+	propList = append(propList, props...)
 
 	// PropStat, only HTTP/1.1 200 is sent.
 	propStatList := []propstatXML{}

@@ -33,6 +33,10 @@ service Storage {
 	rpc GetQuota(QuotaReq) returns (QuotaResponse) {}
 }
 
+service Tagger {
+	rpc GetTags(TagReq) returns (stream TagResponse) {}
+}
+
 service Share {
 	// with user context, relative to the user logged in
 	rpc CreatePublicLink(NewLinkReq) returns (PublicLinkResponse) {}
@@ -56,6 +60,31 @@ service Share {
 
 service Preview {
 	rpc ReadPreview(PathReq) returns (stream DataChunkResponse) {}
+}
+
+message TagReq {
+	string TagKey = 1;
+}
+
+message Tag {
+	int64 id = 1;
+	ItemType item_type = 2;
+	string uid = 3;
+	string file_id_prefix = 4;
+	string file_id = 5;
+	string tag_key = 6;
+	string tag_value = 7;
+	
+	enum ItemType {
+		FOLDER = 0;
+		FILE = 1;
+	}
+}
+
+message TagResponse {
+	StatusCode status = 1;
+	Tag tag = 2;
+
 }
 
 message IsPublicLinkProtectedResponse {

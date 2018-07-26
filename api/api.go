@@ -128,6 +128,10 @@ type PublicLinkOptions struct {
 	UpdateExpiration bool
 }
 
+type TagManager interface {
+	GetTagsForKey(ctx context.Context, key string) ([]*Tag, error)
+}
+
 type PublicLinkManager interface {
 	CreatePublicLink(ctx context.Context, path string, opt *PublicLinkOptions) (*PublicLink, error)
 	UpdatePublicLink(ctx context.Context, id string, opt *PublicLinkOptions) (*PublicLink, error)

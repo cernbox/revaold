@@ -25,6 +25,7 @@ import (
 	"github.com/cernbox/reva/api/storage_share"
 	"github.com/cernbox/reva/api/storage_usermigration"
 	"github.com/cernbox/reva/api/storage_wrapper_home"
+	"github.com/cernbox/reva/api/tag_manager_db"
 	"github.com/cernbox/reva/api/token_manager_jwt"
 	"github.com/cernbox/reva/api/user_manager_cboxgroupd"
 	"github.com/cernbox/reva/api/virtual_storage"
@@ -33,6 +34,7 @@ import (
 	"github.com/cernbox/reva/revad/svcs/previewsvc"
 	"github.com/cernbox/reva/revad/svcs/sharesvc"
 	"github.com/cernbox/reva/revad/svcs/storagesvc"
+	"github.com/cernbox/reva/revad/svcs/taggersvc"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
@@ -70,15 +72,21 @@ func main() {
 	gc.Add("user-manager-cboxgroupd-secret", "bar", "Secret to talk to the CERNBox Group Daemon")
 
 	gc.Add("token-manager", "jwt", "Implementation to use for the token manager")
-	gc.Add("public-link-manager", "owncloud", "Implementation to use for the public link manager")
-
 	gc.Add("token-manager-jwt-secret", "bar", "Secret to sign JWT tokens.")
 
+	gc.Add("public-link-manager", "owncloud", "Implementation to use for the public link manager")
 	gc.Add("public-link-manager-owncloud-db-username", "foo", "Username to access the owncloud database.")
 	gc.Add("public-link-manager-owncloud-db-password", "bar", "Password to access the owncloud database.")
 	gc.Add("public-link-manager-owncloud-db-hostname", "localhost", "Host where to access the owncloud database.")
 	gc.Add("public-link-manager-owncloud-db-port", 3306, "Port where to access the owncloud database.")
 	gc.Add("public-link-manager-owncloud-db-name", "owncloud", "Name of the owncloud database.")
+
+	gc.Add("tag-manager", "db", "Implementation to use for the tag manager")
+	gc.Add("tag-manager-db-username", "foo", "Username to access the  database.")
+	gc.Add("tag-manager-db-password", "bar", "Password to access the  database.")
+	gc.Add("tag-manager-db-hostname", "localhost", "Host where to access the  database.")
+	gc.Add("tag-manager-db-port", 3306, "Port where to access the  database.")
+	gc.Add("tag-manager-db-name", "", "Name of the  database.")
 
 	gc.Add("redis-tcp-address", "localhost:6379", "redis tcp address")
 	gc.Add("redis-read-timeout", 3, "timeout for socket reads. If reached, commands will fail with a timeout instead of blocking. Zero means default.")
@@ -191,6 +199,7 @@ func main() {
 
 	tokenManager := token_manager_jwt.New(gc.GetString("token-manager-jwt-secret"))
 	authManager := auth_manager_nop.New()
+	tagManager := tag_manager_db.New(gc.GetString("tag-manager-db-username"), gc.GetString("tag-manager-db-password"), gc.GetString("tag-manager-db-hostname"), gc.GetInt("tag-manager-db-port"), gc.GetString("tag-manager-db-name"), vs)
 	server := grpc.NewServer(
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 			grpc_ctxtags.StreamServerInterceptor(),
@@ -218,6 +227,7 @@ func main() {
 	api.RegisterStorageServer(server, storagesvc.New(vs))
 	api.RegisterShareServer(server, sharesvc.New(publicLinkManager, shareManager))
 	api.RegisterPreviewServer(server, previewsvc.New())
+	api.RegisterTaggerServer(server, taggersvc.New(tagManager))
 
 	logger.Info("listening for grpc connecitons on: " + gc.GetString("tcp-address"))
 	lis, err := net.Listen("tcp", gc.GetString("tcp-address"))

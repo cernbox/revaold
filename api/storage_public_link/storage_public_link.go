@@ -129,7 +129,7 @@ func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata
 
 	md.IsReadOnly = linkMetadata.IsReadOnly
 	md.Path = path.Join("/", link.Token, strings.TrimPrefix(md.Path, linkMetadata.Path))
-	md.Id = link.Token // no id for this storage
+	md.Id = link.Token
 	return md, nil
 }
 

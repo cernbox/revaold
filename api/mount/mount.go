@@ -19,6 +19,10 @@ func New(mountID, mountPoint string, opts *api.MountOptions, s api.Storage) api.
 		mountPoint = strings.TrimSuffix(mountPoint, "/")
 	}
 
+	if opts == nil {
+		opts = &api.MountOptions{}
+	}
+
 	m := &mount{storage: s,
 		mountPoint:   mountPoint,
 		mountOptions: opts,

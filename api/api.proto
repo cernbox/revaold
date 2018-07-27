@@ -35,6 +35,8 @@ service Storage {
 
 service Tagger {
 	rpc GetTags(TagReq) returns (stream TagResponse) {}
+	rpc SetTag(TagReq) returns (EmptyResponse) {}
+	rpc UnSetTag(TagReq) returns (EmptyResponse) {}
 }
 
 service Share {
@@ -63,7 +65,9 @@ service Preview {
 }
 
 message TagReq {
-	string TagKey = 1;
+	string tag_key = 1;
+	string tag_val = 2;
+	string path = 3;
 }
 
 message Tag {

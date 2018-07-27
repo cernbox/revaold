@@ -69,9 +69,10 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
-	// route to get the favorites list
+	// favorites routes
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.getFav)).Methods("REPORT")
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.getFav)).Methods("REPORT")
+	p.router.HandleFunc("/index.php/apps/files/api/v1/files/{path:.*}", p.tokenAuth(p.modifyFav)).Methods("POST")
 
 	// public link webdav access
 	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
@@ -135,6 +136,85 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
 
+}
+
+func (p *proxy) modifyFav(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	body, err := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		p.logger.Error("error reading r.Body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	path := mux.Vars(r)["path"]
+	favSet, err := p.isFavSet(ctx, body)
+	if err != nil {
+		p.logger.Error("cannot infer is operation was to add or remove fav", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if favSet {
+		if err := p.setTag(ctx, "fav", path); err != nil {
+			p.logger.Error("error setting tag for path", zap.String("path", path), zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		// write back body req as reponse
+		w.Write(body)
+		return
+	}
+
+	// operation is to remove the tag
+	if err := p.unSetTag(ctx, "fav", path); err != nil {
+		p.logger.Error("error unsetting tag for path", zap.String("path", path), zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	// write back body req as reponse
+	w.Write(body)
+}
+
+type setTagReq struct {
+	Tags []string `json:"tags"`
+}
+
+func (p *proxy) isFavSet(ctx context.Context, body []byte) (bool, error) {
+	s := &setTagReq{}
+	if err := json.Unmarshal(body, s); err != nil {
+		return false, err
+	}
+	return len(s.Tags) > 0, nil
+}
+
+func (p *proxy) setTag(ctx context.Context, key, path string) error {
+	revaPath := p.getRevaPath(ctx, path)
+	req := &reva_api.TagReq{TagKey: key, Path: revaPath}
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getTagClient().SetTag(gCtx, req)
+	if err != nil {
+		return err
+	}
+	if res.Status != reva_api.StatusCode_OK {
+		return reva_api.NewError(reva_api.UnknownError)
+	}
+	return nil
+}
+
+func (p *proxy) unSetTag(ctx context.Context, key, path string) error {
+	revaPath := p.getRevaPath(ctx, path)
+	req := &reva_api.TagReq{TagKey: key, Path: revaPath}
+	gCtx := GetContextWithAuth(ctx)
+	res, err := p.getTagClient().UnSetTag(gCtx, req)
+	if err != nil {
+		return err
+	}
+	if res.Status != reva_api.StatusCode_OK {
+		return reva_api.NewError(reva_api.UnknownError)
+	}
+	return nil
 }
 
 func (p *proxy) getTagsForKey(ctx context.Context, key string) ([]*reva_api.Tag, error) {

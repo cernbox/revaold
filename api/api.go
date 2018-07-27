@@ -130,6 +130,8 @@ type PublicLinkOptions struct {
 
 type TagManager interface {
 	GetTagsForKey(ctx context.Context, key string) ([]*Tag, error)
+	SetTag(ctx context.Context, key, val, path string) error
+	UnSetTag(ctx context.Context, key, val, path string) error
 }
 
 type PublicLinkManager interface {

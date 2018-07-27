@@ -4,6 +4,7 @@ import (
 	"github.com/cernbox/reva/api"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
+	"golang.org/x/net/context"
 )
 
 func New(tm api.TagManager) api.TaggerServer {
@@ -30,4 +31,22 @@ func (s *svc) GetTags(req *api.TagReq, stream api.Tagger_GetTagsServer) error {
 		}
 	}
 	return nil
+}
+
+func (s *svc) SetTag(ctx context.Context, req *api.TagReq) (*api.EmptyResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	if err := s.tm.SetTag(ctx, req.TagKey, req.TagVal, req.Path); err != nil {
+		l.Error("error setting tag", zap.String("key", req.TagKey), zap.String("val", req.TagVal), zap.String("path", req.Path), zap.Error(err))
+		return &api.EmptyResponse{Status: api.StatusCode_UNKNOWN}, nil
+	}
+	return &api.EmptyResponse{}, nil
+}
+
+func (s *svc) UnSetTag(ctx context.Context, req *api.TagReq) (*api.EmptyResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	if err := s.tm.UnSetTag(ctx, req.TagKey, req.TagVal, req.Path); err != nil {
+		l.Error("error unsetting tag", zap.String("key", req.TagKey), zap.String("val", req.TagVal), zap.String("path", req.Path), zap.Error(err))
+		return &api.EmptyResponse{Status: api.StatusCode_UNKNOWN}, nil
+	}
+	return &api.EmptyResponse{}, nil
 }

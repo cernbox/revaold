@@ -392,6 +392,7 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.EmptyResp
 		l.Error("")
 		return nil, err
 	}
+
 	if err := s.vs.Upload(ctx, req.Path, fd); err != nil {
 		return nil, err
 	}

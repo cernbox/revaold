@@ -35,21 +35,42 @@ func New(opt *Options) api.UserManager {
 	}
 
 	opt.init()
-	return &userManager{logger: opt.Logger, cboxGroupDaemonSecret: opt.CBOXGroupDaemonSecret, cboxGroupDaemonURI: opt.CBOXGroupDaemonURI}
+	tr := &http.Transport{
+		//	DisableKeepAlives:   opts.DisableKeepAlives,
+		//IdleConnTimeout:     time.Duration(opts.IdleConnTimeout) * time.Second,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		//TLSClientConfig:     &tls.Config{InsecureSkipVerify: opts.InsecureSkipVerify},
+		//DisableCompression:  opts.DisableCompression,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	return &userManager{logger: opt.Logger, cboxGroupDaemonSecret: opt.CBOXGroupDaemonSecret, cboxGroupDaemonURI: opt.CBOXGroupDaemonURI, tr: tr}
 }
 
 type userManager struct {
 	cboxGroupDaemonURI    string
 	cboxGroupDaemonSecret string
 	logger                *zap.Logger
+	tr                    *http.Transport
+}
+
+func (um *userManager) IsInGroup(ctx context.Context, username, group string) (bool, error) {
+	groups, err := um.GetUserGroups(ctx, username)
+	if err != nil {
+		return false, err
+	}
+	for _, g := range groups {
+		if g == group {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (um *userManager) GetUserGroups(ctx context.Context, username string) ([]string, error) {
 	groups := []string{}
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{Transport: um.tr}
 	url := fmt.Sprintf("%s/api/v1/membership/usergroups/%s", um.cboxGroupDaemonURI, username)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

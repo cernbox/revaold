@@ -70,6 +70,7 @@ func (fs *shareStorage) getReceivedShareMetadata(ctx context.Context, share *api
 	}
 	finfo.IsReadOnly = share.ReadOnly
 	finfo.ShareTarget = share.Target
+	finfo.IsShareable = false // TODO(labkode): add re-shares
 	return finfo, nil
 }
 
@@ -117,6 +118,7 @@ func (fs *shareStorage) GetMetadata(ctx context.Context, p string) (*api.Metadat
 	md.Path = path.Join("/", share.Id, strings.TrimPrefix(md.Path, shareMetadata.Path))
 	md.Id = share.Id
 	md.ShareTarget = shareMetadata.ShareTarget
+	md.IsShareable = shareMetadata.IsShareable
 	return md, nil
 }
 
@@ -169,6 +171,7 @@ func (fs *shareStorage) ListFolder(ctx context.Context, name string) ([]*api.Met
 		md.Id = p
 		md.ShareTarget = shareMetadata.ShareTarget
 		md.IsReadOnly = shareMetadata.IsReadOnly
+		md.IsShareable = shareMetadata.IsShareable
 		fs.logger.Debug("children entry", zap.String("childpath", md.Path), zap.String("originalchildmd.path", originalPath), zap.String("childmd.path", md.Path), zap.String("parentmd.path", shareMetadata.Path), zap.String("strings", strings.TrimPrefix(originalPath, shareMetadata.Path)))
 	}
 

@@ -136,6 +136,122 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_sharing/api/externalShares", p.tokenAuth(p.getExternalShares)).Methods("GET")
 
+	// project spaces
+	p.router.HandleFunc("/index.php/apps/files_projectspaces/ajax/personal_list.php", p.tokenAuth(p.getPersonalProjects)).Methods("GET")
+
+}
+
+func (p *proxy) listFolder(ctx context.Context, revaPath string) ([]*reva_api.Metadata, error) {
+	gCtx := GetContextWithAuth(ctx)
+	gReq := &reva_api.PathReq{Path: revaPath}
+	stream, err := p.getStorageClient().ListFolder(gCtx, gReq)
+	if err != nil {
+		return nil, err
+	}
+
+	mds := []*reva_api.Metadata{}
+	for {
+		mdRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if mdRes.Status != reva_api.StatusCode_OK {
+			return nil, reva_api.NewError(reva_api.UnknownError)
+		}
+		md := mdRes.Metadata
+		md.Path = p.getOCPath(ctx, md)
+		mds = append(mds, md)
+	}
+	return mds, nil
+}
+
+/*
+{
+   "data":{
+      "directory":"\/",
+      "files":[
+         {
+            "fileid":28159344,
+            "mtime":1510656728,
+            "size":"753647901797",
+            "storage_mtime":1510656728,
+            "path":"",
+            "path_hash":"8f7ff74eee5bdf3c31fd480311dde3fb",
+            "parent":12343478,
+            "encrypted":0,
+            "unencrypted_size":0,
+            "name":"  project castor",
+            "mimetype":"httpd\/unix-directory",
+            "permissions":31,
+            "project_owner":"castorc3",
+            "project_name":"castor",
+            "project_readers":"cernbox-project-castor-readers",
+            "project_writers":"cernbox-project-castor-writers",
+            "project_admins":"cernbox-project-castor-admins",
+            "custom_perm":1,
+            "isPreviewAvailable":false,
+            "type":"dir"
+         },
+      ],
+      "permissions":1
+   },
+   "status":"success"
+}
+*/
+type personalProjectsRes struct {
+	Data   interface{} `json:"data"`
+	Status string      `json:"status"`
+}
+type personalProjectsData struct {
+	Directory   string          `json:"directory"`
+	Permissions int             `json:"permissions"`
+	Files       []*fileResponse `json:"files"`
+}
+type fileResponse struct {
+	Type        string `json:"type"`
+	CustomPerm  int    `json:"custom_perm"`
+	FileID      string `json:"fileid"`
+	Mtime       uint64 `json:"mtime"`
+	Size        uint64 `json:"size"`
+	Name        string `json:"name"`
+	MimeType    string `json:"mimetype"`
+	Permissions int    `json:"permissions"`
+	Path        string `json:"path"`
+}
+
+func (p *proxy) mdsToPersonalProjectsRes(ctx context.Context, mds []*reva_api.Metadata) *personalProjectsRes {
+	files := []*fileResponse{}
+	for _, md := range mds {
+		file := &fileResponse{FileID: md.Id, Mtime: md.Mtime, Size: md.Size, Name: path.Base(md.Path), MimeType: md.Mime, Permissions: 1, Path: path.Dir(md.Path), Type: "dir", CustomPerm: 1}
+		files = append(files, file)
+	}
+	data := &personalProjectsData{Directory: "/", Permissions: 1, Files: files}
+	res := &personalProjectsRes{Data: data, Status: "success"}
+	return res
+}
+func (p *proxy) getPersonalProjects(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	path := p.ownCloudPersonalProjectsPrefix
+	revaPath := p.getRevaPath(ctx, path)
+	mds, err := p.listFolder(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("error listing folder", zap.String("path", path), zap.String("reva_path", revaPath), zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	projects := p.mdsToPersonalProjectsRes(ctx, mds)
+	data, err := json.Marshal(projects)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error json marshaling personal projects response", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
 }
 
 func (p *proxy) modifyFav(w http.ResponseWriter, r *http.Request) {
@@ -478,6 +594,9 @@ type Options struct {
 	OwnCloudPublicLinkPrefix string
 	RevaPublicLinkPrefix     string
 
+	OwnCloudPersonalProjectsPrefix string
+	RevaPersonalProjectsPrefix     string
+
 	CBOXGroupDaemonURI    string
 	CBOXGroupDaemonSecret string
 }
@@ -509,6 +628,14 @@ func (opt *Options) init() {
 
 	if opt.RevaPublicLinkPrefix == "" {
 		opt.RevaPublicLinkPrefix = "/public-links"
+	}
+
+	if opt.OwnCloudPersonalProjectsPrefix == "" {
+		opt.OwnCloudPersonalProjectsPrefix = "/__myprojects"
+	}
+
+	if opt.RevaPersonalProjectsPrefix == "" {
+		opt.RevaPersonalProjectsPrefix = "/projects"
 	}
 
 }
@@ -549,6 +676,9 @@ func New(opt *Options) (http.Handler, error) {
 		ownCloudPublicLinkPrefix: opt.OwnCloudPublicLinkPrefix,
 		revaPublicLinkPrefix:     opt.RevaPublicLinkPrefix,
 
+		ownCloudPersonalProjectsPrefix: opt.OwnCloudPersonalProjectsPrefix,
+		revaPersonalProjectsPrefix:     opt.RevaPersonalProjectsPrefix,
+
 		chunksFolder:    opt.ChunksFolder,
 		temporaryFolder: opt.TemporaryFolder,
 	}
@@ -576,6 +706,9 @@ type proxy struct {
 
 	ownCloudPublicLinkPrefix string
 	revaPublicLinkPrefix     string
+
+	ownCloudPersonalProjectsPrefix string
+	revaPersonalProjectsPrefix     string
 
 	cboxGroupDaemonURI    string
 	cboxGroupDaemonSecret string
@@ -2018,7 +2151,7 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 		FileContents: string(fileContents),
 		MTime:        int(md.Mtime),
 		Mime:         md.Mime,
-		Writable:     true,
+		Writable:     !md.IsReadOnly,
 	}
 
 	encoded, err := json.Marshal(res)
@@ -4319,7 +4452,7 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 	}
 	modifiedMd := modifiedMdRes.Metadata
 
-	w.Header().Add("Content-Type", md.Mime)
+	w.Header().Add("Content-Type", modifiedMd.Mime)
 	w.Header().Set("ETag", modifiedMd.Etag)
 	w.Header().Set("OC-FileId", modifiedMd.Id)
 	w.Header().Set("OC-ETag", modifiedMd.Etag)
@@ -4883,10 +5016,14 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 		xml.Name{Space: "", Local: "d:getetag"},
 		"", []byte(md.Etag)}
 
+	// See https://github.com/owncloud/core/issues/8322
 	perm := ""
 	if !md.IsReadOnly {
-		perm = "RWCKDNV"
+		perm = "WCKDNV"
 
+	}
+	if md.IsShareable {
+		perm += "R"
 	}
 	ocPermissions := propertyXML{xml.Name{Space: "", Local: "oc:permissions"},
 		"", []byte(perm)}
@@ -5183,6 +5320,10 @@ func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
 			}
 
 			revaPath = path.Join(p.revaSharePrefix, revaPath)
+		} else if strings.HasPrefix(ocPath, p.ownCloudPersonalProjectsPrefix) {
+			revaPath = strings.TrimPrefix(ocPath, p.ownCloudPersonalProjectsPrefix)
+			revaPath = path.Join(p.revaPersonalProjectsPrefix, revaPath)
+
 		} else {
 			// apply home default
 			revaPath = strings.TrimPrefix(ocPath, p.ownCloudHomePrefix)
@@ -5233,6 +5374,9 @@ func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 			if strings.HasPrefix(revaPath, p.revaHomePrefix) {
 				ocPath = strings.TrimPrefix(revaPath, p.revaHomePrefix)
 				ocPath = path.Join(p.ownCloudHomePrefix, ocPath)
+			} else if strings.HasPrefix(revaPath, p.revaPersonalProjectsPrefix) {
+				ocPath = strings.TrimPrefix(revaPath, p.revaPersonalProjectsPrefix)
+				ocPath = path.Join(p.ownCloudPersonalProjectsPrefix, ocPath)
 			} else {
 				// migration logic, strip /oldhome or /eoshome-l from reva path
 				ocPath = strings.Trim(revaPath, "/")

@@ -40,6 +40,9 @@ const (
 
 	TokenInvalidErrorCode ErrorCode = "TOKEN_INVALID"
 
+	// ProjectNotFoundErrorCode is used when a resource is not found.
+	ProjectNotFoundErrorCode ErrorCode = "PROJECT_NOT_FOUND"
+
 	UnknownError ErrorCode = "UNKNOWN"
 )
 

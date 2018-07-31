@@ -86,6 +86,7 @@ func (fs *linkStorage) getLinkMetadata(ctx context.Context, link *api.PublicLink
 		return nil, err
 	}
 	finfo.IsReadOnly = link.ReadOnly
+	finfo.IsShareable = false // TODO(labkode: add re-shares
 	return finfo, nil
 }
 
@@ -130,6 +131,7 @@ func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata
 	md.IsReadOnly = linkMetadata.IsReadOnly
 	md.Path = path.Join("/", link.Token, strings.TrimPrefix(md.Path, linkMetadata.Path))
 	md.Id = link.Token
+	md.IsShareable = linkMetadata.IsShareable
 	return md, nil
 }
 
@@ -180,6 +182,7 @@ func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Meta
 		md.Path = path.Join("/", p)
 		md.IsReadOnly = linkMetadata.IsReadOnly
 		md.Id = p
+		md.IsShareable = linkMetadata.IsShareable
 		fs.logger.Debug("children entry", zap.String("childpath", md.Path), zap.String("originalchildmd.path", originalPath), zap.String("childmd.path", md.Path), zap.String("parentmd.path", linkMetadata.Path), zap.String("strings", strings.TrimPrefix(originalPath, linkMetadata.Path)))
 	}
 

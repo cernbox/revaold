@@ -56,7 +56,7 @@ func New(opt *Options) (api.Storage, error) {
 }
 
 func (fs *eosStorage) GetPathByID(ctx context.Context, id string) (string, error) {
-	return id, nil
+	//return id, nil
 	// we don't support access by fileid on this storage
 	return "", api.NewError(api.StorageNotSupportedErrorCode)
 }

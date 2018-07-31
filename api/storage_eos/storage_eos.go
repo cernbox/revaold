@@ -396,5 +396,6 @@ func (fs *eosStorage) convertToMetadata(eosFileInfo *eosclient.FileInfo) *api.Me
 	finfo.EosFile = eosFileInfo.File
 	finfo.EosInstance = eosFileInfo.Instance
 	finfo.Mime = api.DetectMimeType(finfo.IsDir, finfo.Path)
+	finfo.IsShareable = true
 	return finfo
 }

@@ -43,6 +43,10 @@ func (m *mount) isReadOnly() bool {
 	return m.mountOptions.ReadOnly
 }
 
+func (m *mount) isSharingDisabled() bool {
+	return m.mountOptions.SharingDisabled
+}
+
 func (m *mount) GetMountPoint() string              { return m.mountPoint }
 func (m *mount) GetMountPointId() string            { return m.mountPointId }
 func (m *mount) GetMountOptions() *api.MountOptions { return m.mountOptions }
@@ -72,6 +76,9 @@ func (m *mount) SetACL(ctx context.Context, path string, readOnly bool, recipien
 	if m.isReadOnly() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
 	}
+	if m.isSharingDisabled() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	}
 	p, _, err := m.getInternalPath(ctx, path)
 	if err != nil {
 		return err
@@ -83,6 +90,9 @@ func (m *mount) UpdateACL(ctx context.Context, path string, readOnly bool, recip
 	if m.isReadOnly() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
 	}
+	if m.isSharingDisabled() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	}
 	p, _, err := m.getInternalPath(ctx, path)
 	if err != nil {
 		return err
@@ -92,6 +102,9 @@ func (m *mount) UpdateACL(ctx context.Context, path string, readOnly bool, recip
 
 func (m *mount) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
 	if m.isReadOnly() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	}
+	if m.isSharingDisabled() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
 	}
 	p, _, err := m.getInternalPath(ctx, path)
@@ -155,6 +168,10 @@ func (m *mount) GetMetadata(ctx context.Context, p string) (*api.Metadata, error
 	fi.Path = path.Join(mountPrefix, internalPath)
 	l.Debug("path conversion: internal => external", zap.String("external", fi.Path), zap.String("internal", internalPath))
 	fi.Id = m.GetMountPointId() + fi.Id
+	fi.IsReadOnly = m.isReadOnly()
+	if fi.IsShareable {
+		fi.IsShareable = !(m.isReadOnly() || m.isSharingDisabled())
+	}
 	return fi, nil
 }
 
@@ -181,6 +198,10 @@ func (m *mount) ListFolder(ctx context.Context, p string) ([]*api.Metadata, erro
 		f.Path = path.Join(mountPrefix, internalPath)
 		l.Debug("path conversion: internal => external", zap.String("external", f.Path), zap.String("internal", internalPath))
 		f.Id = m.GetMountPointId() + f.Id
+		f.IsReadOnly = m.isReadOnly()
+		if f.IsShareable {
+			f.IsShareable = !(m.isReadOnly() || m.isSharingDisabled())
+		}
 	}
 
 	return finfos, nil

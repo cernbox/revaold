@@ -53,7 +53,8 @@ func ContextSetPublicLink(ctx context.Context, pl *PublicLink) context.Context {
 }
 
 type MountOptions struct {
-	ReadOnly bool `json:"read_only"`
+	ReadOnly        bool `json:"read_only"`
+	SharingDisabled bool `json:"sharing_disabled"`
 }
 
 // Mount contains the information about a mount.
@@ -164,8 +165,22 @@ type ShareManager interface {
 	*/
 }
 
+type Project struct {
+	Name         string
+	Path         string
+	Owner        string
+	AdminGroup   string
+	ReadersGroup string
+	WritersGroup string
+}
+
+type ProjectManager interface {
+	GetAllProjects(ctx context.Context) ([]*Project, error)
+	GetProject(ctx context.Context, name string) (*Project, error)
+}
 type UserManager interface {
 	GetUserGroups(ctx context.Context, username string) ([]string, error)
+	IsInGroup(ctx context.Context, username, group string) (bool, error)
 }
 type AuthManager interface {
 	Authenticate(ctx context.Context, clientID, clientPassword string) (*User, error)

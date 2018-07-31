@@ -4,7 +4,7 @@
 
 Name: revad
 Summary: REVA gRCP server
-Version: 0.0.1
+Version: 0.0.2
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,5 +54,7 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue Jul 31 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.2
+- Sharing, Favourites and Project space support
 * Tue Jul 03 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.1
 - First version

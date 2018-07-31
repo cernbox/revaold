@@ -117,6 +117,12 @@ func (sm *shareManager) UpdateFolderShare(ctx context.Context, id string, update
 		return nil, err
 	}
 
+	md, err := sm.vfs.GetMetadata(ctx, share.Path)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
 	stmtString := "update oc_share set "
 	stmtPairs := map[string]interface{}{}
 
@@ -161,6 +167,20 @@ func (sm *shareManager) UpdateFolderShare(ctx context.Context, id string, update
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
+
+	//  update acl on the storage
+	err = sm.vfs.SetACL(ctx, md.Path, share.ReadOnly, share.Recipient, []*api.FolderShare{})
+	if err != nil {
+		l.Error("error setting acl on storage, rollbacking operation", zap.Error(err))
+		err2 := sm.Unshare(ctx, share.Id)
+		if err2 != nil {
+			l.Error("cannot remove non commited share, fix manually", zap.Error(err2), zap.String("share_id", share.Id))
+			return nil, err2
+		}
+		return nil, err
+	}
+
+	l.Info("share commited on storage acl", zap.String("share_id", share.Id))
 	return share, nil
 }
 func (sm *shareManager) Unshare(ctx context.Context, id string) error {

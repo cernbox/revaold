@@ -2317,6 +2317,7 @@ func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly boo
 	}
 
 	publicLink := publicLinkRes.PublicLink
+	fmt.Println("public link created", publicLink)
 	ocsShare, err := p.publicLinkToOCSShare(ctx, publicLink)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -2784,6 +2785,7 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 
 	md, err := p.getMetadata(ctx, pl.Path)
 	if err != nil {
+		p.logger.Error("error getting the metadata for pl path: "+pl.Path, zap.Error(err))
 		return nil, err
 	}
 
@@ -3063,18 +3065,36 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
 	shareID := mux.Vars(r)["share_id"]
-	res, err := p.getShareClient().RevokePublicLink(gCtx, &reva_api.ShareIDReq{Id: shareID})
+
+	found, err := p.isPublicLinkShare(ctx, shareID)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	if found {
+	}
 
-	if res.Status != reva_api.StatusCode_OK {
-		p.writeError(res.Status, w, r)
+	found, err = p.isFolderShare(ctx, shareID)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	if found {
+		res, err := p.getShareClient().UnshareFolder(gCtx, &reva_api.UnshareFolderReq{Id: shareID})
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if res.Status != reva_api.StatusCode_OK {
+			p.writeError(res.Status, w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 func (p *proxy) isPublicLinkShare(ctx context.Context, shareID string) (bool, error) {
@@ -4992,6 +5012,7 @@ func getChunkBLOBInfo(path string) (*chunkBLOBInfo, error) {
 func (p *proxy) mdsToXML(ctx context.Context, mds []*reva_api.Metadata) (string, error) {
 	responses := []*responseXML{}
 	for _, md := range mds {
+		fmt.Println("metadata record", md)
 		res, err := p.mdToPropResponse(ctx, md)
 		if err != nil {
 			return "", err

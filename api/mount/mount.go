@@ -168,9 +168,11 @@ func (m *mount) GetMetadata(ctx context.Context, p string) (*api.Metadata, error
 	fi.Path = path.Join(mountPrefix, internalPath)
 	l.Debug("path conversion: internal => external", zap.String("external", fi.Path), zap.String("internal", internalPath))
 	fi.Id = m.GetMountPointId() + fi.Id
-	fi.IsReadOnly = m.isReadOnly()
+	if !fi.IsReadOnly {
+		fi.IsReadOnly = m.isReadOnly()
+	}
 	if fi.IsShareable {
-		fi.IsShareable = !(m.isReadOnly() || m.isSharingDisabled())
+		//fi.IsShareable = !(m.isReadOnly() || m.isSharingDisabled())
 	}
 	return fi, nil
 }
@@ -201,6 +203,9 @@ func (m *mount) ListFolder(ctx context.Context, p string) ([]*api.Metadata, erro
 		f.IsReadOnly = m.isReadOnly()
 		if f.IsShareable {
 			f.IsShareable = !(m.isReadOnly() || m.isSharingDisabled())
+		}
+		if !f.IsReadOnly {
+			f.IsReadOnly = m.isReadOnly()
 		}
 	}
 

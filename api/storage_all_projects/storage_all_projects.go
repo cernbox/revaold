@@ -51,24 +51,60 @@ func (fs *allProjectsStorage) getProject(ctx context.Context, name string) (*api
 }
 
 func (fs *allProjectsStorage) GetPathByID(ctx context.Context, id string) (string, error) {
-	/*
-		path := "/" + id
-		_, _, err := fs.getProject(ctx, path)
-		if err != nil {
-			return "", err
+	id = "oldproject:" + id
+	eosPath, err := fs.vs.GetPathByID(ctx, id)
+	if err != nil {
+		fs.logger.Error("error getting path from id", zap.Error(err))
+		return "", err
+
+	}
+
+	right := strings.Trim(strings.TrimPrefix(eosPath, "/eos/project/"), "/") // csc or c/cbox or csc/Docs or c/cbox/Docs
+	tokens := strings.Split(right, "/")
+
+	fmt.Printf("tokens: %+v\n", tokens)
+	var projectName string
+	var relPath string
+	if len(tokens) >= 1 {
+		if len(tokens[0]) == 1 { // c/cernbox
+			projectName = tokens[1]
+			if len(tokens) > 2 {
+				relPath = path.Join(tokens[2:]...)
+			}
+		} else {
+			projectName = tokens[0] // csc
+			if len(tokens) > 1 {
+				relPath = path.Join(tokens[1:]...)
+			}
 		}
-		return path, nil
-	*/
-	return "", api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+
+	path := path.Join("/", projectName, relPath)
+	return path, nil
 }
 
 type accessLevel int
 
+func (al accessLevel) String() string {
+	switch al {
+	case 0:
+		return "nothing"
+	case 1:
+		return "reader"
+	case 2:
+		return "writer"
+	case 3:
+		return "admin"
+	default:
+		return "unknown"
+	}
+}
+
 const (
-	accessLevelAdmin accessLevel = iota
-	accessLevelWrite
-	accessLevelRead
-	accessLevelNothing
+	accessLevelNothing accessLevel = 0
+	accessLevelRead    accessLevel = 1
+	accessLevelWrite   accessLevel = 2
+	accessLevelAdmin   accessLevel = 3
 )
 
 func (fs *allProjectsStorage) getProjectAccess(ctx context.Context, user string, project *api.Project) accessLevel {
@@ -79,26 +115,31 @@ func (fs *allProjectsStorage) getProjectAccess(ctx context.Context, user string,
 	}
 
 	if user == project.Owner {
-		fs.logger.Error("user is project admin")
 		return accessLevelAdmin
 	}
 
-	return fs.accessLevelFromGroups(ctx, groups, project)
+	level := fs.accessLevelFromGroups(ctx, groups, project)
+	return level
 }
 
 func (fs *allProjectsStorage) accessLevelFromGroups(ctx context.Context, groups []string, project *api.Project) accessLevel {
+	var level accessLevel = accessLevelNothing
 	for _, g := range groups {
 		if g == project.AdminGroup {
 			return accessLevelAdmin
 		}
 		if g == project.WritersGroup {
-			return accessLevelWrite
+			if accessLevelWrite > level {
+				level = accessLevelWrite
+			}
 		}
 		if g == project.ReadersGroup {
-			return accessLevelRead
+			if accessLevelRead > level {
+				level = accessLevelRead
+			}
 		}
 	}
-	return accessLevelNothing
+	return level
 }
 
 func (fs *allProjectsStorage) getProjectMetadata(ctx context.Context, project *api.Project) (*api.Metadata, error) {
@@ -124,7 +165,7 @@ func (fs *allProjectsStorage) getProjectMetadata(ctx context.Context, project *a
 		return nil, err
 	}
 
-	if level == accessLevelRead {
+	if level <= accessLevelRead {
 		md.IsReadOnly = true
 	}
 
@@ -134,20 +175,81 @@ func (fs *allProjectsStorage) getProjectMetadata(ctx context.Context, project *a
 		md.IsShareable = false
 	}
 
-	fs.logger.Info("revad: storage_all_projects: get project metadata", zap.String("user", u.AccountId), zap.String("project", project.Name), zap.Int("level", int(level)), zap.String("md",
+	fs.logger.Info("revad: storage_all_projects: get project metadata", zap.String("user", u.AccountId), zap.String("project", project.Name), zap.String("level", level.String()), zap.String("md",
 		fmt.Sprintf("%+v", md)))
 	return md, nil
 }
 
-func (fs *allProjectsStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
-	return api.NewError(api.StorageNotSupportedErrorCode)
+func (fs *allProjectsStorage) SetACL(ctx context.Context, name string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	project, relPath, err := fs.getProject(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	md, err := fs.getProjectMetadata(ctx, project)
+	if err != nil {
+		fs.logger.Error("error getting metadata for project", zap.Error(err))
+		return err
+	}
+
+	if md.IsReadOnly {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+	if !md.IsShareable {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
+	targetPath := path.Join(md.Path, relPath)
+	return fs.vs.SetACL(newCtx, targetPath, readOnly, recipient, shareList)
 }
 
-func (fs *allProjectsStorage) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
-	return api.NewError(api.StorageNotSupportedErrorCode)
+func (fs *allProjectsStorage) UnsetACL(ctx context.Context, name string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	project, relPath, err := fs.getProject(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	md, err := fs.getProjectMetadata(ctx, project)
+	if err != nil {
+		fs.logger.Error("error getting metadata for project", zap.Error(err))
+		return err
+	}
+
+	if md.IsReadOnly {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+	if !md.IsShareable {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
+	targetPath := path.Join(md.Path, relPath)
+	return fs.vs.UnsetACL(newCtx, targetPath, recipient, shareList)
 }
-func (fs *allProjectsStorage) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
-	return api.NewError(api.StorageNotSupportedErrorCode)
+
+func (fs *allProjectsStorage) UpdateACL(ctx context.Context, name string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	project, relPath, err := fs.getProject(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	md, err := fs.getProjectMetadata(ctx, project)
+	if err != nil {
+		fs.logger.Error("error getting metadata for project", zap.Error(err))
+		return err
+	}
+
+	if md.IsReadOnly {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+	if !md.IsShareable {
+		return api.NewError(api.StoragePermissionDeniedErrorCode)
+	}
+
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
+	targetPath := path.Join(md.Path, relPath)
+	return fs.vs.UpdateACL(newCtx, targetPath, readOnly, recipient, shareList)
 }
 
 func (fs *allProjectsStorage) getProjectPath(ctx context.Context, project *api.Project, relPath string) string {
@@ -177,7 +279,6 @@ func (fs *allProjectsStorage) GetMetadata(ctx context.Context, p string) (*api.M
 	}
 
 	targetPath := path.Join(md.Path, relPath)
-	fmt.Println(project.Name + " >>> " + targetPath)
 
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
 	md2, err := fs.vs.GetMetadata(newCtx, targetPath)
@@ -208,6 +309,9 @@ func (fs *allProjectsStorage) listRoot(ctx context.Context) ([]*api.Metadata, er
 			fs.logger.Error("revad: storage_all_projects: error getting md for project path: "+p, zap.Error(err))
 			continue
 		}
+		// top project folder are not shareable
+		md.IsShareable = false
+		md.IsReadOnly = true
 		mds = append(mds, md)
 	}
 	return mds, nil
@@ -224,16 +328,15 @@ func (fs *allProjectsStorage) ListFolder(ctx context.Context, name string) ([]*a
 		return nil, err
 	}
 
-	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
-	md, err := fs.getProjectMetadata(newCtx, project)
+	md, err := fs.getProjectMetadata(ctx, project)
 	if err != nil {
 		fs.logger.Error("error getting metadata for project", zap.Error(err))
 		return nil, err
 	}
 
 	targetPath := path.Join(md.Path, relPath)
-	fmt.Println(project.Name + " >>> " + targetPath)
 
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
 	mds, err := fs.vs.ListFolder(newCtx, targetPath)
 	if err != nil {
 		return nil, err
@@ -255,15 +358,14 @@ func (fs *allProjectsStorage) Download(ctx context.Context, name string) (io.Rea
 		return nil, err
 	}
 
-	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
-	md, err := fs.getProjectMetadata(newCtx, project)
+	md, err := fs.getProjectMetadata(ctx, project)
 	if err != nil {
 		fs.logger.Error("error getting metadata for project", zap.Error(err))
 		return nil, err
 	}
 
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
 	targetPath := path.Join(md.Path, relPath)
-	fmt.Println(project.Name + " >>> " + targetPath)
 	return fs.vs.Download(newCtx, targetPath)
 }
 
@@ -273,8 +375,7 @@ func (fs *allProjectsStorage) Upload(ctx context.Context, name string, r io.Read
 		return err
 	}
 
-	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
-	md, err := fs.getProjectMetadata(newCtx, project)
+	md, err := fs.getProjectMetadata(ctx, project)
 	if err != nil {
 		fs.logger.Error("error getting metadata for project", zap.Error(err))
 		return err
@@ -284,8 +385,8 @@ func (fs *allProjectsStorage) Upload(ctx context.Context, name string, r io.Read
 		return api.NewError(api.StoragePermissionDeniedErrorCode)
 	}
 
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
 	targetPath := path.Join(md.Path, relPath)
-	fmt.Println(project.Name + " >>> " + targetPath)
 	return fs.vs.Upload(newCtx, targetPath, r)
 }
 
@@ -299,8 +400,7 @@ func (fs *allProjectsStorage) Move(ctx context.Context, oldName, newName string)
 		return err
 	}
 
-	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: oldProject.Owner})
-	md, err := fs.getProjectMetadata(newCtx, oldProject)
+	md, err := fs.getProjectMetadata(ctx, oldProject)
 	if err != nil {
 		fs.logger.Error("error getting metadata for old project", zap.Error(err))
 		return err
@@ -314,9 +414,9 @@ func (fs *allProjectsStorage) Move(ctx context.Context, oldName, newName string)
 		return errors.New("cross-project rename forbidden")
 	}
 
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: oldProject.Owner})
 	oldPath := path.Join(md.Path, oldRelPath)
 	newPath := path.Join(md.Path, newRelPath)
-	fmt.Printf("revad: storage_all_projects: move from(%s) to (%s)\n", oldPath, newPath)
 	return fs.vs.Move(newCtx, oldPath, newPath)
 }
 
@@ -326,8 +426,7 @@ func (fs *allProjectsStorage) GetQuota(ctx context.Context, name string) (int, i
 		return 0, 0, err
 	}
 
-	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
-	md, err := fs.getProjectMetadata(newCtx, project)
+	md, err := fs.getProjectMetadata(ctx, project)
 	if err != nil {
 		fs.logger.Error("error getting metadata for project", zap.Error(err))
 		return 0, 0, err
@@ -337,8 +436,8 @@ func (fs *allProjectsStorage) GetQuota(ctx context.Context, name string) (int, i
 		return 0, 0, api.NewError(api.StoragePermissionDeniedErrorCode)
 	}
 
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
 	targetPath := path.Join(md.Path, relPath)
-	fmt.Println(project.Name + " >>> " + targetPath)
 	return fs.vs.GetQuota(newCtx, targetPath)
 
 }
@@ -348,8 +447,7 @@ func (fs *allProjectsStorage) CreateDir(ctx context.Context, name string) error 
 		return err
 	}
 
-	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
-	md, err := fs.getProjectMetadata(newCtx, project)
+	md, err := fs.getProjectMetadata(ctx, project)
 	if err != nil {
 		fs.logger.Error("error getting metadata for project", zap.Error(err))
 		return err
@@ -359,9 +457,8 @@ func (fs *allProjectsStorage) CreateDir(ctx context.Context, name string) error 
 		return api.NewError(api.StoragePermissionDeniedErrorCode)
 	}
 
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
 	targetPath := path.Join(md.Path, relPath)
-	fmt.Println(project.Name + " >>> " + targetPath)
-
 	return fs.vs.CreateDir(newCtx, targetPath)
 }
 
@@ -371,8 +468,7 @@ func (fs *allProjectsStorage) Delete(ctx context.Context, name string) error {
 		return err
 	}
 
-	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
-	md, err := fs.getProjectMetadata(newCtx, project)
+	md, err := fs.getProjectMetadata(ctx, project)
 	if err != nil {
 		fs.logger.Error("error getting metadata for project", zap.Error(err))
 		return err
@@ -382,8 +478,8 @@ func (fs *allProjectsStorage) Delete(ctx context.Context, name string) error {
 		return api.NewError(api.StoragePermissionDeniedErrorCode)
 	}
 
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
 	targetPath := path.Join(md.Path, relPath)
-	fmt.Println(project.Name + " >>> " + targetPath)
 	return fs.vs.Delete(newCtx, targetPath)
 }
 

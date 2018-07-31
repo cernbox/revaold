@@ -46,7 +46,7 @@ func (pm *projectManager) GetProject(ctx context.Context, projectName string) (*
 
 }
 
-func getAdminGroup(name string) string   { return "cernbox-project-" + name + "-admin" }
+func getAdminGroup(name string) string   { return "cernbox-project-" + name + "-admins" }
 func getReadersGroup(name string) string { return "cernbox-project-" + name + "-readers" }
 func getWritersGroup(name string) string { return "cernbox-project-" + name + "-writers" }
 

@@ -158,6 +158,7 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
+
 	md, err := lm.vfs.GetMetadata(ctx, path)
 	if err != nil {
 		l.Error("", zap.Error(err))
@@ -239,7 +240,7 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 
 	pb, err := lm.InspectPublicLink(ctx, fmt.Sprintf("%d", lastId))
 	if err != nil {
-		l.Error("", zap.Error(err))
+		l.Error("error inspecting public link", zap.Error(err))
 		return nil, err
 	}
 	return pb, nil
@@ -569,6 +570,8 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		}
 		md, err := lm.vfs.GetMetadata(newCtx, p)
 		if err != nil {
+			l := ctx_zap.Extract(ctx)
+			l.Error("error getting metadata for public link", zap.Error(err))
 			return nil, err
 		}
 

@@ -3,8 +3,8 @@
 #
 
 Name: revad
-Summary: REVA gRCP server
-Version: 0.0.2
+Summary: REVA is a gRPC backend server for CERNBox
+Version: 0.0.4
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,11 @@ rm -rf %buildroot/
 
 
 %changelog
+* Wed Aug 01 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.4
+- EOS Storage: hide .sys. files from recycle ls
+- Mount: fix logic when checking if sharing is enabled
+* Tue Jul 31 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.3
+- Respect read-only and shareability conf of inner mounts for mig mounts
 * Tue Jul 31 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.2
 - Sharing, Favourites and Project space support
 * Tue Jul 03 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.1

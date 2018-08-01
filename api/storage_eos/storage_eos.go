@@ -346,6 +346,13 @@ func (fs *eosStorage) ListRecycle(ctx context.Context, path string) ([]*api.Recy
 	}
 	recycleEntries := []*api.RecycleEntry{}
 	for _, entry := range eosDeletedEntries {
+		if !fs.showHiddenSys {
+			base := gopath.Base(entry.RestorePath)
+			if hiddenReg.MatchString(base) {
+				continue
+			}
+
+		}
 		recycleEntry := fs.convertToRecycleEntry(entry)
 		recycleEntries = append(recycleEntries, recycleEntry)
 	}

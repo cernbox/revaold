@@ -45,9 +45,12 @@ func (m *mount) isReadOnly() bool {
 
 func (m *mount) isSharingEnabled() bool {
 	if m.isReadOnly() {
+		fmt.Println("hugo is read-only", m.GetMountOptions())
 		return false
 	}
-	return !m.mountOptions.SharingDisabled
+	enabled := !m.mountOptions.SharingDisabled
+	fmt.Println("hugo is enabled",enabled, m.mountOptions, m.GetMountOptions())
+return enabled
 }
 
 func (m *mount) GetMountPoint() string              { return m.mountPoint }
@@ -79,8 +82,8 @@ func (m *mount) SetACL(ctx context.Context, path string, readOnly bool, recipien
 	if m.isReadOnly() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
 	}
-	if m.isSharingEnabled() {
-		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	if !m.isSharingEnabled() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("sharing-disabled mount")
 	}
 	p, _, err := m.getInternalPath(ctx, path)
 	if err != nil {
@@ -93,8 +96,8 @@ func (m *mount) UpdateACL(ctx context.Context, path string, readOnly bool, recip
 	if m.isReadOnly() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
 	}
-	if m.isSharingEnabled() {
-		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	if !m.isSharingEnabled() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("sharing-disabled mount")
 	}
 	p, _, err := m.getInternalPath(ctx, path)
 	if err != nil {
@@ -107,8 +110,8 @@ func (m *mount) UnsetACL(ctx context.Context, path string, recipient *api.ShareR
 	if m.isReadOnly() {
 		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
 	}
-	if m.isSharingEnabled() {
-		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("read-only mount")
+	if !m.isSharingEnabled() {
+		return api.NewError(api.StoragePermissionDeniedErrorCode).WithMessage("sharing-disabled mount")
 	}
 	p, _, err := m.getInternalPath(ctx, path)
 	if err != nil {

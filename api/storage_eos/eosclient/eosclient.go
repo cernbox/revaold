@@ -101,11 +101,10 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 	errBuf := &bytes.Buffer{}
 	cmd.Stdout = outBuf
 	cmd.Stderr = errBuf
-	err := cmd.Run()
-	if c.opt.EnableLogging {
-		c.opt.Logger.Info("eosclient", zap.String("cmd", fmt.Sprintf("%+v", cmd)))
-	}
 
+	err := cmd.Run()
+
+	var exitStatus int
 	if exiterr, ok := err.(*exec.ExitError); ok {
 		// The program has exited with an exit code != 0
 		// This works on both Unix and Windows. Although package
@@ -113,11 +112,15 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 		// defined for both Unix and Windows and in both cases has
 		// an ExitStatus() method with the same signature.
 		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-			switch status.ExitStatus() {
+			exitStatus = status.ExitStatus()
+			switch exitStatus {
 			case 2:
 				err = api.NewError(api.StorageNotFoundErrorCode)
 			}
 		}
+	}
+	if c.opt.EnableLogging {
+		c.opt.Logger.Info("eosclient: cmd", zap.String("args", fmt.Sprintf("%v", cmd.Args)), zap.Int("exist_status", exitStatus), zap.Error(err))
 	}
 	return outBuf.String(), errBuf.String(), err
 }

@@ -62,7 +62,6 @@ func (fs *allProjectsStorage) GetPathByID(ctx context.Context, id string) (strin
 	right := strings.Trim(strings.TrimPrefix(eosPath, "/eos/project/"), "/") // csc or c/cbox or csc/Docs or c/cbox/Docs
 	tokens := strings.Split(right, "/")
 
-	fmt.Printf("tokens: %+v\n", tokens)
 	var projectName string
 	var relPath string
 	if len(tokens) >= 1 {

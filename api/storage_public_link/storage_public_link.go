@@ -52,7 +52,6 @@ func (fs *linkStorage) getLink(ctx context.Context, name string) (*api.PublicLin
 		return nil, "", nil, api.NewError(api.ContextUserRequiredError).WithMessage("pl access token does not match requested path")
 	}
 
-	fmt.Printf("eeeee %+v\n", pl)
 	ctx = api.ContextSetUser(ctx, &api.User{AccountId: pl.OwnerId, Groups: []string{}})
 
 	link, err := fs.linkManager.InspectPublicLinkByToken(ctx, token)
@@ -85,7 +84,10 @@ func (fs *linkStorage) getLinkMetadata(ctx context.Context, link *api.PublicLink
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	finfo.IsReadOnly = link.ReadOnly
+	if !finfo.IsReadOnly {
+		finfo.IsReadOnly = link.ReadOnly
+	}
+
 	finfo.IsShareable = false // TODO(labkode: add re-shares
 	return finfo, nil
 }
@@ -122,7 +124,6 @@ func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata
 	}
 
 	internalPath := path.Join(link.Path, linkRelativePath)
-	fmt.Println(link.Token + " >>> " + internalPath)
 	md, err := fs.vfs.GetMetadata(ctx, internalPath)
 	if err != nil {
 		return nil, err
@@ -171,7 +172,6 @@ func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Meta
 	}
 
 	targetPath := path.Join(linkMetadata.Path, linkRelativePath)
-	fmt.Println(link.Token + " >>> " + targetPath)
 	mds, err := fs.vfs.ListFolder(ctx, targetPath)
 	if err != nil {
 		return nil, err
@@ -196,7 +196,6 @@ func (fs *linkStorage) Download(ctx context.Context, name string) (io.ReadCloser
 	}
 
 	p = path.Join(link.Path, p)
-	fmt.Println(link.Token + " >>> " + p)
 	return fs.vfs.Download(ctx, p)
 }
 
@@ -207,7 +206,6 @@ func (fs *linkStorage) Upload(ctx context.Context, name string, r io.ReadCloser)
 	}
 
 	p = path.Join(link.Path, p)
-	fmt.Println(link.Token + " >>> " + p)
 	return fs.vfs.Upload(ctx, p, r)
 }
 
@@ -236,7 +234,6 @@ func (fs *linkStorage) GetQuota(ctx context.Context, name string) (int, int, err
 	}
 
 	p = path.Join(link.Path, p)
-	fmt.Println(link.Token + " >>> " + p)
 	return fs.vfs.GetQuota(ctx, p)
 }
 
@@ -247,7 +244,6 @@ func (fs *linkStorage) CreateDir(ctx context.Context, name string) error {
 	}
 
 	p = path.Join(link.Path, p)
-	fmt.Println(link.Token + " >>> " + p)
 	return fs.vfs.CreateDir(ctx, p)
 }
 
@@ -258,7 +254,6 @@ func (fs *linkStorage) Delete(ctx context.Context, name string) error {
 	}
 
 	p = path.Join(link.Path, p)
-	fmt.Println(link.Token + " >>> " + p)
 	return fs.vfs.Delete(ctx, p)
 }
 

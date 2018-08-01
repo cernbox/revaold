@@ -138,7 +138,7 @@ var publicLinkTemplate string = `
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
 	<input type="hidden" name="dir" value="/" id="dir">
-	<input type="hidden" name="downloadURL" value="https://labradorbox.cern.ch:4443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
+	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
 	<input type="hidden" name="filename" value="/" id="filename">
 	<input type="hidden" name="mimetype" value="httpd/unix-directory" id="mimetype">
@@ -157,7 +157,7 @@ var publicLinkTemplate string = `
 			<div id="logo-claim" style="display:none;"></div>
 					<div class="header-right">
 				<span id="details">
-					<a href="https://labradorbox.cern.ch:4443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="download" class="button">
+					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="download" class="button">
 						<img class="svg" alt="" src="/core/img/actions/download.svg"/>
 						<span id="download-text">Download</span>
 					</a>
@@ -650,7 +650,7 @@ var publicLinkTemplateFile = `
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
 	<input type="hidden" name="dir" value="/" id="dir">
-	<input type="hidden" name="downloadURL" value="https://labradorbox.cern.ch:4443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
+	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
 	<input type="hidden" name="filename" value="/" id="filename">
 	<input type="hidden" name="mimetype" value="{{ .Mime }}" id="mimetype">
@@ -672,7 +672,7 @@ var publicLinkTemplateFile = `
 			<div id="logo-claim" style="display:none;"></div>
 					<div class="header-right">
 				<span id="details">
-					<a href="https://labradorbox.cern.ch:4443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="download" class="button">
+					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="download" class="button">
 						<img class="svg" alt="" src="/core/img/actions/download.svg"/>
 						<span id="download-text">Download</span>
 					</a>

@@ -396,6 +396,7 @@ func (fs *eosStorage) convertToMetadata(eosFileInfo *eosclient.FileInfo) *api.Me
 	finfo.IsDir = eosFileInfo.IsDir
 	finfo.Etag = eosFileInfo.ETag
 	if finfo.IsDir {
+		finfo.TreeCount = eosFileInfo.TreeCount
 		finfo.Size = eosFileInfo.TreeSize
 	} else {
 		finfo.Size = eosFileInfo.Size

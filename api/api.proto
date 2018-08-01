@@ -201,17 +201,18 @@ message Metadata {
 	bool is_shareable = 10;
 	string mime = 11;
 	bytes sys = 12; // sys is for storing arbitrary data
+	uint64 tree_count = 13;
 
 	// EOS filesytem extended metadata records
-	string eos_file = 13;
-	string eos_instance = 14;
+	string eos_file = 14;
+	string eos_instance = 15;
 
 	// Share extended metadata records
-	string share_target = 15;
+	string share_target = 16;
 
 	// Migration extended metadata records
-	string mig_id = 16;
-	string mig_path = 17;
+	string mig_id = 17;
+	string mig_path = 18;
 }
 
 message PathReq {

@@ -3,7 +3,6 @@ package storage_share
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"path"
 	"regexp"
@@ -68,7 +67,10 @@ func (fs *shareStorage) getReceivedShareMetadata(ctx context.Context, share *api
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	finfo.IsReadOnly = share.ReadOnly
+	if !finfo.IsReadOnly {
+		finfo.IsReadOnly = share.ReadOnly
+	}
+
 	finfo.ShareTarget = share.Target
 	finfo.IsShareable = false // TODO(labkode): add re-shares
 	return finfo, nil
@@ -108,7 +110,6 @@ func (fs *shareStorage) GetMetadata(ctx context.Context, p string) (*api.Metadat
 	}
 
 	internalPath := path.Join(share.Path, shareRelativePath)
-	fmt.Println(share.Id + " >>> " + internalPath)
 	md, err := fs.vs.GetMetadata(newCtx, internalPath)
 	if err != nil {
 		return nil, err
@@ -159,7 +160,6 @@ func (fs *shareStorage) ListFolder(ctx context.Context, name string) ([]*api.Met
 	}
 
 	targetPath := path.Join(shareMetadata.Path, shareRelativePath)
-	fmt.Println(share.Id + " >>> " + targetPath)
 	mds, err := fs.vs.ListFolder(newCtx, targetPath)
 	if err != nil {
 		return nil, err
@@ -185,7 +185,6 @@ func (fs *shareStorage) Download(ctx context.Context, name string) (io.ReadClose
 	}
 
 	p = path.Join(share.Path, p)
-	fmt.Println(share.Id + " >>> " + p)
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
 	return fs.vs.Download(newCtx, p)
 }
@@ -201,7 +200,6 @@ func (fs *shareStorage) Upload(ctx context.Context, name string, r io.ReadCloser
 	}
 
 	p = path.Join(share.Path, p)
-	fmt.Println(share.Id + " >>> " + p)
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
 	return fs.vs.Upload(newCtx, p, r)
 }
@@ -237,7 +235,6 @@ func (fs *shareStorage) GetQuota(ctx context.Context, name string) (int, int, er
 	}
 
 	p = path.Join(share.Path, p)
-	fmt.Println(share.Id + " >>> " + p)
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
 	return fs.vs.GetQuota(newCtx, p)
 
@@ -253,7 +250,6 @@ func (fs *shareStorage) CreateDir(ctx context.Context, name string) error {
 	}
 
 	p = path.Join(share.Path, p)
-	fmt.Println(share.Id + " >>> " + p)
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
 	return fs.vs.CreateDir(newCtx, p)
 }
@@ -269,7 +265,6 @@ func (fs *shareStorage) Delete(ctx context.Context, name string) error {
 	}
 
 	p = path.Join(share.Path, p)
-	fmt.Println(share.Id + " >>> " + p)
 	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: share.OwnerId})
 	return fs.vs.Delete(newCtx, p)
 }

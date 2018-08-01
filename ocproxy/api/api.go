@@ -599,6 +599,12 @@ type Options struct {
 
 	CBOXGroupDaemonURI    string
 	CBOXGroupDaemonSecret string
+
+	MaxNumFilesForArchive int
+	MaxSizeForArchive     int
+	MaxViewerFileFize     int
+
+	OverwriteHost string
 }
 
 func (opt *Options) init() {
@@ -638,6 +644,22 @@ func (opt *Options) init() {
 		opt.RevaPersonalProjectsPrefix = "/projects"
 	}
 
+	if opt.MaxSizeForArchive == 0 {
+		opt.MaxSizeForArchive = 1024 * 1024 * 1024 * 8 // 8 GiB
+	}
+
+	if opt.MaxNumFilesForArchive == 0 {
+		opt.MaxNumFilesForArchive = 1000
+	}
+	if opt.MaxViewerFileFize == 0 {
+		opt.MaxViewerFileFize = 1024 * 1024 * 10 // 10MiB
+	}
+
+	if opt.OverwriteHost == "" {
+		// use system hostname
+
+		opt.OverwriteHost, _ = os.Hostname()
+	}
 }
 
 func New(opt *Options) (http.Handler, error) {
@@ -681,6 +703,12 @@ func New(opt *Options) (http.Handler, error) {
 
 		chunksFolder:    opt.ChunksFolder,
 		temporaryFolder: opt.TemporaryFolder,
+
+		maxNumFilesForArchive: opt.MaxNumFilesForArchive,
+		maxSizeForArchive:     opt.MaxSizeForArchive,
+		viewerMaxFileSize:     opt.MaxViewerFileFize,
+
+		overwriteHost: opt.OverwriteHost,
 	}
 
 	proxy.registerRoutes()
@@ -712,6 +740,12 @@ type proxy struct {
 
 	cboxGroupDaemonURI    string
 	cboxGroupDaemonSecret string
+
+	maxNumFilesForArchive int
+	maxSizeForArchive     int
+	viewerMaxFileSize     int
+
+	overwriteHost string
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -1358,7 +1392,6 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		fmt.Println(md)
 		if md.IsDir {
 			files = append(files, revaPath)
 		} else {
@@ -1366,6 +1399,46 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 			p.get(w, r)
 			return
 		}
+	}
+
+	// we are going to download more than 1 file or directory.
+	// we calculate summ size and number of files (recursively relying on tree size and container)
+	// to not overload the serve with heavy archive downloads
+	var fileCount int
+	var sizeCount int
+	for _, fn := range files {
+		md, err := p.getMetadata(ctx, fn)
+		if err != nil {
+			p.logger.Warn("error getting md for file in archive, skiping...")
+			continue
+		}
+		sizeCount += int(md.Size)
+
+		if !md.IsDir {
+			fileCount++
+		} else {
+			if md.TreeCount != 0 {
+				fileCount += int(md.TreeCount)
+			} else {
+				fileCount++
+			}
+		}
+	}
+
+	if fileCount > p.maxNumFilesForArchive {
+		p.logger.Warn("exceeded max number of files for archiving", zap.Int("max", p.maxNumFilesForArchive), zap.Int("found", fileCount))
+		w.WriteHeader(http.StatusBadRequest)
+		msg := fmt.Sprintf("You are trying to download an archive (tar/zip) that contains %s files, which exceed our limit of %d.\nTry using the sync client to get a copy of your files", fileCount, p.maxNumFilesForArchive)
+		w.Write([]byte(msg))
+		return
+	}
+
+	if sizeCount > p.maxSizeForArchive {
+		p.logger.Warn("exceeded max aggregated size of files for archiving", zap.Int("max", p.maxSizeForArchive), zap.Int("computed_size", sizeCount))
+		w.WriteHeader(http.StatusBadRequest)
+		msg := fmt.Sprintf("You are trying to download an archive (tar/zip) that has a size of %d bytes, which exceed our limit of %d bytes.\nTry using the sync client to get a copy of your files", sizeCount, p.maxSizeForArchive)
+		w.Write([]byte(msg))
+		return
 	}
 
 	// TODO(labkode): add request ID to the archive name so we can trace back archive.
@@ -1512,7 +1585,45 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 
 	p.logger.Debug("archive name: " + archiveName)
 
-	// TODO(labkode): check for size because once the data is being written to the client we cannot override the headers.
+	// we are going to download more than 1 file or directory.
+	// we calculate summ size and number of files (recursively relying on tree size and container)
+	// to not overload the serve with heavy archive downloads
+	var fileCount int
+	var sizeCount int
+	for _, fn := range files {
+		md, err := p.getMetadata(ctx, fn)
+		if err != nil {
+			p.logger.Warn("error getting md for file in archive, skiping...")
+			continue
+		}
+		sizeCount += int(md.Size)
+
+		if !md.IsDir {
+			fileCount++
+		} else {
+			if md.TreeCount != 0 {
+				fileCount += int(md.TreeCount)
+			} else {
+				fileCount++
+			}
+		}
+	}
+
+	if fileCount > p.maxNumFilesForArchive {
+		p.logger.Warn("exceeded max number of files for archiving", zap.Int("max", p.maxNumFilesForArchive), zap.Int("found", fileCount))
+		w.WriteHeader(http.StatusBadRequest)
+		msg := fmt.Sprintf("You are trying to download an archive (tar/zip) that contains %s files, which exceed our limit of %d.\nTry using the sync client to get a copy of your files", fileCount, p.maxNumFilesForArchive)
+		w.Write([]byte(msg))
+		return
+	}
+
+	if sizeCount > p.maxSizeForArchive {
+		p.logger.Warn("exceeded max aggregated size of files for archiving", zap.Int("max", p.maxSizeForArchive), zap.Int("computed_size", sizeCount))
+		w.WriteHeader(http.StatusBadRequest)
+		msg := fmt.Sprintf("You are trying to download an archive (tar/zip) that has a size of %d bytes, which exceed our limit of %d bytes.\nTry using the sync client to get a copy of your files", sizeCount, p.maxSizeForArchive)
+		w.Write([]byte(msg))
+		return
+	}
 
 	// if downloadStartSecret is set in the query param we need to set the cookie ocDownloadStarted with same value.
 	if r.URL.Query().Get("downloadStartSecret") != "" {
@@ -1898,6 +2009,7 @@ func (p *proxy) getRecycleEntries(ctx context.Context) ([]*reva_api.RecycleEntry
     ]
   },
   "status": "success"
+}
 */
 type restoreResponse struct {
 	Status string       `json:"status"`
@@ -2110,6 +2222,16 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// TODO(labkode): stop loading huge files, set max to 1mib?
+	if int(md.Size) > p.viewerMaxFileSize {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		p.logger.Warn("file is too big to be opened in the browser", zap.Int("max_size", p.viewerMaxFileSize), zap.Int("file_size", int(md.Size)))
+		msg := fmt.Sprintf("The file is too big to be opened in the browser (maximum size is %d  bytes)", p.viewerMaxFileSize)
+		w.Write([]byte(fmt.Sprintf(`{ "message": "%s" }`, msg)))
+		return
+	}
+
 	gCtx := GetContextWithAuth(ctx)
 	pathReq := &reva_api.PathReq{Path: revaPath}
 	stream, err := p.getStorageClient().ReadFile(gCtx, pathReq)
@@ -2118,8 +2240,6 @@ func (p *proxy) loadFile(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	// TODO(labkode): stop loading huge files, set max to 1mib?
 
 	fileContents := []byte{}
 	for {
@@ -2317,7 +2437,6 @@ func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly boo
 	}
 
 	publicLink := publicLinkRes.PublicLink
-	fmt.Println("public link created", publicLink)
 	ocsShare, err := p.publicLinkToOCSShare(ctx, publicLink)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -2633,7 +2752,6 @@ func (p *proxy) getReceivedFolderShares(ctx context.Context) ([]*OCSShare, error
 
 	ocsShares := []*OCSShare{}
 	for _, share := range folderShares {
-		fmt.Printf("hugo: folder share %+v\n", share)
 		ocsShare, err := p.receivedFolderShareToOCSShare(ctx, share)
 		if err != nil {
 			p.logger.Error("cannot convert folder share to ocs share", zap.Error(err), zap.String("folder share", fmt.Sprintf("%+v", share)))
@@ -2686,7 +2804,6 @@ func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
 func (p *proxy) receivedFolderShareToOCSShare(ctx context.Context, share *reva_api.FolderShare) (*OCSShare, error) {
 	ocPath := p.getSharedMountPath(ctx, share)
 	revaPath := p.getRevaPath(ctx, ocPath)
-	fmt.Println("hugo", share, ocPath, revaPath)
 	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		return nil, err
@@ -3497,7 +3614,6 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 	ctx = reva_api.ContextSetPublicLinkToken(ctx, res.Token)
 
 	revaPath := p.getRevaPath(ctx, "/")
-	fmt.Println(revaPath)
 
 	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
@@ -3510,10 +3626,11 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 
 	if pl.ItemType == reva_api.PublicLink_FOLDER {
 		data := struct {
-			Token       string
-			AccessToken string
-			Note        string
-		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage"}
+			Token         string
+			AccessToken   string
+			Note          string
+			OverwriteHost string
+		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost}
 
 		tpl, err := template.New("public_link").Parse(publicLinkTemplate)
 		if err != nil {
@@ -3528,13 +3645,13 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Token       string
-		AccessToken string
-		ShareName   string
-		Size        int
-		Mime        string
-	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime}
-	fmt.Println(data)
+		Token         string
+		AccessToken   string
+		ShareName     string
+		Size          int
+		Mime          string
+		OverwriteHost string
+	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost}
 
 	tpl, err := template.New("public_link_file").Parse(publicLinkTemplateFile)
 	if err != nil {
@@ -3919,7 +4036,6 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	basename := path.Base(reqPath)
 	if token, ok := reva_api.ContextGetPublicLinkToken(ctx); ok && token != "" {
 		if pl, ok := reva_api.ContextGetPublicLink(ctx); ok {
-			fmt.Println("reqPath: ", reqPath)
 			if reqPath == "/" { // preview for file pl
 				basename = pl.Name
 			}
@@ -4024,9 +4140,7 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	md := mdRes.Metadata
-	fmt.Printf("hey %+v\n", md)
 	md.Path = p.getOCPath(ctx, md)
-	fmt.Printf("hey 2 %+v\n", md)
 	if md.IsDir {
 		p.logger.Warn("file is a folder")
 		w.WriteHeader(http.StatusNotImplemented)
@@ -5012,7 +5126,6 @@ func getChunkBLOBInfo(path string) (*chunkBLOBInfo, error) {
 func (p *proxy) mdsToXML(ctx context.Context, mds []*reva_api.Metadata) (string, error) {
 	responses := []*responseXML{}
 	for _, md := range mds {
-		fmt.Println("metadata record", md)
 		res, err := p.mdToPropResponse(ctx, md)
 		if err != nil {
 			return "", err

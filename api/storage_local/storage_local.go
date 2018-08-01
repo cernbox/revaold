@@ -153,7 +153,6 @@ func (fs *localStorage) Upload(ctx context.Context, name string, r io.ReadCloser
 	if err != nil {
 		return err
 	}
-	fmt.Println("written ", nb, " bytes")
 	if err := os.Rename(tmp.Name(), name); err != nil {
 		if os.IsNotExist(err) {
 			return api.NewError(api.StorageNotFoundErrorCode)

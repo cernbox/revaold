@@ -572,6 +572,25 @@ func (c *Client) mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 			return nil, err
 		}
 	}
+	var fileCounter uint64
+	// fileCounter is only for containers
+	if val, ok := kv["files"]; ok {
+		fileCounter, err = strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var dirCounter uint64
+	// dirCounter is only for containers
+	if val, ok := kv["container"]; ok {
+		dirCounter, err = strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// treeCount is the number of entries under the tree
+	treeCount := fileCounter + dirCounter
 
 	var size uint64
 	if val, ok := kv["size"]; ok {
@@ -593,31 +612,33 @@ func (c *Client) mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 	}
 
 	fi := &FileInfo{
-		File:     kv["file"],
-		Inode:    inode,
-		FID:      fid,
-		ETag:     kv["etag"],
-		Size:     size,
-		TreeSize: treeSize,
-		MTime:    mtime,
-		IsDir:    isDir,
-		Instance: c.opt.URL,
-		SysACL:   kv["sys.acl"],
+		File:      kv["file"],
+		Inode:     inode,
+		FID:       fid,
+		ETag:      kv["etag"],
+		Size:      size,
+		TreeSize:  treeSize,
+		MTime:     mtime,
+		IsDir:     isDir,
+		Instance:  c.opt.URL,
+		SysACL:    kv["sys.acl"],
+		TreeCount: treeCount,
 	}
 	return fi, nil
 }
 
 type FileInfo struct {
-	File     string `json:"eos_file"`
-	Inode    uint64 `json:"inode"`
-	FID      uint64 `json:"fid"`
-	ETag     string
-	TreeSize uint64
-	MTime    uint64
-	Size     uint64
-	IsDir    bool
-	Instance string
-	SysACL   string
+	File      string `json:"eos_file"`
+	Inode     uint64 `json:"inode"`
+	FID       uint64 `json:"fid"`
+	ETag      string
+	TreeSize  uint64
+	MTime     uint64
+	Size      uint64
+	IsDir     bool
+	Instance  string
+	SysACL    string
+	TreeCount uint64
 }
 
 type DeletedEntry struct {

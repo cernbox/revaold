@@ -417,8 +417,6 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where id=? and (share_with=?)"
 	}
 
-	fmt.Println(query, queryArgs)
-
 	if err := sm.db.QueryRow(query, queryArgs...).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
@@ -451,7 +449,6 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	} else {
 		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and (share_with=?)"
 	}
-	fmt.Println(query, queryArgs)
 	rows, err := sm.db.Query(query, queryArgs...)
 	if err != nil {
 		return nil, err
@@ -556,7 +553,6 @@ func (sm *shareManager) getDBShares(ctx context.Context, accountID string) ([]*d
 }
 
 func (sm *shareManager) convertToReceivedFolderShare(ctx context.Context, dbShare *dbShare) (*api.FolderShare, error) {
-	fmt.Println("hugo: db share", dbShare)
 	var recipientType api.ShareRecipient_RecipientType
 	if dbShare.ShareType == 0 {
 		recipientType = api.ShareRecipient_USER
@@ -576,7 +572,6 @@ func (sm *shareManager) convertToReceivedFolderShare(ctx context.Context, dbShar
 		},
 		Target: dbShare.FileTarget,
 	}
-	fmt.Println("hugo: folder share", fmt.Sprintf("%+v", share))
 	return share, nil
 
 }

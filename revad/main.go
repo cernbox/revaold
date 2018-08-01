@@ -255,7 +255,6 @@ func loadMountTable(mt *api.MountTable) error {
 
 	// register mounts into the virtual storage
 	for _, m := range mounts {
-		fmt.Printf("%+v", m)
 		vs.AddMount(context.Background(), m)
 	}
 	return nil

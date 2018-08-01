@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -34,6 +33,12 @@ func init() {
 	gc.Add("cboxgroupd-http-address", "http://localhost:2002", "http(s) address of the CERNBox Group Daemon (cboxgroupd).")
 	gc.Add("cboxgroupd-shared-secret", "bar", "shared secret to connect to the CERNBox Group Daemon (cboxgroupd).")
 
+	gc.Add("archive-max-num-files", 1000, "maximun number of files to allow for download in archive (tar/zip)")
+	gc.Add("archive-max-size", 8589934592, "maximun aggreagated size to allow for download in archive (tar/zip)")
+	gc.Add("viewer-max-file-size", 10485760, "maximun file size to open files in a viewer")
+
+	gc.Add("overwrite-host", "", "if set, overwrites the hostname of the machine, usually used when server is after a proxy")
+
 	gc.BindFlags()
 	gc.ReadConfig()
 }
@@ -53,6 +58,10 @@ func main() {
 		Logger:                logger,
 		CBOXGroupDaemonURI:    gc.GetString("cboxgroupd-http-address"),
 		CBOXGroupDaemonSecret: gc.GetString("cboxgroupd-shared-secret"),
+		MaxNumFilesForArchive: gc.GetInt("archive-max-num-files"),
+		MaxSizeForArchive:     gc.GetInt("archive-max-size"),
+		MaxViewerFileFize:     gc.GetInt("viewer-max-file-size"),
+		OverwriteHost:         gc.GetString("overwrite-host"),
 	}
 
 	_, err := api.New(opts)
@@ -61,24 +70,21 @@ func main() {
 		panic(err)
 	}
 
+	loggedRouter := gologger.GetLoggedHTTPHandler(gc.GetString("http-log"), router)
+
 	err = router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-		pathTemplate, err := route.GetPathTemplate()
-		if err == nil {
-			fmt.Println("ROUTE:", pathTemplate)
+		var routeString, path, methods string
+
+		routeString, err = route.GetPathTemplate()
+		path, _ = route.GetPathRegexp()
+		if v, err := route.GetMethods(); err == nil {
+			methods = strings.Join(v, ",")
 		}
-		pathRegexp, err := route.GetPathRegexp()
-		if err == nil {
-			fmt.Println("Path regexp:", pathRegexp)
-		}
-		methods, err := route.GetMethods()
-		if err == nil {
-			fmt.Println("Methods:", strings.Join(methods, ","))
-		}
-		fmt.Println()
+
+		logger.Info(methods + " " + routeString + " (regexp: " + path + ")")
+
 		return nil
 	})
-
-	loggedRouter := gologger.GetLoggedHTTPHandler(gc.GetString("http-log"), router)
 
 	logger.Info("server is listening", zap.String("tcp-address", gc.GetString("tcp-address")), zap.Bool("tls-enabled", gc.GetBool("tls-enable")), zap.String("tls-cert", gc.GetString("tls-cert")), zap.String("tls-key", gc.GetString("tls-key")))
 	var listenErr error

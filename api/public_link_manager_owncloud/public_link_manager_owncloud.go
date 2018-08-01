@@ -18,6 +18,11 @@ import (
 	"math/rand"
 )
 
+func init() {
+	// Seed the random source with unix nano time
+	rand.Seed(time.Now().UTC().UnixNano())
+}
+
 //TODO(labkode): add owner_id to other public link queries when consulting db
 const tokenLength = 15
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -92,6 +97,16 @@ func (lm *linkManager) AuthenticatePublicLink(ctx context.Context, token, passwo
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
+	}
+
+	// check expiration time
+	if pb.Expires != 0 {
+		now := time.Now().Unix()
+		if uint64(now) > pb.Expires {
+			l.Warn("public link has expired", zap.String("id", pb.Id))
+			return nil, api.NewError(api.PublicLinkInvalidExpireDateErrorCode)
+
+		}
 	}
 
 	if pb.Protected {
@@ -191,7 +206,19 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 	if opt.ReadOnly {
 		permissions = 1
 	}
+
 	token := genToken()
+	_, err = lm.getDBShareByToken(ctx, token)
+	if err == nil { // token already exists, abort
+		panic("the generated token already exists in the database. token: " + token)
+	}
+
+	if err != nil {
+		if !api.IsErrorCode(err, api.PublicLinkNotFoundErrorCode) {
+			l.Error("error checking the uniqueness of the generated token", zap.Error(err))
+			return nil, err
+		}
+	}
 
 	fileSource, err := strconv.ParseUint(itemSource, 10, 64)
 	if err != nil {
@@ -490,12 +517,9 @@ func (lm *linkManager) getDBShare(ctx context.Context, accountID, id string) (*d
 
 	query := "select coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type, coalesce(share_name, '') as share_name from oc_share where share_type=? and uid_owner=? and id=?"
 	if err := lm.db.QueryRow(query, 3, accountID, id).Scan(&shareWith, &prefix, &itemSource, &token, &expiration, &stime, &permissions, &itemType, &shareName); err != nil {
-		fmt.Println("hello")
 		if err == sql.ErrNoRows {
-			fmt.Println("inside")
 			return nil, api.NewError(api.PublicLinkNotFoundErrorCode)
 		}
-		fmt.Println("chao")
 
 		return nil, err
 	}

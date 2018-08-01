@@ -39,7 +39,6 @@ func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret 
 	// First bind with a read only user
 	err = l.Bind(am.bindUsername, am.bindPassword)
 	if err != nil {
-		fmt.Println("bind failed", err)
 		return nil, err
 	}
 
@@ -54,7 +53,6 @@ func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret 
 
 	sr, err := l.Search(searchRequest)
 	if err != nil {
-		fmt.Println("search failed", fmt.Sprintf(am.filter, clientID))
 		return nil, err
 	}
 

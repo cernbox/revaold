@@ -186,7 +186,6 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata,
 }
 
 func (fs *eosStorage) getTargetMetadataPath(mountPrefix, p string) string {
-	fmt.Println("getTargetMetadataPath", mountPrefix, p)
 	if strings.HasPrefix(mountPrefix, "/new/user/") {
 		return path.Join(strings.TrimPrefix(mountPrefix, "/new/user/"), p)
 	}

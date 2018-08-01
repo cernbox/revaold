@@ -149,7 +149,7 @@ func (fs *localStorage) Upload(ctx context.Context, name string, r io.ReadCloser
 	if err != nil {
 		return err
 	}
-	nb, err := io.Copy(tmp, r)
+	_, err = io.Copy(tmp, r)
 	if err != nil {
 		return err
 	}

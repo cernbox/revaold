@@ -3,7 +3,6 @@ package storage_public_link
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"path"
 	"strings"

@@ -631,6 +631,9 @@ var publicLinkTemplateFile = `
 		})(jQuery, OC);
 		</script>
     		<script src="/apps/wopiviewer/js/script.js"></script>
+		{{ if (eq .Mime "application/pynb") }}
+    		<script src="/apps/swanviewer/js/script.js"></script>
+		{{ end }}
 	<body id="body-public">
 	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
 	<noscript>
@@ -682,7 +685,7 @@ var publicLinkTemplateFile = `
           <!-- Preview frame is filled via JS to support SVG images for modern browsers -->
           <div id="imgframe"></div>
           <div class="directDownload">
-            <a href="https://labradorbox.cern.ch:443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadFile" class="button">
+            <a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadFile" class="button">
             <img class="svg" alt="" src="/core/img/actions/download.svg"/>
             Download {{ .ShareName }}
             <!--Download {{ .ShareName }} (4.7 MB)-->
@@ -690,8 +693,14 @@ var publicLinkTemplateFile = `
           </div>
           <div class="directLink">
             <label for="directLink">Direct link</label>
-            <input id="directLink" type="text" readonly value="https://labradorbox.cern.ch:443/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}">
+            <input id="directLink" type="text" readonly value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}">
           </div>
+
+	  <!--
+	  {{ if (eq .Mime "application/pynb") }}
+	  <a href="https://cern.ch/swanserver/cgi-bin/go?projurl=https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download%3Fx-access-token={{ .AccessToken }}" target="_blank"><img class="svg" alt="" src="/apps/swanviewer/img//badge_swan_white_150.svg"></a>
+	  {{ end }}
+	  -->
         </div>
       </div>
       <footer>
@@ -702,4 +711,26 @@ var publicLinkTemplateFile = `
     </div>
 	</body>
 </html>
+`
+
+var notebookScript = `
+#!/usr/bin/env python3
+
+import nbformat
+from nbconvert import HTMLExporter
+import sys
+ 
+source_fn = sys.argv[1]
+target_fn = sys.argv[2]
+
+
+with open(source_fn, 'r') as content_file:
+        content = content_file.read()
+        tnb = nbformat.reads(content, as_version=4)
+        html_exporter = HTMLExporter()
+        html_exporter.template_file = 'full' # basic html to be embeded in CERNBox
+        (body, resources) = html_exporter.from_notebook_node(tnb)
+        with open(target_fn, "w") as fd:
+                fd.write(body)
+# Installation: pip3 install nbconvert
 `

@@ -15,10 +15,10 @@ import (
 	"image/color"
 	"io"
 	"io/ioutil"
-	"mime"
 	"net/http"
 	gourl "net/url"
 	"os"
+	"os/exec"
 	gouser "os/user"
 	"path"
 	"path/filepath"
@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	reva_api "github.com/cernbox/reva/api"
@@ -140,10 +141,141 @@ func (p *proxy) registerRoutes() {
 	// project spaces
 	p.router.HandleFunc("/index.php/apps/files_projectspaces/ajax/personal_list.php", p.tokenAuth(p.getPersonalProjects)).Methods("GET")
 
+	// wopi routes
 	p.router.HandleFunc("/index.php/apps/wopiviewer/config", p.getWopiConfig).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/wopiviewer/open", p.tokenAuth(p.wopiOpen)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/wopiviewer/publicopen", p.tokenAuth(p.wopiPublicOpen)).Methods("POST")
 
+	// swan routes
+	p.router.HandleFunc("/index.php/apps/swanviewer/eosinfo", p.tokenAuth(p.swanEosInfo)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/swanviewer/load", p.tokenAuth(p.swanLoad)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/swanviewer/publicload", p.tokenAuth(p.swanPublicLoad)).Methods("GET")
+
+}
+
+func (p *proxy) swanPublicLoad(w http.ResponseWriter, r *http.Request) {
+	p.swanLoad(w, r)
+}
+
+func (p *proxy) swanLoad(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	filename := r.URL.Query().Get("filename")
+	revaPath := p.getRevaPath(ctx, filename)
+
+	gCtx := GetContextWithAuth(ctx)
+	pathReq := &reva_api.PathReq{Path: revaPath}
+	stream, err := p.getStorageClient().ReadFile(gCtx, pathReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fileContents := []byte{}
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != reva_api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				fileContents = append(fileContents, dc.Data...)
+			}
+		}
+	}
+
+	notebook, err := ioutil.TempFile(p.temporaryFolder, "notebook")
+	if err != nil {
+		p.logger.Error("ocproxy: api: swanLoad: error creating tmp file to store the notebook", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if _, err = notebook.Write(fileContents); err != nil {
+		p.logger.Error("ocproxy: api: swanLoad: error writing to tmp file", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	script, err := p.swanGetPythonScript(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: api: swanLoad: error ensuring the python script")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	htmlFile := path.Join(p.temporaryFolder, path.Base(notebook.Name()+".html"))
+
+	// convert notebook to html
+	cmd := exec.Command("/usr/bin/python3", script, notebook.Name(), htmlFile)
+	_, stdErr, exitCode := execute(cmd)
+	if exitCode != 0 {
+		p.logger.Error("ocproxy: api: swanLoad: error running nbconvert", zap.Int("exitcode", exitCode), zap.String("stderr", stdErr))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	htmlOutput, err := ioutil.ReadFile(htmlFile)
+	if err != nil {
+		p.logger.Error("ocproxy: api: swanLoad: error reading html output file", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(htmlOutput)
+}
+
+func (p *proxy) swanGetPythonScript(ctx context.Context) (string, error) {
+	fd, err := ioutil.TempFile(p.temporaryFolder, "notebook-script")
+	if err != nil {
+		return "", err
+	}
+	defer fd.Close()
+
+	if _, err = fd.Write([]byte(notebookScript)); err != nil {
+		return "", err
+	}
+	return fd.Name(), nil
+}
+
+func (p *proxy) swanEosInfo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	fn := r.URL.Query().Get("filename")
+	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting md for swan", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	data := struct {
+		EosInfo struct {
+			EosFile string `json:"eos.file"`
+		} `json:"eosinfo"`
+	}{struct {
+		EosFile string `json:"eos.file"`
+	}{md.EosFile}}
+
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		p.logger.Error("ocproxy: api: swanEosInfo: error encoding to json", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
 }
 
 func (p *proxy) wopiPublicOpen(w http.ResponseWriter, r *http.Request) {
@@ -215,6 +347,7 @@ func (p *proxy) wopiPublicOpen(w http.ResponseWriter, r *http.Request) {
 	q.Add("canedit", canEdit)
 	q.Add("folderurl", folderURL)
 	q.Add("username", "")
+	q.Add("eosinstance", md.EosInstance)
 	req.URL.RawQuery = q.Encode()
 
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
@@ -312,6 +445,7 @@ func (p *proxy) wopiOpen(w http.ResponseWriter, r *http.Request) {
 	q.Add("canedit", canEdit)
 	q.Add("folderurl", folderURL)
 	q.Add("username", user.AccountId)
+	q.Add("eosinstance", md.EosInstance)
 	req.URL.RawQuery = q.Encode()
 
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
@@ -3161,12 +3295,8 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		itemType = ItemTypeFile
 	}
 
-	var mimeType string
-	if pl.ItemType == reva_api.PublicLink_FOLDER {
-		mimeType = "httpd/unix-directory"
-	} else {
-		mimeType = mime.TypeByExtension(path.Ext(pl.Name))
-	}
+	mimeType := reva_api.DetectMimeType(reva_api.PublicLink_FOLDER == pl.ItemType, pl.Name)
+
 	var permissions Permission
 	if pl.ReadOnly {
 		permissions = PermissionRead
@@ -5785,4 +5915,26 @@ func (p *proxy) splitRootPath(ctx context.Context, path string) (string, string,
 func (p *proxy) addShareTarget(ctx context.Context, id string, md *reva_api.Metadata) string {
 	return fmt.Sprintf("%s (id:%s)", md.ShareTarget, id)
 
+}
+
+func execute(cmd *exec.Cmd) (string, string, int) {
+	outBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	cmd.Stdout = outBuf
+	cmd.Stderr = errBuf
+
+	err := cmd.Run()
+
+	var exitStatus int
+	if exiterr, ok := err.(*exec.ExitError); ok {
+		// The program has exited with an exit code != 0
+		// This works on both Unix and Windows. Although package
+		// syscall is generally platform dependent, WaitStatus is
+		// defined for both Unix and Windows and in both cases has
+		// an ExitStatus() method with the same signature.
+		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+			exitStatus = status.ExitStatus()
+		}
+	}
+	return outBuf.String(), errBuf.String(), exitStatus
 }

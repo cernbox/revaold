@@ -234,6 +234,24 @@ func DetectMimeType(isDir bool, path string) string {
 	if isDir {
 		return "httpd/unix-directory"
 	}
+
 	ext := gopath.Ext(path)
-	return mime.TypeByExtension(ext)
+
+	mimeType := getCustomMime(ext)
+
+	if mimeType == "" {
+		mimeType = mime.TypeByExtension(ext)
+	}
+
+	return mimeType
+}
+func getCustomMime(ext string) string {
+	switch ext {
+	case ".root":
+		return "application/root"
+	case ".ipynb":
+		return "application/pynb"
+	default:
+		return ""
+	}
 }

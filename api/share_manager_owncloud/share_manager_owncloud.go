@@ -402,6 +402,7 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
+
 	queryArgs := []interface{}{id, accountID}
 	groupArgs := []interface{}{}
 	for _, v := range groups {
@@ -435,7 +436,7 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	queryArgs := []interface{}{0, 1, accountID}
+	queryArgs := []interface{}{0, 1, accountID, accountID}
 	groupArgs := []interface{}{}
 	for _, v := range groups {
 		groupArgs = append(groupArgs, v)
@@ -444,10 +445,10 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	var query string
 
 	if len(groups) > 1 {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and uid_owner!=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
 		queryArgs = append(queryArgs, groupArgs...)
 	} else {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and (share_with=?)"
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and uid_owner!=? and (share_with=?)"
 	}
 	rows, err := sm.db.Query(query, queryArgs...)
 	if err != nil {

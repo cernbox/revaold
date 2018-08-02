@@ -36,6 +36,7 @@ var publicLinkTemplate string = `
 		<link rel="stylesheet" href="/apps/files/css/files.css">
 		<link rel="stylesheet" href="/apps/files/css/upload.css">
     		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
+    		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -123,6 +124,7 @@ var publicLinkTemplate string = `
 
 		})(jQuery, OC);
 		</script>
+    		<script src="/apps/wopiviewer/js/script.js"></script>
 	<body id="body-public">
 	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
 	<noscript>
@@ -288,9 +290,6 @@ var publicLinkTemplatePassword = `
     <link rel="stylesheet" href="/core/css/share.css">
     <link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
     <link rel="stylesheet" href="/apps/files_versions/css/versions.css">
-    <link rel="stylesheet" href="/apps/files_videoplayer/css/style.css">
-    <link rel="stylesheet" href="/apps/firstrunwizard/css/colorbox.css">
-    <link rel="stylesheet" href="/apps/firstrunwizard/css/firstrunwizard.css">
     <link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
     <link rel="stylesheet" href="/apps/files_sharing/css/authenticate.css">
     <script src="/index.php/core/js/oc.js"></script>
@@ -341,6 +340,7 @@ var publicLinkTemplatePassword = `
     <script src="/core/js/files/fileinfo.js"></script>
     <script src="/core/js/files/client.js"></script>
     <script src="/apps/files_sharing/js/authenticate.js"></script>
+    <script src="/apps/wopiviewer/js/script.js"></script>
   </head>
   <body id="body-login">
     <noscript>
@@ -420,9 +420,6 @@ var publicLinkTemplateNotFound string = `
     <link rel="stylesheet" href="/core/css/tooltip.css">
     <link rel="stylesheet" href="/core/css/share.css">
     <link rel="stylesheet" href="/apps/files_versions/css/versions.css">
-    <link rel="stylesheet" href="/apps/files_videoplayer/css/style.css">
-    <link rel="stylesheet" href="/apps/firstrunwizard/css/colorbox.css">
-    <link rel="stylesheet" href="/apps/firstrunwizard/css/firstrunwizard.css">
     <link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
     <link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
     <script src="/index.php/core/js/oc.js"></script>
@@ -470,9 +467,6 @@ var publicLinkTemplateNotFound string = `
     <script src="/core/js/sharedialogshareelistview.js"></script>
     <script src="/core/js/sharedialogview.js"></script>
     <script src="/core/js/share.js"></script>
-    <script src="/apps/files_videoplayer/js/viewer.js"></script>
-    <script src="/apps/firstrunwizard/js/jquery.colorbox.js"></script>
-    <script src="/apps/firstrunwizard/js/firstrunwizard.js"></script>
     <script src="/core/js/files/fileinfo.js"></script>
     <script src="/core/js/files/client.js"></script>
   </head>
@@ -550,6 +544,7 @@ var publicLinkTemplateFile = `
 		<link rel="stylesheet" href="/apps/files/css/files.css">
 		<link rel="stylesheet" href="/apps/files/css/upload.css">
     		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
+    		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -635,6 +630,7 @@ var publicLinkTemplateFile = `
 			});
 		})(jQuery, OC);
 		</script>
+    		<script src="/apps/wopiviewer/js/script.js"></script>
 	<body id="body-public">
 	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
 	<noscript>

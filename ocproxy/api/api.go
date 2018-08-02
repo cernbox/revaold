@@ -17,8 +17,9 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
-	"net/url"
+	gourl "net/url"
 	"os"
+	gouser "os/user"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -139,6 +140,245 @@ func (p *proxy) registerRoutes() {
 	// project spaces
 	p.router.HandleFunc("/index.php/apps/files_projectspaces/ajax/personal_list.php", p.tokenAuth(p.getPersonalProjects)).Methods("GET")
 
+	p.router.HandleFunc("/index.php/apps/wopiviewer/config", p.getWopiConfig).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/wopiviewer/open", p.tokenAuth(p.wopiOpen)).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/wopiviewer/publicopen", p.tokenAuth(p.wopiPublicOpen)).Methods("POST")
+
+}
+
+func (p *proxy) wopiPublicOpen(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	fn := r.Form.Get("filename")
+	token := r.Form.Get("token")
+	folderURL := r.Form.Get("folderurl")
+
+	pl, ok := reva_api.ContextGetPublicLink(ctx)
+	if !ok {
+		p.logger.Warn("ocproxy: api: cannot get public link from ctx")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if pl.Token != token {
+		p.logger.Warn("ocproxy: api: pl ctx does not match requested token", zap.String("req_token", token), zap.String("ctx_token", pl.Token))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting md for pl", zap.String("reva_path", revaPath), zap.String("token", pl.Token), zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	unixUser, err := gouser.Lookup(pl.OwnerId)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting unix uid/gid", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	uid, gid := unixUser.Uid, unixUser.Gid
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+	url := fmt.Sprintf("%s/cbox/open", p.wopiServer)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// wopi accepts booleans as strings :(
+	var canEdit string = "false"
+	if !pl.ReadOnly {
+		canEdit = "true"
+	}
+
+	q := req.URL.Query()
+	q.Add("ruid", uid)
+	q.Add("rgid", gid)
+	q.Add("filename", md.EosFile)
+	q.Add("canedit", canEdit)
+	q.Add("folderurl", folderURL)
+	q.Add("username", "")
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
+	res, err := client.Do(req)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.StatusCode != http.StatusOK {
+		p.logger.Error("error calling wopi at /cbox/endpoints", zap.Int("status", res.StatusCode))
+		w.WriteHeader(res.StatusCode)
+		return
+
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error reading res body on /cbox/open", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	wopiSRC, _ := gourl.QueryUnescape(string(body))
+	data := struct {
+		WopiSRC string `json:"wopi_src"`
+	}{wopiSRC}
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error encoding to json", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(encoded)
+}
+
+func (p *proxy) wopiOpen(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	fn := r.Form.Get("filename")
+	folderURL := r.Form.Get("folderurl")
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting user from ctx", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	unixUser, err := gouser.Lookup(user.AccountId)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting unix uid/gid", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	uid, gid := unixUser.Uid, unixUser.Gid
+
+	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting md", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+	url := fmt.Sprintf("%s/cbox/open", p.wopiServer)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// wopi accepts booleans as strings :(
+	var canEdit string = "false"
+	if !md.IsReadOnly {
+		canEdit = "true"
+	}
+
+	q := req.URL.Query()
+	q.Add("ruid", uid)
+	q.Add("rgid", gid)
+	q.Add("filename", md.EosFile)
+	q.Add("canedit", canEdit)
+	q.Add("folderurl", folderURL)
+	q.Add("username", user.AccountId)
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
+	res, err := client.Do(req)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.StatusCode != http.StatusOK {
+		p.logger.Error("error calling wopi at /cbox/endpoints", zap.Int("status", res.StatusCode))
+		w.WriteHeader(res.StatusCode)
+		return
+
+	}
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error reading res body on /cbox/open", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	wopiSRC, _ := gourl.QueryUnescape(string(body))
+	data := struct {
+		WopiSRC string `json:"wopi_src"`
+	}{wopiSRC}
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error encoding to json", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(encoded)
+}
+
+func (p *proxy) getWopiConfig(w http.ResponseWriter, r *http.Request) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	url := fmt.Sprintf("%s/cbox/endpoints", p.wopiServer)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
+	res, err := client.Do(req)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.StatusCode != http.StatusOK {
+		p.logger.Error("error calling wopi at /cbox/endpoints", zap.Int("status", res.StatusCode))
+		w.WriteHeader(res.StatusCode)
+		return
+
+	}
+	w.Header().Set("Content-Type", "application/json")
+	io.Copy(w, res.Body)
 }
 
 func (p *proxy) listFolder(ctx context.Context, revaPath string) ([]*reva_api.Metadata, error) {
@@ -605,6 +845,9 @@ type Options struct {
 	MaxViewerFileFize     int
 
 	OverwriteHost string
+
+	WopiServer string
+	WopiSecret string
 }
 
 func (opt *Options) init() {
@@ -657,7 +900,6 @@ func (opt *Options) init() {
 
 	if opt.OverwriteHost == "" {
 		// use system hostname
-
 		opt.OverwriteHost, _ = os.Hostname()
 	}
 }
@@ -709,6 +951,9 @@ func New(opt *Options) (http.Handler, error) {
 		viewerMaxFileSize:     opt.MaxViewerFileFize,
 
 		overwriteHost: opt.OverwriteHost,
+
+		wopiServer: opt.WopiServer,
+		wopiSecret: opt.WopiSecret,
 	}
 
 	proxy.registerRoutes()
@@ -746,6 +991,9 @@ type proxy struct {
 	viewerMaxFileSize     int
 
 	overwriteHost string
+
+	wopiServer string
+	wopiSecret string
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -3733,7 +3981,7 @@ func (p *proxy) capabilities(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) getPublicPreview(w http.ResponseWriter, r *http.Request) {
-	v, _ := url.QueryUnescape(r.URL.Query().Get("file"))
+	v, _ := gourl.QueryUnescape(r.URL.Query().Get("file"))
 	mux.Vars(r)["path"] = path.Clean(v)
 	p.getPreview(w, r)
 }
@@ -4351,7 +4599,7 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	destinationURL, err := url.ParseRequestURI(destination)
+	destinationURL, err := gourl.ParseRequestURI(destination)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return

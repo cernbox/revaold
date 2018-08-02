@@ -38,6 +38,8 @@ func init() {
 	gc.Add("viewer-max-file-size", 10485760, "maximun file size to open files in a viewer")
 
 	gc.Add("overwrite-host", "", "if set, overwrites the hostname of the machine, usually used when server is after a proxy")
+	gc.Add("wopi-server", "http://wopihost.example.org", "hostname of the wopi server")
+	gc.Add("wopi-secret", "bar", "secret to use to connect to the wopi server")
 
 	gc.BindFlags()
 	gc.ReadConfig()
@@ -62,6 +64,8 @@ func main() {
 		MaxSizeForArchive:     gc.GetInt("archive-max-size"),
 		MaxViewerFileFize:     gc.GetInt("viewer-max-file-size"),
 		OverwriteHost:         gc.GetString("overwrite-host"),
+		WopiServer:            gc.GetString("wopi-server"),
+		WopiSecret:            gc.GetString("wopi-secret"),
 	}
 
 	_, err := api.New(opts)

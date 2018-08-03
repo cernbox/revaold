@@ -1,10 +1,15 @@
 package storage_homemigration
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"path"
+	"strings"
+	"syscall"
 
 	"github.com/cernbox/reva/api"
 	"go.uber.org/zap"
@@ -26,6 +31,9 @@ type eosStorage struct {
 
 	oldHome    api.Storage
 	newHomeMap map[string]api.Storage
+
+	oldScript, newScript               string
+	oldScriptEnabled, newScriptEnabled bool
 }
 
 type Options struct {
@@ -34,6 +42,12 @@ type Options struct {
 
 	OldHome    api.Storage
 	NewHomeMap map[string]api.Storage
+
+	EosUserScript string `json:"eosuser_script"`
+	EosHomeScript string `json:"eoshome_script"`
+
+	EosUserEnableScript bool `json:"eosuser_enable_script"`
+	EosHomeEnableScript bool `json:""eoshome_enable_script`
 }
 
 func (opt *Options) init() {
@@ -47,10 +61,14 @@ func New(opt *Options) (api.Storage, error) {
 	opt.init()
 
 	eosStorage := &eosStorage{
-		logger:     opt.Logger,
-		oldHome:    opt.OldHome,
-		newHomeMap: opt.NewHomeMap,
-		migrator:   opt.Migrator,
+		logger:           opt.Logger,
+		oldHome:          opt.OldHome,
+		newHomeMap:       opt.NewHomeMap,
+		migrator:         opt.Migrator,
+		oldScript:        opt.EosUserScript,
+		newScript:        opt.EosHomeScript,
+		oldScriptEnabled: opt.EosUserEnableScript,
+		newScriptEnabled: opt.EosHomeEnableScript,
 	}
 	return eosStorage, nil
 }
@@ -145,6 +163,71 @@ func (fs *eosStorage) GetQuota(ctx context.Context, p string) (int, int, error) 
 	return ts.GetQuota(ctx, p)
 
 }
+
+// eos-create-user-directory <eos_mgm_url> <eos_user_dir_prefix> <eos_recycle_dir_prefix> <user_id>
+func (fs *eosStorage) executeScript(ctx context.Context, script, username, instance string) (string, string, int) {
+
+	cmd := exec.Command("/bin/bash", script, instance, "/eos/user/", "/eos/user/proc/recycle", username)
+
+	outBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	cmd.Stdout = outBuf
+	cmd.Stderr = errBuf
+
+	err := cmd.Run()
+	fs.logger.Info("script to create homedir executed", zap.String("cmd", fmt.Sprintf("%+v", cmd)))
+
+	var exitStatus int
+	if exiterr, ok := err.(*exec.ExitError); ok {
+		// The program has exited with an exit code != 0
+		// This works on both Unix and Windows. Although package
+		// syscall is generally platform dependent, WaitStatus is
+		// defined for both Unix and Windows and in both cases has
+		// an ExitStatus() method with the same signature.
+		if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+			exitStatus = status.ExitStatus()
+		}
+	}
+
+	return outBuf.String(), errBuf.String(), exitStatus
+}
+
+func (fs *eosStorage) createHome(ctx context.Context, username, mountID string) error {
+	if mountID == "oldhome" {
+		if fs.oldScriptEnabled {
+			instance := "root://eosuser-internal.cern.ch"
+			_, stdErr, exitStatus := fs.executeScript(ctx, fs.oldScript, username, instance)
+			if exitStatus != 0 {
+				fs.logger.Error("api: storage_homemigration: createHome: error calling script for oldhome", zap.Int("exit", exitStatus), zap.String("stderr", stdErr))
+				return errors.New("error calling script to create home for oldhome")
+			}
+			fs.logger.Info("homedir created for user on oldhome", zap.String("user", username))
+			return nil
+
+		} else {
+			fs.logger.Warn("api: storage_homemigration: createHome: script disabled to create homes on oldhome")
+			return errors.New("homedir creation disabled on oldhome")
+		}
+	} else if strings.HasPrefix(mountID, "/eoshome-") {
+		if fs.newScriptEnabled {
+			instance := "root://" + mountID + ".cern.ch"
+			_, stdErr, exitStatus := fs.executeScript(ctx, fs.newScript, username, instance)
+			if exitStatus != 0 {
+				fs.logger.Error("api: storage_homemigration: createHome: error calling script for eoshome-*", zap.Int("exit", exitStatus), zap.String("stderr", stdErr))
+				return errors.New("error calling script to create home for eoshome-*")
+			}
+			fs.logger.Info("homedir created for user on eoshome-*", zap.String("user", username))
+			return nil
+
+		} else {
+			fs.logger.Warn("api: storage_homemigration: createHome: script disabled to create homes on eoshome-*")
+			return errors.New("homedir creation disabled on eoshome-*")
+		}
+	} else {
+		panic("creating home for mount " + mountID + " is forbidden")
+	}
+}
+
 func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {
@@ -154,6 +237,30 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata,
 	ts, mountID, mountPrefix := fs.getStorageForUser(ctx, u)
 	md, err := ts.GetMetadata(ctx, p)
 	if err != nil {
+		// if p is / and err is not found we create the home directory for the user and we retry
+		if api.IsErrorCode(err, api.StorageNotFoundErrorCode) && p == "/" {
+			fs.logger.Warn("user does not have a homedir, we create one")
+			if err2 := fs.createHome(ctx, u.AccountId, mountID); err2 != nil {
+				fs.logger.Error("api: storage_homemigration: GetMetadata: error creating homedir for user", zap.String("user", u.AccountId), zap.Error(err))
+				return nil, err
+			}
+
+			fs.logger.Info("api: storage_homemigration: GetMetadata: homedir create for user", zap.String("user", u.AccountId))
+			// get again md for path now that we have a valid homedir
+
+			md, err = ts.GetMetadata(ctx, p)
+			if err != nil {
+				fs.logger.Error("api: storage_homemigration: GetMetadata: error getting md just after creating homedir")
+				return nil, err
+			}
+			migID := fmt.Sprintf("%s:%s", mountID, md.Id)
+			migPath := path.Join(mountPrefix, md.Path)
+
+			md.MigId = migID
+			md.MigPath = migPath
+
+			return md, nil
+		}
 		return nil, err
 	}
 

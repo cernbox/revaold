@@ -105,8 +105,6 @@ func (s *svc) ReadRevision(req *api.RevisionReq, stream api.Storage_ReadRevision
 			l.Error("", zap.Error(err))
 			return nil
 		}
-		fmt.Println("chunk sent with size", dc.Length)
-
 	}
 	return nil
 }

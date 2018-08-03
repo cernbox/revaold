@@ -11,6 +11,7 @@ import (
 	"github.com/cernbox/reva/api"
 
 	"database/sql"
+	"github.com/bluele/gcache"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
@@ -28,50 +29,23 @@ const tokenLength = 15
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 const versionPrefix = ".sys.v#."
 
-func getFileIDFromVersionFolder(p string) string {
-	basename := gopath.Base(p)
-	basename = strings.TrimPrefix(basename, "/")
-	basename = strings.TrimPrefix(basename, versionPrefix)
-	filename := gopath.Join(gopath.Dir(p), basename)
-	return filename
-}
-
-func getVersionFolder(p string) string {
-	basename := gopath.Base(p)
-	versionFolder := gopath.Join(gopath.Dir(p), versionPrefix+basename)
-	return versionFolder
-}
-
-func genToken() string {
-	b := make([]byte, tokenLength)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
-
-func hashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
-func checkPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
-}
-
-func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, vfs api.VirtualStorage) (api.PublicLinkManager, error) {
+func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, cacheSize, cacheEviction int, vfs api.VirtualStorage) (api.PublicLinkManager, error) {
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbUsername, dbPassword, dbHost, dbPort, dbName))
 	if err != nil {
 		return nil, err
 	}
 
-	return &linkManager{db: db, vfs: vfs}, nil
+	fmt.Println("hugo", cacheSize, cacheEviction)
+	cache := gcache.New(cacheSize).LFU().Build()
+	return &linkManager{db: db, vfs: vfs, cache: cache, cacheEviction: time.Second * time.Duration(cacheEviction)}, nil
 }
 
 type linkManager struct {
-	db  *sql.DB
-	vfs api.VirtualStorage
+	db            *sql.DB
+	vfs           api.VirtualStorage
+	cache         gcache.Cache
+	cacheSize     int
+	cacheEviction time.Duration
 }
 
 // getFileIDParts returns the two parts of a fileID.
@@ -567,6 +541,9 @@ func (lm *linkManager) getDBShares(ctx context.Context, accountID string) ([]*db
 	return dbShares, nil
 }
 
+// converToPublicLink converts  an entry from the db to a public link. It the share is to a file, we need
+// to convert the version folder back to a file id, hence performing a md operation. This operation is expensive
+// but we can perform aggresive caching as it a file exists the version folder will exist and viceversa.
 func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare) (*api.PublicLink, error) {
 	var expires uint64
 	if dbShare.Expiration != "" {
@@ -588,11 +565,8 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		// need to point to the file id, so in the UI the share info
 		// appears on the latest file version.
 		newCtx := api.ContextSetUser(ctx, &api.User{AccountId: dbShare.Owner})
-		p, err := lm.vfs.GetPathByID(newCtx, fileID)
-		if err != nil {
-			return nil, err
-		}
-		md, err := lm.vfs.GetMetadata(newCtx, p)
+		//md, err := lm.vfs.GetMetadata(newCtx, fileID)
+		md, err := lm.getCachedMetadata(newCtx, fileID)
 		if err != nil {
 			l := ctx_zap.Extract(ctx)
 			l.Error("error getting metadata for public link", zap.Error(err))
@@ -602,7 +576,8 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		versionFolder := md.Path
 		filename := getFileIDFromVersionFolder(versionFolder)
 
-		md, err = lm.vfs.GetMetadata(newCtx, filename)
+		//md, err = lm.vfs.GetMetadata(newCtx, filename)
+		md, err = lm.getCachedMetadata(newCtx, filename)
 		if err != nil {
 			return nil, err
 		}
@@ -622,8 +597,27 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		OwnerId:   dbShare.Owner,
 		Name:      dbShare.ShareName,
 	}
+
 	return publicLink, nil
 
+}
+func (lm *linkManager) getCachedMetadata(ctx context.Context, key string) (*api.Metadata, error) {
+	l := ctx_zap.Extract(ctx)
+	v, err := lm.cache.Get(key)
+	if err == nil {
+		if md, ok := v.(*api.Metadata); ok {
+			l.Info("revad: api: getCachedMetadata:  md found in cache", zap.String("path", key))
+			return md, nil
+		}
+	}
+
+	md, err := lm.vfs.GetMetadata(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	lm.cache.SetWithExpire(key, md, lm.cacheEviction)
+	l.Info("revad: api: getCachedMetadata: md retrieved and stored  in cache", zap.String("path", key))
+	return md, nil
 }
 
 func getUserFromContext(ctx context.Context) (*api.User, error) {
@@ -632,4 +626,36 @@ func getUserFromContext(ctx context.Context) (*api.User, error) {
 		return nil, api.NewError(api.ContextUserRequiredError)
 	}
 	return u, nil
+}
+
+func getFileIDFromVersionFolder(p string) string {
+	basename := gopath.Base(p)
+	basename = strings.TrimPrefix(basename, "/")
+	basename = strings.TrimPrefix(basename, versionPrefix)
+	filename := gopath.Join(gopath.Dir(p), basename)
+	return filename
+}
+
+func getVersionFolder(p string) string {
+	basename := gopath.Base(p)
+	versionFolder := gopath.Join(gopath.Dir(p), versionPrefix+basename)
+	return versionFolder
+}
+
+func genToken() string {
+	b := make([]byte, tokenLength)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func checkPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

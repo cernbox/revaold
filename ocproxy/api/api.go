@@ -31,6 +31,7 @@ import (
 
 	reva_api "github.com/cernbox/reva/api"
 
+	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
 	"github.com/gorilla/mux"
 	"github.com/rwcarlsen/goexif/exif"
@@ -347,7 +348,7 @@ func (p *proxy) wopiPublicOpen(w http.ResponseWriter, r *http.Request) {
 	q.Add("canedit", canEdit)
 	q.Add("folderurl", folderURL)
 	q.Add("username", "")
-	q.Add("eosinstance", md.EosInstance)
+	q.Add("endpoint", md.EosInstance)
 	req.URL.RawQuery = q.Encode()
 
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
@@ -445,7 +446,7 @@ func (p *proxy) wopiOpen(w http.ResponseWriter, r *http.Request) {
 	q.Add("canedit", canEdit)
 	q.Add("folderurl", folderURL)
 	q.Add("username", user.AccountId)
-	q.Add("eosinstance", md.EosInstance)
+	q.Add("endpoint", md.EosInstance)
 	req.URL.RawQuery = q.Encode()
 
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
@@ -982,13 +983,15 @@ type Options struct {
 
 	WopiServer string
 	WopiSecret string
+
+	CacheSize     int
+	CacheEviction int
 }
 
 func (opt *Options) init() {
 	if opt.TemporaryFolder == "" {
 		opt.TemporaryFolder = os.TempDir()
 	}
-
 	if opt.ChunksFolder == "" {
 		opt.ChunksFolder = filepath.Join(opt.TemporaryFolder, "chunks")
 	}
@@ -1035,6 +1038,12 @@ func (opt *Options) init() {
 	if opt.OverwriteHost == "" {
 		// use system hostname
 		opt.OverwriteHost, _ = os.Hostname()
+	}
+	if opt.CacheSize == 0 {
+		opt.CacheSize = 1000000
+	}
+	if opt.CacheEviction == 0 {
+		opt.CacheEviction = 86400
 	}
 }
 
@@ -1088,6 +1097,9 @@ func New(opt *Options) (http.Handler, error) {
 
 		wopiServer: opt.WopiServer,
 		wopiSecret: opt.WopiSecret,
+
+		shareCache:    gcache.New(opt.CacheSize).LFU().Build(),
+		cacheEviction: time.Duration(opt.CacheEviction) * time.Second,
 	}
 
 	proxy.registerRoutes()
@@ -1128,6 +1140,9 @@ type proxy struct {
 
 	wopiServer string
 	wopiSecret string
+
+	shareCache    gcache.Cache
+	cacheEviction time.Duration
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -1252,6 +1267,7 @@ func (p *proxy) basicAuth(h http.HandlerFunc) http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
 		if userRes.Status != reva_api.StatusCode_OK {
 			p.logger.Error("", zap.Error(err))
 			w.Header().Set("WWW-Authenticate", "Basic Realm='owncloud credentials'")
@@ -3040,6 +3056,7 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 
 	ocsShares = append(ocsShares, folderShares...)
 
+	// TODO(labkode): do filtering reva side
 	// if path is set, filter to only shares from that path
 	if path != "" {
 		filtered := []*OCSShare{}
@@ -3186,7 +3203,7 @@ func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
 func (p *proxy) receivedFolderShareToOCSShare(ctx context.Context, share *reva_api.FolderShare) (*OCSShare, error) {
 	ocPath := p.getSharedMountPath(ctx, share)
 	revaPath := p.getRevaPath(ctx, ocPath)
-	md, err := p.getMetadata(ctx, revaPath)
+	md, err := p.getCachedMetadata(ctx, revaPath)
 	if err != nil {
 		return nil, err
 	}
@@ -3234,7 +3251,7 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 	user, _ := reva_api.ContextGetUser(ctx)
 	owner := user.AccountId
 
-	md, err := p.getMetadata(ctx, share.Path)
+	md, err := p.getCachedMetadata(ctx, share.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -3282,7 +3299,8 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 	user, _ := reva_api.ContextGetUser(ctx)
 	owner := user.AccountId
 
-	md, err := p.getMetadata(ctx, pl.Path)
+	md, err := p.getCachedMetadata(ctx, pl.Path)
+	//md, err := p.getMetadata(ctx, pl.Path)
 	if err != nil {
 		p.logger.Error("error getting the metadata for pl path: "+pl.Path, zap.Error(err))
 		return nil, err
@@ -5937,4 +5955,23 @@ func execute(cmd *exec.Cmd) (string, string, int) {
 		}
 	}
 	return outBuf.String(), errBuf.String(), exitStatus
+}
+
+func (p *proxy) getCachedMetadata(ctx context.Context, path string) (*reva_api.Metadata, error) {
+	v, err := p.shareCache.Get(path)
+	if err == nil {
+		if md, ok := v.(*reva_api.Metadata); ok {
+			p.logger.Info("ocproxy: api: getCachedMetadata: md found in cache", zap.String("path", path))
+			return md, nil
+		}
+	}
+
+	md, err := p.getMetadata(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+
+	p.shareCache.SetWithExpire(path, md, p.cacheEviction)
+	p.logger.Info("ocproxy: api: getCachedMetadata: md retrieved and stored  in cache", zap.String("path", path))
+	return md, nil
 }

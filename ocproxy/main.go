@@ -41,6 +41,9 @@ func init() {
 	gc.Add("wopi-server", "http://wopihost.example.org", "hostname of the wopi server")
 	gc.Add("wopi-secret", "bar", "secret to use to connect to the wopi server")
 
+	gc.Add("cache-size", 1000000, "cache size for md records")
+	gc.Add("cache-eviction", 86400, "cache eviction time in seconds for md records")
+
 	gc.BindFlags()
 	gc.ReadConfig()
 }
@@ -66,6 +69,8 @@ func main() {
 		OverwriteHost:         gc.GetString("overwrite-host"),
 		WopiServer:            gc.GetString("wopi-server"),
 		WopiSecret:            gc.GetString("wopi-secret"),
+		CacheSize:             gc.GetInt("cache-size"),
+		CacheEviction:         gc.GetInt("cache-eviction"),
 	}
 
 	_, err := api.New(opts)

@@ -35,7 +35,6 @@ func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, cache
 		return nil, err
 	}
 
-	fmt.Println("hugo", cacheSize, cacheEviction)
 	cache := gcache.New(cacheSize).LFU().Build()
 	return &linkManager{db: db, vfs: vfs, cache: cache, cacheEviction: time.Second * time.Duration(cacheEviction)}, nil
 }
@@ -606,7 +605,7 @@ func (lm *linkManager) getCachedMetadata(ctx context.Context, key string) (*api.
 	v, err := lm.cache.Get(key)
 	if err == nil {
 		if md, ok := v.(*api.Metadata); ok {
-			l.Info("revad: api: getCachedMetadata:  md found in cache", zap.String("path", key))
+			l.Debug("revad: api: getCachedMetadata:  md found in cache", zap.String("path", key))
 			return md, nil
 		}
 	}
@@ -616,7 +615,7 @@ func (lm *linkManager) getCachedMetadata(ctx context.Context, key string) (*api.
 		return nil, err
 	}
 	lm.cache.SetWithExpire(key, md, lm.cacheEviction)
-	l.Info("revad: api: getCachedMetadata: md retrieved and stored  in cache", zap.String("path", key))
+	l.Debug("revad: api: getCachedMetadata: md retrieved and stored  in cache", zap.String("path", key))
 	return md, nil
 }
 

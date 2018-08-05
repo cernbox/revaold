@@ -1066,6 +1066,16 @@ func New(opt *Options) (http.Handler, error) {
 		return nil, err
 	}
 
+	tr := &http.Transport{
+		//	DisableKeepAlives:   opts.DisableKeepAlives,
+		//IdleConnTimeout:     time.Duration(opts.IdleConnTimeout) * time.Second,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		//TLSClientConfig:     &tls.Config{InsecureSkipVerify: opts.InsecureSkipVerify},
+		//DisableCompression:  opts.DisableCompression,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
 	proxy := &proxy{
 		maxUploadFileSize:     int64(opt.MaxUploadFileSize),
 		router:                opt.Router,
@@ -1100,6 +1110,8 @@ func New(opt *Options) (http.Handler, error) {
 
 		shareCache:    gcache.New(opt.CacheSize).LFU().Build(),
 		cacheEviction: time.Duration(opt.CacheEviction) * time.Second,
+
+		tr: tr,
 	}
 
 	proxy.registerRoutes()
@@ -1143,6 +1155,7 @@ type proxy struct {
 
 	shareCache    gcache.Cache
 	cacheEviction time.Duration
+	tr            *http.Transport
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -3111,7 +3124,7 @@ func (p *proxy) getPublicLinkShares(ctx context.Context) ([]*OCSShare, error) {
 	for _, pl := range publicLinks {
 		ocsShare, err := p.publicLinkToOCSShare(ctx, pl)
 		if err != nil {
-			p.logger.Error("cannot convert public link to ocs share", zap.Error(err), zap.String("pl", fmt.Sprintf("%+v", pl)))
+			p.logger.Warn("cannot convert public link to ocs share", zap.Error(err), zap.String("pl", fmt.Sprintf("%+v", pl)))
 			continue
 		}
 		ocsShares = append(ocsShares, ocsShare)
@@ -3153,7 +3166,7 @@ func (p *proxy) getReceivedFolderShares(ctx context.Context) ([]*OCSShare, error
 	for _, share := range folderShares {
 		ocsShare, err := p.receivedFolderShareToOCSShare(ctx, share)
 		if err != nil {
-			p.logger.Error("cannot convert folder share to ocs share", zap.Error(err), zap.String("folder share", fmt.Sprintf("%+v", share)))
+			p.logger.Warn("cannot convert folder share to ocs share", zap.Error(err), zap.String("folder share", fmt.Sprintf("%+v", share)))
 			continue
 		}
 		ocsShares = append(ocsShares, ocsShare)
@@ -3191,7 +3204,7 @@ func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
 	for _, share := range folderShares {
 		ocsShare, err := p.folderShareToOCSShare(ctx, share)
 		if err != nil {
-			p.logger.Error("cannot convert folder share to ocs share", zap.Error(err), zap.String("folder share", fmt.Sprintf("%+v", share)))
+			p.logger.Warn("cannot convert folder share to ocs share", zap.Error(err), zap.String("folder share", fmt.Sprintf("%+v", share)))
 			continue
 		}
 		ocsShares = append(ocsShares, ocsShare)

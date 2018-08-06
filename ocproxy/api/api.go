@@ -4296,7 +4296,7 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	if flip == FlipVertical {
 		img = imaging.FlipV(img)
-	} else {
+	} else if flip == FlipHorizontal {
 		img = imaging.FlipH(img)
 	}
 

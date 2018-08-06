@@ -10,6 +10,7 @@ WorkingDirectory=/var/log/ocproxy
 ExecStart=/usr/local/bin/ocproxy
 StandardOutput=null
 StandardError=syslog
+LimitNOFILE=49152
 
 [Install]
 WantedBy=multi-user.target

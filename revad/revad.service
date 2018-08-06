@@ -10,6 +10,7 @@ WorkingDirectory=/var/log/revad
 ExecStart=/usr/local/bin/revad
 StandardOutput=null
 StandardError=syslog
+LimitNOFILE=49152
 
 [Install]
 WantedBy=multi-user.target

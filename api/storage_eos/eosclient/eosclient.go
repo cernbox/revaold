@@ -301,7 +301,7 @@ func (c *Client) Read(ctx context.Context, username, path string) (io.ReadCloser
 		return nil, err
 	}
 	uuid, _ := uuid.NewV4()
-	rand := uuid.String()
+	rand := "eosread-" + uuid.String()
 	localTarget := fmt.Sprintf("%s/%s", c.opt.CacheDirectory, rand)
 	xrdPath := fmt.Sprintf("%s//%s", c.opt.URL, path)
 	cmd := exec.Command("/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", xrdPath, localTarget, fmt.Sprintf("-OSeos.ruid=%s&eos.rgid=%s", unixUser.Uid, unixUser.Gid))
@@ -318,7 +318,7 @@ func (c *Client) Write(ctx context.Context, username, path string, stream io.Rea
 	if err != nil {
 		return err
 	}
-	fd, err := ioutil.TempFile(c.opt.CacheDirectory, "eoswrite")
+	fd, err := ioutil.TempFile(c.opt.CacheDirectory, "eoswrite-")
 	if err != nil {
 		return err
 	}

@@ -4489,7 +4489,7 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	if flip == FlipVertical {
 		img = imaging.FlipV(img)
-	} else {
+	} else if flip == FlipHorizontal {
 		img = imaging.FlipH(img)
 	}
 

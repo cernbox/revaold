@@ -1775,6 +1775,7 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("files") != "" {
 		fullPath := path.Join(dir, r.URL.Query().Get("files"))
+		fullPath = p.getRevaPath(ctx, fullPath)
 		files = append(files, fullPath)
 	} else {
 		fileList := r.URL.Query()["files[]"]
@@ -1972,6 +1973,7 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Query().Get("files") != "" {
 		fullPath := path.Join(dir, r.URL.Query().Get("files"))
+		fullPath = p.getRevaPath(ctx, fullPath)
 		files = append(files, fullPath)
 	} else {
 		fileList := r.URL.Query()["files[]"]
@@ -5974,7 +5976,7 @@ func (p *proxy) getCachedMetadata(ctx context.Context, path string) (*reva_api.M
 	v, err := p.shareCache.Get(path)
 	if err == nil {
 		if md, ok := v.(*reva_api.Metadata); ok {
-			p.logger.Info("ocproxy: api: getCachedMetadata: md found in cache", zap.String("path", path))
+			p.logger.Debug("ocproxy: api: getCachedMetadata: md found in cache", zap.String("path", path))
 			return md, nil
 		}
 	}
@@ -5985,6 +5987,6 @@ func (p *proxy) getCachedMetadata(ctx context.Context, path string) (*reva_api.M
 	}
 
 	p.shareCache.SetWithExpire(path, md, p.cacheEviction)
-	p.logger.Info("ocproxy: api: getCachedMetadata: md retrieved and stored  in cache", zap.String("path", path))
+	p.logger.Debug("ocproxy: api: getCachedMetadata: md retrieved and stored  in cache", zap.String("path", path))
 	return md, nil
 }

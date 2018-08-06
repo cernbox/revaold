@@ -18,14 +18,19 @@ import (
 	"golang.org/x/net/context"
 )
 
-func New(vs api.VirtualStorage) api.StorageServer {
+func New(vs api.VirtualStorage, temporaryFolder string) api.StorageServer {
 	s := new(svc)
+	if temporaryFolder == "" {
+		temporaryFolder = os.TempDir()
+	}
 	s.vs = vs
+	s.temporaryFolder = temporaryFolder
 	return s
 }
 
 type svc struct {
-	vs api.VirtualStorage
+	vs              api.VirtualStorage
+	temporaryFolder string
 }
 
 func (s *svc) RestoreRevision(ctx context.Context, req *api.RevisionReq) (*api.EmptyResponse, error) {
@@ -271,7 +276,7 @@ func (s *svc) WriteChunk(stream api.Storage_WriteChunkServer) error {
 			l.Error("", zap.Error(err))
 			return err
 		}
-		txFolder := filepath.Join(os.TempDir(), req.TxId)
+		txFolder := s.getTxFolder(req.TxId)
 		if _, err := os.Stat(txFolder); err != nil {
 			l.Error("", zap.Error(err))
 			return err
@@ -305,7 +310,8 @@ func (s *svc) StartWriteTx(ctx context.Context, req *api.EmptyReq) (*api.TxInfoR
 	// create a temporary folder with the TX ID
 	uuid, _ := uuid.NewV4()
 	txID := uuid.String()
-	if err := os.Mkdir(filepath.Join(os.TempDir(), txID), 0755); err != nil {
+	txFolder := s.getTxFolder(txID)
+	if err := os.Mkdir(txFolder, 0755); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
@@ -338,12 +344,14 @@ func parseChunkFilename(fn string) (*chunkInfo, error) {
 
 func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.EmptyResponse, error) {
 	l := ctx_zap.Extract(ctx)
-	txFolder := filepath.Join(os.TempDir(), req.TxId)
+	txFolder := s.getTxFolder(req.TxId)
 	fd, err := os.Open(txFolder)
 	defer fd.Close()
 	if os.IsNotExist(err) {
 		return nil, err
 	}
+	defer os.RemoveAll(txFolder) // remove txFolder once assembled file is returned
+
 	// list all the chunks in the directory
 	names, err := fd.Readdirnames(0)
 	if err != nil {
@@ -405,4 +413,8 @@ func (s *svc) Move(ctx context.Context, req *api.MoveReq) (*api.EmptyResponse, e
 		return nil, err
 	}
 	return &api.EmptyResponse{}, nil
+}
+
+func (s *svc) getTxFolder(txID string) string {
+	return filepath.Join(s.temporaryFolder, txID)
 }

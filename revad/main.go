@@ -97,7 +97,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	api.RegisterAuthServer(server, authsvc.New(authManager, tokenManager, publicLinkManager))
-	api.RegisterStorageServer(server, storagesvc.New(vs))
+	api.RegisterStorageServer(server, storagesvc.New(vs, gc.GetString("svc-storage-tx-temporary-folder")))
 	api.RegisterShareServer(server, sharesvc.New(publicLinkManager, shareManager))
 	api.RegisterPreviewServer(server, previewsvc.New())
 	api.RegisterTaggerServer(server, taggersvc.New(tagManager))
@@ -410,6 +410,8 @@ func init() {
 
 	gc.Add("mig-eoshome-homedir-script", "/root/eoshome-homedir-creation.sh", "script to create home directory on EOSHOME")
 	gc.Add("mig-eoshome-homedir-script-enabled", false, "if set enables creation of home dirs in EOSHOME")
+
+	gc.Add("svc-storage-tx-temporary-folder", "", "temporary folder to create and assemble write tx, if default, assumes os.Tempdir")
 
 	gc.BindFlags()
 	gc.ReadConfig()

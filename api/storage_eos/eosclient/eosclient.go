@@ -322,6 +322,9 @@ func (c *Client) Write(ctx context.Context, username, path string, stream io.Rea
 	if err != nil {
 		return err
 	}
+	defer fd.Close()
+	defer os.RemoveAll(fd.Name())
+
 	// copy stream to local temp file
 	_, err = io.Copy(fd, stream)
 	if err != nil {

@@ -1789,9 +1789,18 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 
 	// if only one file, trigger normal download
 	if len(files) == 1 {
-		mux.Vars(r)["path"] = files[0]
-		p.get(w, r)
-		return
+		md, err := p.getMetadata(ctx, files[0])
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if !md.IsDir {
+			mux.Vars(r)["path"] = md.Path
+			p.get(w, r)
+			return
+
+		}
 	}
 
 	// if files is empty means that we need to download the whole content of dir or
@@ -1899,9 +1908,12 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 				hdr.Mode = 0755
 			}
 
-			if err := tw.WriteHeader(hdr); err != nil {
-				p.logger.Error("", zap.Error(err), zap.String("fn", fn))
-				return err
+			// tar archive gets corrupted is header name is empty
+			if md.Path != "" {
+				if err := tw.WriteHeader(hdr); err != nil {
+					p.logger.Error("", zap.Error(err), zap.String("fn", fn))
+					return err
+				}
 			}
 
 			// if file, write file contents into the tar archive
@@ -5600,7 +5612,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 	}
 
 	// Finder needs the the getLastModified property to work.
-	t := time.Unix(int64(md.Mtime), 0)
+	t := time.Unix(int64(md.Mtime), 0).UTC()
 	lasModifiedString := t.Format(time.RFC1123)
 	getLastModified := propertyXML{
 		xml.Name{Space: "", Local: "d:getlastmodified"},

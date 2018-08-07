@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/cernbox/reva/api"
+	"github.com/gofrs/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
-	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
 )
 
@@ -251,7 +251,7 @@ func (v *vfs) inspectRootNode(ctx context.Context) (*api.Metadata, error) {
 			return nil, err
 		}
 	*/
-	uuid, _ := uuid.NewV4()
+	uuid := uuid.Must(uuid.NewV4())
 	etag := uuid.String()
 
 	md := &api.Metadata{

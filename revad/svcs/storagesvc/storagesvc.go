@@ -12,8 +12,8 @@ import (
 
 	"github.com/cernbox/reva/api"
 
+	"github.com/gofrs/uuid"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
-	"github.com/satori/go.uuid"
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 )
@@ -308,7 +308,7 @@ func (s *svc) WriteChunk(stream api.Storage_WriteChunkServer) error {
 func (s *svc) StartWriteTx(ctx context.Context, req *api.EmptyReq) (*api.TxInfoResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	// create a temporary folder with the TX ID
-	uuid, _ := uuid.NewV4()
+	uuid := uuid.Must(uuid.NewV4())
 	txID := uuid.String()
 	txFolder := s.getTxFolder(txID)
 	if err := os.Mkdir(txFolder, 0755); err != nil {
@@ -359,7 +359,7 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.EmptyResp
 	}
 	l.Info("number of chunks", zap.String("nchunks", fmt.Sprintf("%d", len(names))))
 
-	uuid, _ := uuid.NewV4()
+	uuid := uuid.Must(uuid.NewV4())
 	rand := uuid.String()
 	assembledFilename := filepath.Join(txFolder, fmt.Sprintf("assembled-%s", rand))
 	l.Info("", zap.String("assembledfilename", assembledFilename))

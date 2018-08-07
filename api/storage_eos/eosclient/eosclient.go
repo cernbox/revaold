@@ -16,7 +16,7 @@ import (
 	"syscall"
 
 	"github.com/cernbox/reva/api"
-	"github.com/satori/go.uuid"
+	"github.com/gofrs/uuid"
 	"go.uber.org/zap"
 )
 
@@ -300,7 +300,7 @@ func (c *Client) Read(ctx context.Context, username, path string) (io.ReadCloser
 	if err != nil {
 		return nil, err
 	}
-	uuid, _ := uuid.NewV4()
+	uuid := uuid.Must(uuid.NewV4())
 	rand := "eosread-" + uuid.String()
 	localTarget := fmt.Sprintf("%s/%s", c.opt.CacheDirectory, rand)
 	xrdPath := fmt.Sprintf("%s//%s", c.opt.URL, path)

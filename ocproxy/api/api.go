@@ -4539,8 +4539,8 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	fd, err = os.Open(target)
 	defer fd.Close()
 	io.Copy(w, fd)
-
 }
+
 func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	pa := mux.Vars(r)["path"]

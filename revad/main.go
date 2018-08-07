@@ -45,8 +45,9 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
 
+	"github.com/gofrs/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/satori/go.uuid"
+
 	"go.uber.org/zap"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -321,7 +322,7 @@ func getAuthFunc(tm api.TokenManager) func(context.Context) (context.Context, er
 			user, err := tm.DismantleUserToken(ctx, token)
 			if err == nil {
 				grpc_ctxtags.Extract(ctx).Set("auth.accountid", user.AccountId)
-				uuid, _ := uuid.NewV4()
+				uuid := uuid.Must(uuid.NewV4())
 				tid := uuid.String()
 				grpc_ctxtags.Extract(ctx).Set("tid", tid)
 				newCtx := api.ContextSetUser(ctx, user)

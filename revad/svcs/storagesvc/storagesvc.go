@@ -3,11 +3,11 @@ package storagesvc
 import (
 	"bufio"
 	"bytes"
-	"sort"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -344,11 +344,11 @@ func parseChunkFilename(fn string) (*chunkInfo, error) {
 }
 
 func (s *svc) getSortedChunkSlice(names []string) []string {
-	// sort names numerically by chunk	
+	// sort names numerically by chunk
 	sort.Slice(names, func(i, j int) bool {
-		previous := names[i]	
+		previous := names[i]
 		next := names[j]
-		
+
 		previousOffset, err := strconv.ParseInt(strings.Split(previous, "-")[0], 10, 64)
 		if err != nil {
 			panic("chunk name cannot be casted to int: " + previous)
@@ -377,7 +377,7 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.EmptyResp
 	if err != nil {
 		return &api.EmptyResponse{}, err
 	}
-	
+
 	names = s.getSortedChunkSlice(names)
 
 	l.Debug("chunk sorted names", zap.String("names", fmt.Sprintf("%+v", names)))
@@ -394,7 +394,7 @@ func (s *svc) FinishWriteTx(ctx context.Context, req *api.TxEnd) (*api.EmptyResp
 	}
 
 	for i, n := range names {
-		l.Debug("processing chunk", zap.String("name",n), zap.Int("int", i))
+		l.Debug("processing chunk", zap.String("name", n), zap.Int("int", i))
 		chunkFilename := filepath.Join(txFolder, n)
 		l.Info(fmt.Sprintf("processing chunk %d", i), zap.String("chunk", chunkFilename))
 

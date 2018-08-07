@@ -1,1 +1,795 @@
-{}
+{
+  "mounts":   [
+    {
+      "mount_id": "oldhome",
+      "mount_point": "/oldhome",
+      "mount_options": {
+	"sharing_disabled": false,
+        "read_only": false
+      },
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eosuser.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-a",
+      "mount_point": "/eoshome-a",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-a.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-b",
+      "mount_point": "/eoshome-b",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-b.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-c",
+      "mount_point": "/eoshome-c",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-c.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-d",
+      "mount_point": "/eoshome-d",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-d.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-e",
+      "mount_point": "/eoshome-e",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-e.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-f",
+      "mount_point": "/eoshome-f",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-f.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-g",
+      "mount_point": "/eoshome-g",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-g.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-h",
+      "mount_point": "/eoshome-h",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-h.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    
+    {
+      "mount_id": "eoshome-i",
+      "mount_point": "/eoshome-i",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-i.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-j",
+      "mount_point": "/eoshome-j",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-j.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    {
+      "mount_id": "eoshome-k",
+      "mount_point": "/eoshome-k",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-k.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-l",
+      "mount_point": "/eoshome-l",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-l.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+    {
+      "mount_id": "eoshome-m",
+      "mount_point": "/eoshome-m",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-m.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-n",
+      "mount_point": "/eoshome-n",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-n.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-o",
+      "mount_point": "/eoshome-o",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-o.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-p",
+      "mount_point": "/eoshome-p",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-p.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-q",
+      "mount_point": "/eoshome-q",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-q.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-r",
+      "mount_point": "/eoshome-r",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-r.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-s",
+      "mount_point": "/eoshome-s",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-s.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-t",
+      "mount_point": "/eoshome-t",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-t.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-u",
+      "mount_point": "/eoshome-u",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-u.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-v",
+      "mount_point": "/eoshome-v",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-v.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-w",
+      "mount_point": "/eoshome-w",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-w.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-x",
+      "mount_point": "/eoshome-x",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-x.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-y",
+      "mount_point": "/eoshome-y",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-y.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+
+
+    {
+      "mount_id": "eoshome-z",
+      "mount_point": "/eoshome-z",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/",
+	"master_url": "root://eoshome-z.cern.ch",
+	"enable_logging": true
+      },
+      "storage_wrappers": [
+	{
+	  "name": "home",
+	  "priority": 0
+	}	      
+      ]
+    },
+    
+    {
+      "mount_id": "olduser",
+      "mount_point": "/old/user",
+      "mount_options": {
+        "read_only": false
+      },
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/scratch/user/",
+	"master_url": "root://eosuat.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-l",
+      "mount_point": "/new/user/l",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/l",
+	"master_url": "root://eoshome-l.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-a",
+      "mount_point": "/new/user/a",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/a",
+	"master_url": "root://eoshome-a.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-b",
+      "mount_point": "/new/user/b",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/b",
+	"master_url": "root://eoshome-b.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-c",
+      "mount_point": "/new/user/c",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/c",
+	"master_url": "root://eoshome-c.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-d",
+      "mount_point": "/new/user/d",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/d",
+	"master_url": "root://eoshome-d.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-e",
+      "mount_point": "/new/user/e",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/e",
+	"master_url": "root://eoshome-e.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-f",
+      "mount_point": "/new/user/f",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/f",
+	"master_url": "root://eoshome-f.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-g",
+      "mount_point": "/new/user/g",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/g",
+	"master_url": "root://eoshome-g.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-h",
+      "mount_point": "/new/user/h",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/h",
+	"master_url": "root://eoshome-h.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-i",
+      "mount_point": "/new/user/i",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/i",
+	"master_url": "root://eoshome-i.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-j",
+      "mount_point": "/new/user/j",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/j",
+	"master_url": "root://eoshome-j.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-k",
+      "mount_point": "/new/user/k",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/k",
+	"master_url": "root://eoshome-k.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-l",
+      "mount_point": "/new/user/l",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/l",
+	"master_url": "root://eoshome-l.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-m",
+      "mount_point": "/new/user/m",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/m",
+	"master_url": "root://eoshome-m.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-n",
+      "mount_point": "/new/user/n",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/n",
+	"master_url": "root://eoshome-n.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-o",
+      "mount_point": "/new/user/o",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/o",
+	"master_url": "root://eoshome-o.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-p",
+      "mount_point": "/new/user/p",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/p",
+	"master_url": "root://eoshome-p.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-q",
+      "mount_point": "/new/user/q",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/q",
+	"master_url": "root://eoshome-q.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-r",
+      "mount_point": "/new/user/r",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/r",
+	"master_url": "root://eoshome-r.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-s",
+      "mount_point": "/new/user/s",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/s",
+	"master_url": "root://eoshome-s.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-t",
+      "mount_point": "/new/user/t",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/t",
+	"master_url": "root://eoshome-t.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-u",
+      "mount_point": "/new/user/u",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/u",
+	"master_url": "root://eoshome-u.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-v",
+      "mount_point": "/new/user/v",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/v",
+	"master_url": "root://eoshome-v.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-w",
+      "mount_point": "/new/user/w",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/w",
+	"master_url": "root://eoshome-w.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-x",
+      "mount_point": "/new/user/x",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/x",
+	"master_url": "root://eoshome-x.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-y",
+      "mount_point": "/new/user/y",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/y",
+	"master_url": "root://eoshome-y.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "newuser-z",
+      "mount_point": "/new/user/z",
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/user/z",
+	"master_url": "root://eoshome-z.cern.ch",
+	"enable_logging": true
+      }
+    },
+
+    {
+      "mount_id": "shared-with-me",
+      "mount_point": "/shared-with-me",
+      "mount_options": {
+        "read_only": false
+      },
+      "storage_driver": "share",
+      "storage_options": {}
+    },
+    {
+      "mount_id": "public-links",
+      "mount_point": "/public-links",
+      "mount_options": {
+        "read_only": false
+      },
+      "storage_driver": "public_link",
+      "storage_options": {}
+    },
+    {
+      "mount_id": "oldproject",
+      "mount_point": "/eos/project",
+      "mount_options": {
+        "read_only": false
+      },
+      "storage_driver": "eos",
+      "storage_options": {
+        "namespace": "/eos/project/",
+	"master_url": "root://eosuser.cern.ch",
+	"enable_logging": true
+      }
+    },
+    {
+      "mount_id": "project",
+      "mount_point": "/projects",
+      "mount_options": {
+        "read_only": false
+      },
+      "storage_driver": "all_projects",
+      "storage_options": {}
+    }
+]
+}

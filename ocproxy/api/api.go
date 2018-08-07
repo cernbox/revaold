@@ -91,7 +91,10 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/public.php/webdav{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
 	// gallery app routes
+	p.router.HandleFunc("/index.php/apps/gallery/config.public", p.getGalleryConfig).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/gallery/config", p.getGalleryConfig).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/gallery/preview/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/gallery/preview.public/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
 
 	// requests targeting a file/folder
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
@@ -133,7 +136,6 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/files_eosversions/ajax/getVersions.php", p.tokenAuth(p.getVersions)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_eosversions/ajax/rollbackVersion.php", p.tokenAuth(p.rollbackVersion)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_eosversions/download.php", p.tokenAuth(p.downloadVersion)).Methods("GET")
-	p.router.HandleFunc("/index.php/apps/gallery/config", p.tokenAuth(p.getGalleryConfig)).Methods("GET")
 
 	// avatars
 	p.router.HandleFunc("/index.php/avatar/{username}/{size}", p.tokenAuth(p.getAvatar)).Methods("GET")

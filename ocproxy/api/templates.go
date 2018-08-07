@@ -37,6 +37,8 @@ var publicLinkTemplate string = `
 		<link rel="stylesheet" href="/apps/files/css/upload.css">
     		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
     		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
+    		<link rel="stylesheet" href="/apps/gallery/css/slideshow.css">
+    		<link rel="stylesheet" href="/apps/gallery/css/gallerybutton.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -93,6 +95,14 @@ var publicLinkTemplate string = `
 		<script src="/apps/files/js/files.js"></script>
 		<script src="/apps/files/js/filelist.js"></script>
 		<script src="/apps/files/js/keyboardshortcuts.js"></script>
+		<script src="/apps/gallery/js/vendor/bigshot/bigshot-compressed.js"></script>
+		<script src="/apps/gallery/js/galleryutility.js"></script>
+		<script src="/apps/gallery/js/galleryfileaction.js"></script>
+		<script src="/apps/gallery/js/slideshow.js"></script>
+		<script src="/apps/gallery/js/slideshowcontrols.js"></script>
+		<script src="/apps/gallery/js/slideshowzoomablepreview.js"></script>
+		<script src="/apps/gallery/js/gallerybutton.js"></script>
+		<script src="/apps/gallery/js/vendor/dompurify/src/purify.js"></script>
 		<script>
 		(function ($, OC) {
 

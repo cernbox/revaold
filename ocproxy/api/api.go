@@ -1899,15 +1899,18 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 
 			p.logger.Debug("walking", zap.String("filename", path))
 			hdr := &tar.Header{
-				Name:    md.Path,
-				Mode:    0600,
-				Size:    int64(md.Size),
+				Name:    strings.TrimPrefix(md.Path, "/"),
+				Mode:    0644,
 				ModTime: time.Unix(int64(md.Mtime), 0),
 			}
 
 			if md.IsDir {
 				hdr.Typeflag = tar.TypeDir
 				hdr.Mode = 0755
+				hdr.Name += "/"
+			} else {
+				hdr.Typeflag = tar.TypeReg
+				hdr.Size = int64(md.Size)
 			}
 
 			// tar archive gets corrupted is header name is empty
@@ -2077,15 +2080,18 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 
 			p.logger.Debug("walking", zap.String("filename", path))
 			hdr := &tar.Header{
-				Name:    md.Path,
-				Mode:    0600,
-				Size:    int64(md.Size),
+				Name:    strings.TrimPrefix(md.Path, "/"),
+				Mode:    0644,
 				ModTime: time.Unix(int64(md.Mtime), 0),
 			}
 
 			if md.IsDir {
 				hdr.Typeflag = tar.TypeDir
 				hdr.Mode = 0755
+				hdr.Name += "/"
+			} else {
+				hdr.Typeflag = tar.TypeReg
+				hdr.Size = int64(md.Size)
 			}
 
 			if err := tw.WriteHeader(hdr); err != nil {

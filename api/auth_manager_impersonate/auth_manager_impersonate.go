@@ -1,16 +1,11 @@
-package auth_manager_nop
+package auth_manager_impersonate
 
 import (
 	"context"
-	//"crypto/tls"
-	//"fmt"
-
 	"github.com/cernbox/reva/api"
-	//"gopkg.in/ldap.v2"
 )
 
-type authManager struct {
-}
+type authManager struct{}
 
 func New() api.AuthManager {
 	return &authManager{}

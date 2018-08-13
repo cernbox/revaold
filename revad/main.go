@@ -14,7 +14,8 @@ import (
 	"github.com/cernbox/gohub/gologger"
 
 	"github.com/cernbox/reva/api"
-	"github.com/cernbox/reva/api/auth_manager_nop"
+	"github.com/cernbox/reva/api/auth_manager_impersonate"
+	"github.com/cernbox/reva/api/auth_manager_ldap"
 	"github.com/cernbox/reva/api/mount"
 	"github.com/cernbox/reva/api/project_manager_db"
 	"github.com/cernbox/reva/api/public_link_manager_owncloud"
@@ -365,6 +366,14 @@ func init() {
 	gc.Add("tls-enable", false, "Enable TLS for encrypting connections.")
 	gc.Add("mount-table", "/etc/revad/mounts.yaml", "File containing the mounting table.")
 
+	gc.Add("auth-manager", "impersonate", "Implementation to use for the auth manager")
+	gc.Add("auth-manager-ldap-hostname", "localhost", "Hostname for the LDAP server")
+	gc.Add("auth-manager-ldap-port", 389, "Port for the LDAP server")
+	gc.Add("auth-manager-ldap-basedn", "OU=Users,OU=Organic Units,DC=cern,DC=ch", "Base DN for LDAP queries.")
+	gc.Add("auth-manager-ldap-filter", "(samaccountname=%s)", "Filter for LDAP queries.")
+	gc.Add("auth-manager-ldap-bind-username", "DN=foo,OU=Users,OU=Organic Units,DC=cern,DC=ch", "Username to bind to LDAP.")
+	gc.Add("auth-manager-ldap-bind-password", "bar", "Password to bind to LDAP.")
+
 	gc.Add("user-manager", "cboxgroupd", "Implementation to use for the user manager")
 	gc.Add("user-manager-cboxgroupd-uri", "http://localhost:2002", "URI of the CERNBox Group Daemon")
 	gc.Add("user-manager-cboxgroupd-secret", "bar", "Secret to talk to the CERNBox Group Daemon")
@@ -458,9 +467,21 @@ func getTokenManager() api.TokenManager {
 	return tokenManager
 }
 func getAuthManager() api.AuthManager {
-	authManager := auth_manager_nop.New()
-	return authManager
-
+	driver := gc.GetString("auth-manager")
+	switch driver {
+	case "impersonate":
+		return auth_manager_impersonate.New()
+	case "ldap":
+		hostname := gc.GetString("auth-manager-ldap-hostname")
+		port := gc.GetInt("auth-manager-ldap-port")
+		baseDN := gc.GetString("auth-manager-ldap-basedn")
+		filter := gc.GetString("auth-manager-ldap-filter")
+		bindUsername := gc.GetString("auth-manager-ldap-bind-username")
+		bindPassword := gc.GetString("auth-manager-ldap-bind-password")
+		return auth_manager_ldap.New(hostname, port, baseDN, filter, bindUsername, bindPassword)
+	default:
+		panic("auth manager driver not found: " + driver)
+	}
 }
 func getTagManager() api.TagManager {
 	tagManager := tag_manager_db.New(gc.GetString("tag-manager-db-username"), gc.GetString("tag-manager-db-password"), gc.GetString("tag-manager-db-hostname"), gc.GetInt("tag-manager-db-port"), gc.GetString("tag-manager-db-name"), vs)

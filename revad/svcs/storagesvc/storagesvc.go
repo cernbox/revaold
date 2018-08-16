@@ -86,7 +86,12 @@ func (s *svc) ReadRevision(req *api.RevisionReq, stream api.Storage_ReadRevision
 	ctx := stream.Context()
 	l := ctx_zap.Extract(ctx)
 	readCloser, err := s.vs.DownloadRevision(ctx, req.Path, req.RevKey)
-	defer readCloser.Close()
+	defer func() {
+		l.Debug("closing fd when reading version for path: " + req.Path)
+		if err := readCloser.Close(); err != nil {
+			l.Error("error closing fd", zap.Error(err))
+		}
+	}()
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return err
@@ -120,10 +125,15 @@ func (s *svc) ReadFile(req *api.PathReq, stream api.Storage_ReadFileServer) erro
 	l := ctx_zap.Extract(ctx)
 	readCloser, err := s.vs.Download(ctx, req.Path)
 	if err != nil {
-		l.Error("", zap.Error(err))
+		l.Error("error reading file from fs", zap.Error(err))
 		return err
 	}
-	defer readCloser.Close()
+	defer func() {
+		l.Debug("closing fd when reading for path: " + req.Path)
+		if err := readCloser.Close(); err != nil {
+			l.Error("error closing fd", zap.Error(err))
+		}
+	}()
 
 	// send data chunks of maximum 3 MiB
 	buffer := make([]byte, 1024*1024*3)
@@ -143,7 +153,7 @@ func (s *svc) ReadFile(req *api.PathReq, stream api.Storage_ReadFileServer) erro
 
 		}
 		if err != nil {
-			l.Error("", zap.Error(err))
+			l.Error("error when reading from readcloser", zap.Error(err))
 			return err
 		}
 	}

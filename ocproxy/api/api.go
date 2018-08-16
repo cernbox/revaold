@@ -4634,7 +4634,7 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 				reader = bytes.NewReader(dc.Data)
 				_, err := io.CopyN(w, reader, int64(dc.Length))
 				if err != nil {
-					p.logger.Error("", zap.Error(err))
+					p.logger.Error("error copying data to w", zap.Error(err))
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -5811,12 +5811,12 @@ func getMD5Hash(text string) string {
 func GetContextWithAuth(ctx context.Context) context.Context {
 	if token, ok := reva_api.ContextGetPublicLinkToken(ctx); ok && token != "" {
 		header := metadata.New(map[string]string{"authorization": "pl-bearer " + token})
-		return metadata.NewOutgoingContext(context.Background(), header)
+		return metadata.NewOutgoingContext(ctx, header)
 	}
 
 	if token, ok := reva_api.ContextGetAccessToken(ctx); ok && token != "" {
 		header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
-		return metadata.NewOutgoingContext(context.Background(), header)
+		return metadata.NewOutgoingContext(ctx, header)
 	}
 	return ctx
 }

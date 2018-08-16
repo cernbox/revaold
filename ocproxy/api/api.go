@@ -5830,35 +5830,37 @@ func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 
 		authClient := p.getAuthClient()
 
-		var token string
-		// try first with basic authentication
-		if username, password, ok := r.BasicAuth(); ok {
-			req := &reva_api.ForgeUserTokenReq{ClientId: username, ClientSecret: password}
-			res, err := authClient.ForgeUserToken(ctx, req)
-			if err != nil {
-				p.logger.Warn("error authentication user with basic auth", zap.String("username", username), zap.Error(err))
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
+		// 1st: check if token comes from header
+		token := r.Header.Get("X-Access-Token")
 
-			if res.Status != reva_api.StatusCode_OK {
-				p.logger.Warn("grpc auth req failed", zap.String("username", username), zap.Int("code", int(res.Status)))
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-
-			token = res.Token
-			p.logger.Info("x-access-token generated from basic auth", zap.String("username", username))
-		}
-
-		// 2nd: check if token comes from header
-		if token == "" {
-			token = r.Header.Get("X-Access-Token")
-		}
-
-		// 3rd: check if token comes from query parameter
+		// 2nd: check if token comes from query parameter
 		if token == "" {
 			token = r.URL.Query().Get("x-access-token")
+		}
+
+		// 3rd: check basic auth
+		// the request public.php/webdav sends the public link token as basic auth, so
+		// we cannot use basic auth first as it will try to authorize a non existing user, reducing the performance
+		if token == "" {
+			if username, password, ok := r.BasicAuth(); ok {
+				req := &reva_api.ForgeUserTokenReq{ClientId: username, ClientSecret: password}
+				res, err := authClient.ForgeUserToken(ctx, req)
+				if err != nil {
+					p.logger.Warn("error authentication user with basic auth", zap.String("username", username), zap.Error(err))
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+
+				if res.Status != reva_api.StatusCode_OK {
+					p.logger.Warn("grpc auth req failed", zap.String("username", username), zap.Int("code", int(res.Status)))
+					w.WriteHeader(http.StatusUnauthorized)
+					return
+				}
+
+				token = res.Token
+				p.logger.Info("x-access-token generated from basic auth", zap.String("username", username))
+			}
+
 		}
 
 		if token == "" {

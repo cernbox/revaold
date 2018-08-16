@@ -51,7 +51,7 @@ func (fs *linkStorage) getLink(ctx context.Context, name string) (*api.PublicLin
 		return nil, "", nil, api.NewError(api.ContextUserRequiredError).WithMessage("pl access token does not match requested path")
 	}
 
-	ctx = api.ContextSetUser(ctx, &api.User{AccountId: pl.OwnerId, Groups: []string{}})
+	//ctx = api.ContextSetUser(ctx, &api.User{AccountId: pl.OwnerId, Groups: []string{}})
 
 	link, err := fs.linkManager.InspectPublicLinkByToken(ctx, token)
 	if err != nil {

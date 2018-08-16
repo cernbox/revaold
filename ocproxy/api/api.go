@@ -854,8 +854,10 @@ type storageStat struct {
 func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var owner string
-	if user, ok := reva_api.ContextGetUser(r.Context()); ok {
+	if user, ok := reva_api.ContextGetUser(ctx); ok {
 		owner = user.AccountId
+	} else if pl, ok := reva_api.ContextGetPublicLink(ctx); ok {
+		owner = pl.OwnerId
 	}
 
 	gCtx := GetContextWithAuth(ctx)
@@ -867,8 +869,8 @@ func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if res.Status != reva_api.StatusCode_OK {
-		err := reva_api.NewError(reva_api.UnknownError)
-		p.logger.Error("", zap.Error(err))
+		p.writeError(res.Status, w, r)
+		p.logger.Error("wrong grpc status", zap.Int("status", int(res.Status)))
 		return
 	}
 	stat := &storageStat{
@@ -4048,7 +4050,7 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 
 	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("error getting metadata for public link", zap.Error(err))
 		w.Write([]byte(publicLinkTemplateNotFound))
 		return
 	}
@@ -5812,9 +5814,11 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 		return metadata.NewOutgoingContext(context.Background(), header)
 	}
 
-	token, _ := reva_api.ContextGetAccessToken(ctx)
-	header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
-	return metadata.NewOutgoingContext(context.Background(), header)
+	if token, ok := reva_api.ContextGetAccessToken(ctx); ok && token != "" {
+		header := metadata.New(map[string]string{"authorization": "user-bearer " + token})
+		return metadata.NewOutgoingContext(context.Background(), header)
+	}
+	return ctx
 }
 
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {

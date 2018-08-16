@@ -344,6 +344,9 @@ func getAuthFunc(tm api.TokenManager) func(context.Context) (context.Context, er
 			tid := uuid.String()
 			grpc_ctxtags.Extract(ctx).Set("tid", tid)
 			newCtx := api.ContextSetPublicLink(ctx, pl)
+
+			// we set the user context as well from the owner of the link
+			newCtx = api.ContextSetUser(newCtx, &api.User{AccountId: pl.OwnerId, Groups: []string{}})
 			return newCtx, nil
 
 		}

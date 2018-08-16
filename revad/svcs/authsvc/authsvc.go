@@ -39,8 +39,10 @@ func (s *svc) DismantleUserToken(ctx context.Context, req *api.TokenReq) (*api.U
 	token := req.Token
 	u, err := s.tm.DismantleUserToken(ctx, token)
 	if err != nil {
-		l.Error("token invalid", zap.Error(err))
-		return nil, api.NewError(api.TokenInvalidErrorCode).WithMessage(err.Error())
+		l.Warn("token invalid", zap.Error(err))
+		res := &api.UserResponse{Status: api.StatusCode_TOKEN_INVALID}
+		return res, nil
+		//return nil, api.NewError(api.TokenInvalidErrorCode).WithMessage(err.Error())
 	}
 	userRes := &api.UserResponse{User: u}
 	return userRes, nil
@@ -59,7 +61,7 @@ func (s *svc) ForgePublicLinkToken(ctx context.Context, req *api.ForgePublicLink
 
 	token, err := s.tm.ForgePublicLinkToken(ctx, pl)
 	if err != nil {
-		l.Error("", zap.Error(err))
+		l.Warn("", zap.Error(err))
 		return nil, err
 	}
 	tokenResponse := &api.TokenResponse{Token: token}

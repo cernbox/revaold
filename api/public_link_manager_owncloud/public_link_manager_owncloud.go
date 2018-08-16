@@ -563,7 +563,8 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		// the share points to the version folder id, we
 		// need to point to the file id, so in the UI the share info
 		// appears on the latest file version.
-		newCtx := api.ContextSetUser(ctx, &api.User{AccountId: dbShare.Owner})
+		//newCtx := api.ContextSetUser(ctx, &api.User{AccountId: dbShare.Owner})
+		newCtx := ctx
 		//md, err := lm.vfs.GetMetadata(newCtx, fileID)
 		md, err := lm.getCachedMetadata(newCtx, fileID)
 		if err != nil {

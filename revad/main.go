@@ -498,7 +498,7 @@ func applyMigrationLogic() {
 	}
 
 	newHomeMap := map[string]api.Storage{}
-	for _, l := range "abcdefghilmnopqrstuvwxyz" {
+	for _, l := range "abcdefghijklmnopqrstuvwxyz" {
 		letter := string(l)
 		m, err := vs.GetMount(fmt.Sprintf("/eoshome-%s", letter))
 		if err != nil {
@@ -549,8 +549,7 @@ func applyMigrationLogic() {
 	}
 
 	newUserMap := map[string]api.Storage{}
-	//for _, l := range "abcdefghilmnopqrstuvwxyz" {
-	for _, l := range "l" {
+	for _, l := range "abcdefghijklmnopqrstuvwxyz" {
 		letter := string(l)
 		m, err := vs.GetMount(fmt.Sprintf("/new/user/%s", letter))
 		if err != nil {

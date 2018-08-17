@@ -3336,18 +3336,29 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 	user, _ := reva_api.ContextGetUser(ctx)
 	owner := user.AccountId
 
-	md, err := p.getCachedMetadata(ctx, pl.Path)
-	//md, err := p.getMetadata(ctx, pl.Path)
-	if err != nil {
-		p.logger.Error("error getting the metadata for pl path: "+pl.Path, zap.Error(err))
-		return nil, err
-	}
-
 	var itemType ItemType
 	if pl.ItemType == reva_api.PublicLink_FOLDER {
 		itemType = ItemTypeFolder
 	} else {
 		itemType = ItemTypeFile
+	}
+
+	var md *reva_api.Metadata
+	if itemType == ItemTypeFile {
+		fileMD, err := p.getMetadata(ctx, pl.Path)
+		if err != nil {
+			p.logger.Error("error getting the metadata for pl path: "+pl.Path, zap.Error(err))
+			return nil, err
+		}
+		md = fileMD
+
+	} else {
+		folderMD, err := p.getCachedMetadata(ctx, pl.Path)
+		if err != nil {
+			p.logger.Error("error getting the cached metadata for pl path: "+pl.Path, zap.Error(err))
+			return nil, err
+		}
+		md = folderMD
 	}
 
 	mimeType := reva_api.DetectMimeType(reva_api.PublicLink_FOLDER == pl.ItemType, pl.Name)

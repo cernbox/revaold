@@ -68,7 +68,7 @@ func (lm *linkManager) AuthenticatePublicLink(ctx context.Context, token, passwo
 	}
 	pb, err := lm.convertToPublicLink(ctx, dbShare)
 	if err != nil {
-		l.Error("", zap.Error(err))
+		l.Error("error converting db share to public link", zap.Error(err))
 		return nil, err
 	}
 
@@ -563,8 +563,7 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		// the share points to the version folder id, we
 		// need to point to the file id, so in the UI the share info
 		// appears on the latest file version.
-		//newCtx := api.ContextSetUser(ctx, &api.User{AccountId: dbShare.Owner})
-		newCtx := ctx
+		newCtx := api.ContextSetUser(ctx, &api.User{AccountId: dbShare.Owner})
 		//md, err := lm.vfs.GetMetadata(newCtx, fileID)
 		md, err := lm.getCachedMetadata(newCtx, fileID)
 		if err != nil {
@@ -576,8 +575,12 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		versionFolder := md.Path
 		filename := getFileIDFromVersionFolder(versionFolder)
 
-		//md, err = lm.vfs.GetMetadata(newCtx, filename)
-		md, err = lm.getCachedMetadata(newCtx, filename)
+		// we cannot cache the call to get metadata of the current version of the file
+		// as if we cache it, we will hit the problem that after a public link share is created,
+		// the file gets updated, and the cached metadata still points to the old version, with a different
+		// file ID
+		//md, err = lm.getCachedMetadata(newCtx, filename)
+		md, err = lm.vfs.GetMetadata(newCtx, filename)
 		if err != nil {
 			return nil, err
 		}

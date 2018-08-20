@@ -45,6 +45,7 @@ var shareIDRegexp = regexp.MustCompile(`\(id:.+\)$`)
 func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
+	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
 
 	// user prefixed webdav routes
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
@@ -154,6 +155,39 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/swanviewer/load", p.tokenAuth(p.swanLoad)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/swanviewer/publicload", p.tokenAuth(p.swanPublicLoad)).Methods("GET")
 
+}
+
+func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting user from ctx", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	type response struct {
+		Data       interface{} `json:"data"`
+		Status     string      `json:"status"`
+		StatusCode int         `json:"statuscode"`
+	}
+
+	userData := struct {
+		ID          string `json:"id"`
+		DisplayName string `json:"display-name"`
+		Email       string `json:"email"`
+	}{ID: user.AccountId, DisplayName: user.AccountId, Email: user.AccountId + "@cern.ch"}
+
+	res := &response{Data: userData, StatusCode: 100, Status: "ok"}
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error in json marshal", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
 }
 
 func (p *proxy) swanPublicLoad(w http.ResponseWriter, r *http.Request) {

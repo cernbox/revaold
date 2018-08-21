@@ -154,8 +154,56 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/swanviewer/eosinfo", p.tokenAuth(p.swanEosInfo)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/swanviewer/load", p.tokenAuth(p.swanLoad)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/swanviewer/publicload", p.tokenAuth(p.swanPublicLoad)).Methods("GET")
+	
+	// drawio routes
+	p.router.HandleFunc("/index.php/apps/drawio/ajax/settings", p.drawioSettings).Methods("GET")
 
 }
+/*
+{
+   "formats":{
+      "xml":{
+         "mime":"application\/xml",
+         "type":"text"
+      },
+      "drawio":{
+         "mime":"application\/x-drawio",
+         "type":"text"
+      }
+   },
+   "settings":{
+      "overrideXml":"yes",
+      "offlineMode":"no"
+   }
+}
+*/
+
+func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
+	payload := `
+	{
+	   "formats":{
+	      "xml":{
+		 "mime":"text\/xml; charset=utf-8",
+		 "type":"text"
+	      },
+	      "drawio":{
+		 "mime":"application\/x-drawio",
+		 "type":"text"
+	      }
+	   },
+	   "settings":{
+	      "overrideXml":"yes",
+	      "offlineMode":"no"
+	   },
+	   "urls":{
+	      "originUrl":"https://test-drawio.web.cern.ch",
+	      "drawioUrl":"https://test-drawio.web.cern.ch?embed=1&ui=kennedy&lang=en_GB&spin=1&proto=json"
+	   }
+	}`
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(payload))
+}
+
 
 func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

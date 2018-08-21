@@ -110,6 +110,7 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/sharees", p.tokenAuth(p.search)).Methods("GET")
 
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.createShare)).Methods("POST")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.getShare)).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.deleteShare)).Methods("DELETE")
 	p.router.HandleFunc("/ocs/v1.php/apps/files_sharing/api/v1/shares/{share_id}", p.tokenAuth(p.updateShare)).Methods("PUT")
@@ -154,11 +155,55 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/swanviewer/eosinfo", p.tokenAuth(p.swanEosInfo)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/swanviewer/load", p.tokenAuth(p.swanLoad)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/swanviewer/publicload", p.tokenAuth(p.swanPublicLoad)).Methods("GET")
-	
+
 	// drawio routes
 	p.router.HandleFunc("/index.php/apps/drawio/ajax/settings", p.drawioSettings).Methods("GET")
 
 }
+
+func (p *proxy) isSyncClient(r *http.Request) bool {
+	agent := strings.ToLower(r.UserAgent())
+	if strings.Contains(agent, "mirall") {
+		return true
+	}
+	return false
+}
+
+// stripCBOXMappedPath returns the the path in the ownCloud namespace.
+// For example, the sync client will send /home/Photos and the ocPath will be /Photos.
+func (p *proxy) stripCBOXMappedPath(r *http.Request, reqPath string) (string, context.Context) {
+	// we need to guess if the request is comming from a sync client or not.
+	// the best heuristic we have is to rely on the user-agent.
+	ctx := r.Context()
+
+	// TODO(labkode): remove this hack
+	if !p.isSyncClient(r) {
+		p.logger.Debug("request is not from a sync client")
+		return reqPath, ctx
+	}
+
+	homePrefix := "/home"
+	var ocPath string
+	if reqPath != "" {
+		ocPath = path.Join("/", strings.TrimPrefix(reqPath, homePrefix))
+	}
+
+	ctx = context.WithValue(ctx, "sync-client-ocs-prefix", homePrefix)
+	return ocPath, ctx
+}
+
+func (p *proxy) joinCBOXMappedPath(ctx context.Context, ocPath string) string {
+	val := ctx.Value("sync-client-ocs-prefix")
+	if val != nil {
+		prefix, ok := val.(string)
+		if ok {
+			newPath := path.Join(prefix, ocPath)
+			return newPath
+		}
+	}
+	return ocPath
+}
+
 /*
 {
    "formats":{
@@ -1019,7 +1064,7 @@ type OCSShare struct {
 	ItemSource           string     `json:"item_source"`
 	FileSource           string     `json:"file_source"`
 	FileTarget           string     `json:"file_target"`
-	ShareWith            string     `json:"share_with"`
+	ShareWith            *string    `json:"share_with"`
 	ShareWithDisplayName string     `json:"share_with_displayname"`
 	Name                 string     `json:"name"`
 	URL                  string     `json:"url"`
@@ -1034,7 +1079,7 @@ type NewShareOCSRequest struct {
 	ShareWith    string     `json:"shareWith"`
 	PublicUpload bool       `json:"publicUpload"`
 	Password     JSONString `json:"password"`
-	Permissions  Permission `json:"permissions"`
+	Permissions  JSONInt    `json:"permissions"`
 	ExpireDate   JSONString `json:"expireDate"`
 }
 
@@ -2933,8 +2978,7 @@ func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly bool, expiration int64, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (p *proxy) createPublicLinkShare(ctx context.Context, newShare *NewShareOCSRequest, readOnly bool, expiration int64, w http.ResponseWriter, r *http.Request) {
 	gCtx := GetContextWithAuth(ctx)
 	newLinkReq := &reva_api.NewLinkReq{
 		Path:     newShare.Path,
@@ -2976,9 +3020,7 @@ func (p *proxy) createPublicLinkShare(newShare *NewShareOCSRequest, readOnly boo
 
 }
 
-func (p *proxy) createFolderShare(newShare *NewShareOCSRequest, readOnly bool, w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
+func (p *proxy) createFolderShare(ctx context.Context, newShare *NewShareOCSRequest, readOnly bool, w http.ResponseWriter, r *http.Request) {
 	recipientType := reva_api.ShareRecipient_USER
 	if newShare.ShareType == ShareTypeGroup {
 		recipientType = reva_api.ShareRecipient_GROUP
@@ -3055,39 +3097,63 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		shareTypeString := r.Form.Get("shareType")
-		shareWith := r.Form.Get("shareWith")
-		permissionsString := r.Form.Get("permissions")
-		path := r.Form.Get("path")
+		newShare.Path = r.Form.Get("path")
+		newShare.ShareWith = r.Form.Get("shareWith")
 
 		var shareType ShareType
-		var permissions Permission
+		shareTypeString := r.Form.Get("shareType")
 		if shareTypeString == "0" {
 			shareType = ShareTypeUser
 		} else if shareTypeString == "1" {
 			shareType = ShareTypeGroup
+		} else if shareTypeString == "3" {
+			shareType = ShareTypePublicLink
 		}
-
-		perm, err := strconv.ParseInt(permissionsString, 10, 64)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		permissions = Permission(perm)
-
-		newShare.Path = path
-		newShare.ShareWith = shareWith
 		newShare.ShareType = shareType
-		newShare.Permissions = permissions
+
+		permissions := r.Form.Get("permissions")
+		permissionsJSON := JSONInt{}
+		if permissions != "" {
+			perm, err := strconv.ParseInt(permissions, 10, 64)
+			if err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			permissionsJSON.Value = int(perm)
+			permissionsJSON.Valid = true
+			permissionsJSON.Set = true
+
+		}
+		newShare.Permissions = permissionsJSON
+
+		// convert expiration and password fields to JSONString and JSONInt
+		password := r.Form.Get("password")
+		passwordJSON := JSONString{}
+		if password != "" {
+			passwordJSON.Value = password
+			passwordJSON.Set = true
+			passwordJSON.Valid = true
+		}
+		newShare.Password = passwordJSON
+
+		expireDate := r.Form.Get("expireDate")
+		expireDateJSON := JSONString{}
+		if expireDate != "" {
+			expireDateJSON.Value = expireDate
+			expireDateJSON.Set = true
+			expireDateJSON.Valid = true
+		}
+		newShare.ExpireDate = expireDateJSON
 
 	}
 
+	newShare.Path, ctx = p.stripCBOXMappedPath(r, newShare.Path)
 	newShare.Path = p.getRevaPath(ctx, newShare.Path)
 
-	var readOnly bool
-	if newShare.Permissions == PermissionRead {
-		readOnly = true
+	var readOnly bool = true
+	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) == PermissionReadWrite {
+		readOnly = false
 	}
 
 	var expiration int64
@@ -3119,10 +3185,10 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 	newShare.Name = path.Base(md.Path)
 
 	if newShare.ShareType == ShareTypePublicLink {
-		p.createPublicLinkShare(newShare, readOnly, expiration, w, r)
+		p.createPublicLinkShare(ctx, newShare, readOnly, expiration, w, r)
 		return
 	} else if newShare.ShareType == ShareTypeUser || newShare.ShareType == ShareTypeGroup {
-		p.createFolderShare(newShare, readOnly, w, r)
+		p.createFolderShare(ctx, newShare, readOnly, w, r)
 		return
 	} else {
 		w.WriteHeader(http.StatusNotImplemented)
@@ -3150,7 +3216,9 @@ func (p *proxy) getRemoteShares(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	path := r.URL.Query().Get("path")
+	originalPath := r.URL.Query().Get("path")
+	path, ctx := p.stripCBOXMappedPath(r, originalPath)
+
 	sharedWithMe := r.URL.Query().Get("shared_with_me")
 
 	if sharedWithMe == "true" {
@@ -3180,14 +3248,14 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	if path != "" {
 		filtered := []*OCSShare{}
 		for _, v := range ocsShares {
-			if v.Path == path {
+			if v.Path == originalPath { // compate to req path as path has cbox mapping magic
 				filtered = append(filtered, v)
 			}
 		}
 		ocsShares = filtered
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
 	payload := &OCSPayload{Meta: meta, Data: ocsShares}
 	ocsRes := &OCSResponse{OCS: payload}
 	encoded, err := json.Marshal(ocsRes)
@@ -3360,7 +3428,7 @@ func (p *proxy) receivedFolderShareToOCSShare(ctx context.Context, share *reva_a
 		State:                ShareStateAccepted,
 		UIDFileOwner:         share.OwnerId,
 		UIDOwner:             share.OwnerId,
-		ShareWith:            shareWith,
+		ShareWith:            &shareWith,
 		ShareWithDisplayName: shareWith,
 	}
 	return ocsShare, nil
@@ -3402,13 +3470,13 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 		ItemType:             itemType,
 		MimeType:             mimeType,
 		Name:                 md.Path,
-		Path:                 md.Path,
+		Path:                 p.joinCBOXMappedPath(ctx, md.Path),
 		Permissions:          permissions,
 		ShareTime:            int(share.Mtime),
 		State:                ShareStateAccepted,
 		UIDFileOwner:         owner,
 		UIDOwner:             owner,
-		ShareWith:            shareWith,
+		ShareWith:            &shareWith,
 		ShareWithDisplayName: shareWith,
 	}
 	return ocsShare, nil
@@ -3456,6 +3524,10 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 	if pl.Protected {
 		shareWith = "X"
 	}
+	var shareWithPointer *string
+	if shareWith != "" {
+		shareWithPointer = &shareWith
+	}
 
 	var expiration string
 	if pl.Expires > 0 {
@@ -3475,15 +3547,16 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		ItemType:             itemType,
 		MimeType:             mimeType,
 		Name:                 pl.Name,
-		Path:                 md.Path,
+		Path:                 p.joinCBOXMappedPath(ctx, md.Path),
 		Permissions:          permissions,
 		ShareTime:            int(pl.Mtime),
 		State:                ShareStateAccepted,
 		UIDFileOwner:         owner,
 		UIDOwner:             owner,
-		ShareWith:            shareWith,
+		ShareWith:            shareWithPointer,
 		ShareWithDisplayName: shareWith,
 		Expiration:           expiration,
+		URL:                  fmt.Sprintf("https://%s/index.php/s/%s", p.overwriteHost, pl.Token),
 	}
 	return ocsShare, nil
 }
@@ -3715,7 +3788,33 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
 	if found {
+		res, err := p.getShareClient().RevokePublicLink(gCtx, &reva_api.ShareIDReq{Id: shareID})
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if res.Status != reva_api.StatusCode_OK {
+			p.writeError(res.Status, w, r)
+			return
+		}
+
+		meta := &ResponseMeta{Status: "ok", StatusCode: 100}
+		payload := &OCSPayload{Meta: meta}
+		ocsRes := &OCSResponse{OCS: payload}
+		encoded, err := json.Marshal(ocsRes)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(encoded)
+		return
 	}
 
 	found, err = p.isFolderShare(ctx, shareID)
@@ -3736,8 +3835,34 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 			p.writeError(res.Status, w, r)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+
+		meta := &ResponseMeta{Status: "ok", StatusCode: 100}
+		payload := &OCSPayload{Meta: meta}
+		ocsRes := &OCSResponse{OCS: payload}
+		encoded, err := json.Marshal(ocsRes)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(encoded)
 	}
+
+	p.logger.Warn("share not found: " + shareID)
+	meta := &ResponseMeta{Status: "failure", StatusCode: 404}
+	payload := &OCSPayload{Meta: meta}
+	ocsRes := &OCSResponse{OCS: payload}
+	encoded, err := json.Marshal(ocsRes)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encoded)
 }
 
 func (p *proxy) isPublicLinkShare(ctx context.Context, shareID string) (bool, error) {
@@ -3788,7 +3913,7 @@ func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.Response
 		return
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
 	payload := &OCSPayload{Meta: meta, Data: ocsShare}
 	ocsRes := &OCSResponse{OCS: payload}
 	encoded, err := json.Marshal(ocsRes)
@@ -3803,12 +3928,12 @@ func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.Response
 }
 
 // TODO(labkode): check for updateReadOnly
-func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSRequest, updateExpiration, updatePassword bool, expiration int64, readOnly bool, w http.ResponseWriter, r *http.Request) {
+func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSRequest, updateExpiration, updatePassword, updatePermissions bool, expiration int64, readOnly bool, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	updateLinkReq := &reva_api.UpdateLinkReq{
 		UpdateExpiration: updateExpiration,
 		UpdatePassword:   updatePassword,
-		UpdateReadOnly:   true,
+		UpdateReadOnly:   updatePermissions,
 		ReadOnly:         readOnly,
 		Password:         newShare.Password.Value,
 		Expiration:       uint64(expiration),
@@ -3836,7 +3961,7 @@ func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSReque
 		return
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
 	payload := &OCSPayload{Meta: meta, Data: ocsShare}
 	ocsRes := &OCSResponse{OCS: payload}
 	encoded, err := json.Marshal(ocsRes)
@@ -3877,56 +4002,79 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		shareTypeString := r.Form.Get("shareType")
-		shareWith := r.Form.Get("shareWith")
-		permissionsString := r.Form.Get("permissions")
-		path := r.Form.Get("path")
+		newShare.ShareWith = r.Form.Get("shareWith")
 
 		var shareType ShareType
-		var permissions Permission
+		shareTypeString := r.Form.Get("shareType")
 		if shareTypeString == "0" {
 			shareType = ShareTypeUser
 		} else if shareTypeString == "1" {
 			shareType = ShareTypeGroup
+		} else if shareTypeString == "3" {
+			shareType = ShareTypePublicLink
 		}
-
-		perm, err := strconv.ParseInt(permissionsString, 10, 64)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		permissions = Permission(perm)
-
-		newShare.Path = path
-		newShare.ShareWith = shareWith
 		newShare.ShareType = shareType
-		newShare.Permissions = permissions
+
+		permissionsJSON := JSONInt{}
+		if permissions, ok := r.Form.Get("permissions"), len(r.Form["permissions"]) > 0; ok {
+			if permissions != "" {
+				perm, err := strconv.ParseInt(permissions, 10, 64)
+				if err != nil {
+					p.logger.Error("", zap.Error(err))
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				permissionsJSON.Value = int(perm)
+				permissionsJSON.Valid = true
+				permissionsJSON.Set = true
+
+			}
+		}
+		newShare.Permissions = permissionsJSON
+
+		passwordJSON := JSONString{}
+		if password, ok := r.Form.Get("password"), len(r.Form["password"]) > 0; ok {
+			passwordJSON.Value = password
+			passwordJSON.Set = true
+			passwordJSON.Valid = true
+		}
+		newShare.Password = passwordJSON
+
+		expireDateJSON := JSONString{}
+		if expireDate, ok := r.Form.Get("expireDate"), len(r.Form["expireDate"]) > 0; ok {
+			expireDateJSON.Value = expireDate
+			expireDateJSON.Set = true
+			expireDateJSON.Valid = true
+		}
+		newShare.ExpireDate = expireDateJSON
 
 	}
 
+	var readOnly bool = true
+	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) == PermissionReadWrite {
+		readOnly = false
+	}
+
 	updateExpiration := false
-	updatePassword := false
 	var expiration int64
 	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
 		updateExpiration = true
 		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
 		if err != nil {
-			p.logger.Error("expire data format is not valid", zap.Error(err))
+			p.logger.Warn("expire date format is not 02-01-2006", zap.Error(err))
+			// continue with another date format
+		}
+		t, err = time.Parse("2006-01-02", newShare.ExpireDate.Value)
+		if err != nil {
+			p.logger.Warn("expire date format is not 2006-01-02", zap.Error(err))
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		expiration = t.Unix()
 	}
 
-	if newShare.Password.Set {
-		updatePassword = true
-	}
-
-	var readOnly bool
-	if newShare.Permissions == PermissionRead {
-		readOnly = true
-	}
+	updatePassword := newShare.Password.Set
+	updatePermissions := newShare.Permissions.Set
 
 	found, err := p.isPublicLinkShare(ctx, shareID)
 	if err != nil {
@@ -3935,7 +4083,7 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if found {
-		p.updatePublicLinkShare(shareID, newShare, updateExpiration, updatePassword, expiration, readOnly, w, r)
+		p.updatePublicLinkShare(shareID, newShare, updateExpiration, updatePassword, updatePermissions, expiration, readOnly, w, r)
 		return
 	}
 
@@ -5452,6 +5600,11 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	path := mux.Vars(r)["path"]
 
+	// request comes from remote.php/dav/files/gonzalhu/...
+	if mux.Vars(r)["username"] != "" {
+		ctx = context.WithValue(ctx, "user-dav-uri", true)
+	}
+
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, path)
 	gReq := &reva_api.PathReq{Path: revaPath}
@@ -5766,10 +5919,21 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 
 	// TODO(labkode): harden check for user
 	if user, ok := reva_api.ContextGetUser(ctx); ok {
-		response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
-		if md.IsDir {
-			response.Href = path.Join("/remote.php/dav/files", user.AccountId, md.Path) + "/"
+		var ref string
+
+		// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
+		if val := ctx.Value("user-dav-uri"); val != nil {
+			ref = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+		} else {
+			ref = path.Join("/remote.php/webdav", md.Path)
 		}
+
+		if md.IsDir {
+			ref += "/"
+		}
+
+		response.Href = ref
+
 	} else { // public link access
 		response.Href = path.Join("/public.php/webdav", md.Path)
 		if md.IsDir {

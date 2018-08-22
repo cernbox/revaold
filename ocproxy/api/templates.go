@@ -39,6 +39,7 @@ var publicLinkTemplate string = `
     		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
     		<link rel="stylesheet" href="/apps/gallery/css/slideshow.css">
     		<link rel="stylesheet" href="/apps/gallery/css/gallerybutton.css">
+    		<link rel="stylesheet" href="/apps/files_pdfviewer/css/style.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -135,6 +136,7 @@ var publicLinkTemplate string = `
 		})(jQuery, OC);
 		</script>
     		<script src="/apps/wopiviewer/js/script.js"></script>
+		<script src="/apps/files_pdfviewer/js/previewplugin.js"></script>
 	<body id="body-public">
 	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
 	<noscript>
@@ -555,6 +557,7 @@ var publicLinkTemplateFile = `
 		<link rel="stylesheet" href="/apps/files/css/upload.css">
     		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
     		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
+    		<link rel="stylesheet" href="/apps/files_pdfviewer/css/style.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -641,6 +644,7 @@ var publicLinkTemplateFile = `
 		})(jQuery, OC);
 		</script>
     		<script src="/apps/wopiviewer/js/script.js"></script>
+		<script src="/apps/files_pdfviewer/js/previewplugin.js"></script>
 		{{ if (eq .Mime "application/pynb") }}
     		<script src="/apps/swanviewer/js/script.js"></script>
 		{{ end }}

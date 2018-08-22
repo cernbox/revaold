@@ -249,7 +249,6 @@ func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(payload))
 }
 
-
 func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, err := getUserFromContext(ctx)
@@ -864,6 +863,11 @@ func (p *proxy) getTagsForKey(ctx context.Context, key string) ([]*reva_api.Tag,
 
 func (p *proxy) getFav(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	// request comes from remote.php/dav/files/gonzalhu/...
+	if mux.Vars(r)["username"] != "" {
+		ctx = context.WithValue(ctx, "user-dav-uri", true)
+	}
 
 	favs, err := p.getTagsForKey(ctx, "fav")
 	if err != nil {

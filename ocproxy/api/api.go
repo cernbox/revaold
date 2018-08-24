@@ -3159,19 +3159,25 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 	newShare.Path = p.getRevaPath(ctx, newShare.Path)
 
 	var readOnly bool = true
-	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) == PermissionReadWrite {
+	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) >= PermissionReadWrite {
 		readOnly = false
 	}
 
 	var expiration int64
 	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
 		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
-		if err != nil {
-			p.logger.Error("expire data format is not valid", zap.Error(err))
-			w.WriteHeader(http.StatusBadRequest)
-			return
+		if err == nil {
+			expiration = t.Unix()
+		} else {
+			p.logger.Warn("expire date format is not 02-01-2006", zap.Error(err))
+			t, err = time.Parse("2006-01-02", newShare.ExpireDate.Value)
+			if err != nil {
+				p.logger.Warn("expire date format is not 2006-01-02", zap.Error(err))
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			expiration = t.Unix()
 		}
-		expiration = t.Unix()
 	}
 
 	// check that path exists
@@ -4068,7 +4074,7 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var readOnly bool = true
-	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) == PermissionReadWrite {
+	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) >= PermissionReadWrite {
 		readOnly = false
 	}
 
@@ -4077,17 +4083,18 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 	if newShare.ExpireDate.Set && newShare.ExpireDate.Value != "" {
 		updateExpiration = true
 		t, err := time.Parse("02-01-2006", newShare.ExpireDate.Value)
-		if err != nil {
+		if err == nil {
+			expiration = t.Unix()
+		} else {
 			p.logger.Warn("expire date format is not 02-01-2006", zap.Error(err))
-			// continue with another date format
+			t, err = time.Parse("2006-01-02", newShare.ExpireDate.Value)
+			if err != nil {
+				p.logger.Warn("expire date format is not 2006-01-02", zap.Error(err))
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			expiration = t.Unix()
 		}
-		t, err = time.Parse("2006-01-02", newShare.ExpireDate.Value)
-		if err != nil {
-			p.logger.Warn("expire date format is not 2006-01-02", zap.Error(err))
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		expiration = t.Unix()
 	}
 
 	updatePassword := newShare.Password.Set

@@ -2977,6 +2977,9 @@ func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Expires", "0")
+	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
 
@@ -3268,6 +3271,10 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Expires", "0")
+	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
@@ -3751,6 +3758,9 @@ func (p *proxy) getShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Expires", "0")
+		w.Header().Set("Pragma", "no-cache")
 		w.WriteHeader(http.StatusOK)
 		w.Write(encoded)
 		return
@@ -3769,6 +3779,9 @@ func (p *proxy) getShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Expires", "0")
+		w.Header().Set("Pragma", "no-cache")
 		w.WriteHeader(http.StatusOK)
 		w.Write(encoded)
 		return
@@ -4853,7 +4866,10 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 
 	//w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(md.Path))
 	// TODO(labkode): when accesing a file pl, the path is empty, so the download appears as download, using the eos info is more friendly
-	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(md.EosFile))
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+path.Base(md.EosFile)+"\"")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Expires", "0")
+	w.Header().Set("Pragma", "no-cache")
 	w.WriteHeader(http.StatusOK)
 
 	var reader io.Reader

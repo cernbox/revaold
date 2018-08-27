@@ -41,6 +41,8 @@ func init() {
 	gc.Add("wopi-server", "http://wopihost.example.org", "hostname of the wopi server")
 	gc.Add("wopi-secret", "bar", "secret to use to connect to the wopi server")
 
+	gc.Add("apps-drawio-url", "https://test-drawio.web.cern.ch", "The DrawIO URL")
+
 	gc.Add("cache-size", 1000000, "cache size for md records")
 	gc.Add("cache-eviction", 86400, "cache eviction time in seconds for md records")
 
@@ -69,6 +71,7 @@ func main() {
 		OverwriteHost:         gc.GetString("overwrite-host"),
 		WopiServer:            gc.GetString("wopi-server"),
 		WopiSecret:            gc.GetString("wopi-secret"),
+		DrawIOURL:             gc.GetString("apps-drawio-url"),
 		CacheSize:             gc.GetInt("cache-size"),
 		CacheEviction:         gc.GetInt("cache-eviction"),
 	}

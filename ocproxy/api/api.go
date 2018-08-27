@@ -224,7 +224,7 @@ func (p *proxy) joinCBOXMappedPath(ctx context.Context, ocPath string) string {
 */
 
 func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
-	payload := `
+	payload := fmt.Sprintf(`
 	{
 	   "formats":{
 	      "xml":{
@@ -241,10 +241,10 @@ func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
 	      "offlineMode":"no"
 	   },
 	   "urls":{
-	      "originUrl":"https://test-drawio.web.cern.ch",
-	      "drawioUrl":"https://test-drawio.web.cern.ch?embed=1&ui=kennedy&lang=en_GB&spin=1&proto=json"
+	      "originUrl":"%s",
+	      "drawioUrl":"%s?embed=1&ui=kennedy&lang=en_GB&spin=1&proto=json"
 	   }
-	}`
+	}`, p.drawIOURL)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(payload))
 }
@@ -1119,6 +1119,8 @@ type Options struct {
 	WopiServer string
 	WopiSecret string
 
+	DrawIOURL string
+
 	CacheSize     int
 	CacheEviction int
 }
@@ -1174,6 +1176,11 @@ func (opt *Options) init() {
 		// use system hostname
 		opt.OverwriteHost, _ = os.Hostname()
 	}
+
+	if opt.DrawIOURL == "" {
+		opt.DrawIOURL = "https://test-drawio.web.cern.ch"
+	}
+
 	if opt.CacheSize == 0 {
 		opt.CacheSize = 1000000
 	}
@@ -1243,6 +1250,8 @@ func New(opt *Options) (http.Handler, error) {
 		wopiServer: opt.WopiServer,
 		wopiSecret: opt.WopiSecret,
 
+		drawIOURL: opt.DrawIOURL,
+
 		shareCache:    gcache.New(opt.CacheSize).LFU().Build(),
 		cacheEviction: time.Duration(opt.CacheEviction) * time.Second,
 
@@ -1287,6 +1296,8 @@ type proxy struct {
 
 	wopiServer string
 	wopiSecret string
+
+	drawIOURL string
 
 	shareCache    gcache.Cache
 	cacheEviction time.Duration

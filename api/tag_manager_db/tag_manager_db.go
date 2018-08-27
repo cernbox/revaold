@@ -200,20 +200,15 @@ func (lm *tagManager) GetTagsForKey(ctx context.Context, key string) ([]*api.Tag
 		if err != nil {
 			return nil, err
 		}
+
 		tag := &api.Tag{Id: id, ItemType: api.Tag_ItemType(itemType), Uid: u.AccountId, FileIdPrefix: fileIDPrefix, FileId: fileID, TagKey: key, TagValue: tagVal}
-		tags = append(tags, tag)
 
-	}
-
-	// TODO(labkode): remove orhpans
-
-	// convert tag pointing to versions folder to file
-	for _, tag := range tags {
 		if tag.ItemType == api.Tag_FILE {
 			fileID = joinFileID(tag.FileIdPrefix, tag.FileId)
 			md, err := lm.vfs.GetMetadata(ctx, fileID)
 			if err != nil {
-				return nil, err
+				// TOOD(labkode): log wan here
+				continue
 			}
 
 			versionFolder := md.Path
@@ -221,11 +216,14 @@ func (lm *tagManager) GetTagsForKey(ctx context.Context, key string) ([]*api.Tag
 
 			md, err = lm.vfs.GetMetadata(ctx, filename)
 			if err != nil {
-				return nil, err
+				// TOOD(labkode): log wan here
+				continue
 			}
 			_, id := splitFileID(md.Id)
 			tag.FileId = id
 		}
+
+		tags = append(tags, tag)
 	}
 
 	err = rows.Err()

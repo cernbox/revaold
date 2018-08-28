@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.20
+Version: 0.0.21
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,7 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue Aug 28 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.21
 * Fri Aug 24 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.20
 * Fri Aug 24 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.19
 * Wed Aug 21 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.18

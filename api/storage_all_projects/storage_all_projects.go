@@ -51,7 +51,7 @@ func (fs *allProjectsStorage) getProject(ctx context.Context, name string) (*api
 }
 
 func (fs *allProjectsStorage) GetPathByID(ctx context.Context, id string) (string, error) {
-	id = "oldproject:" + id
+	id = "oldeosproject:" + id
 	eosPath, err := fs.vs.GetPathByID(ctx, id)
 	if err != nil {
 		fs.logger.Error("error getting path from id", zap.Error(err))

@@ -116,6 +116,9 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 			switch exitStatus {
 			case 2:
 				err = api.NewError(api.StorageNotFoundErrorCode)
+			// eos reports back error code 22 when the user is not allowed to enter the instance
+			case 22:
+				err = api.NewError(api.StorageNotFoundErrorCode)
 			}
 		}
 	}

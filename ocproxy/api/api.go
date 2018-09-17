@@ -270,7 +270,9 @@ func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {
 		Email       string `json:"email"`
 	}{ID: user.AccountId, DisplayName: user.AccountId, Email: user.AccountId + "@cern.ch"}
 
-	res := &response{Data: userData, StatusCode: 100, Status: "ok"}
+	meta := &ResponseMeta{Status: "ok", StatusCode: 100, Message: "OK"}
+	payload := &OCSPayload{Meta: meta, Data: userData}
+	res := &OCSResponse{OCS: payload}
 	encoded, err := json.Marshal(res)
 	if err != nil {
 		p.logger.Error("ocproxy: api: error in json marshal", zap.Error(err))

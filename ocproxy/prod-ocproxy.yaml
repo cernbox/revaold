@@ -1,4 +1,0 @@
-jwt-sign-key: "secreto"
-log-level: debug
-wopi-server: "https://cbox-wopi.cern.ch/wopi"
-wopi-secret: "nm57KUfUHH3jYKdvpYffTjGa"

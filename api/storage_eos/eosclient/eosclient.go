@@ -526,11 +526,26 @@ func (c *Client) parseQuota(path, raw string) (int, int, error) {
 }
 
 func (c *Client) parseFileInfo(raw string) (*FileInfo, error) {
+
+	line := raw[15:]
+	index := strings.Index(line, " file=/")
+	lengthString := line[0:index]
+	length, err := strconv.ParseUint(lengthString, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	line = line[index+6:] // skip ' file='
+	name := line[0:length]
+
 	kv := make(map[string]string)
-	partsBySpace := strings.Split(raw, " ") // we have [keylength.file=14 file=/eos/pps/proc/ container=3 ...}
+	kv["file"] = name
+
+	line = line[length+1:]
+	partsBySpace := strings.Split(line, " ") // we have [size=45 container=3 ...}
 	var previousXAttr = ""
 	for _, p := range partsBySpace {
-		partsByEqual := strings.Split(p, "=") // we have kv pairs like [ keylength.file 14]
+		partsByEqual := strings.Split(p, "=") // we have kv pairs like [size 14]
 		if len(partsByEqual) == 2 {
 			// handle xattrn and xattrv special cases
 			if partsByEqual[0] == "xattrn" {
@@ -543,15 +558,6 @@ func (c *Client) parseFileInfo(raw string) (*FileInfo, error) {
 			}
 		}
 	}
-
-	// fix eos path because the kv pair file=path could contains whitespace and the whitespace is the pair separator. Not very smart :(
-	fileLength := kv["keylength.file"]
-	fileLengthInt64, err := strconv.ParseInt(fileLength, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	startIndex := int64(14) + int64(len(fileLength)) + 7
-	kv["file"] = raw[startIndex : startIndex+fileLengthInt64]
 
 	fi, err := c.mapToFileInfo(kv)
 	if err != nil {

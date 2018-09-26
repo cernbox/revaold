@@ -244,7 +244,7 @@ func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
 	      "originUrl":"%s",
 	      "drawioUrl":"%s?embed=1&ui=kennedy&lang=en_GB&spin=1&proto=json"
 	   }
-	}`, p.drawIOURL)
+	}`, p.drawIOURL, p.drawIOURL)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(payload))
 }

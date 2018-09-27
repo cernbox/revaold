@@ -16,6 +16,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	gourl "net/url"
 	"os"
 	"os/exec"
@@ -5927,15 +5928,10 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 	// the fileID must be xml-escaped as there are cases like public links
 	// that contains a path as the file id. This path can contain &, for example,
 	// which if it is not encoded properly, will result in an empty view for the user
-	var fileIDEscaped bytes.Buffer
-	err := xml.EscapeText(&fileIDEscaped, []byte(md.Id))
-	if err != nil {
-		p.logger.Error("error xml escaping oc:fileid", zap.Error(err))
-		return nil, err
-
-	}
+	// url encode fileid
+	encoded := &url.URL{Path: md.Id}
 	ocID := propertyXML{xml.Name{Space: "", Local: "oc:fileid"}, "",
-		fileIDEscaped.Bytes()}
+		[]byte(encoded.String())}
 
 	ocDownloadURL := propertyXML{xml.Name{Space: "", Local: "oc:downloadURL"},
 		"", []byte("")}
@@ -5980,6 +5976,10 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 			response.Href = path.Join("/public.php/webdav", md.Path) + "/"
 		}
 	}
+
+	// url encode path
+	encoded = &url.URL{Path: response.Href}
+	response.Href = encoded.String()
 
 	response.Propstat = propStatList
 

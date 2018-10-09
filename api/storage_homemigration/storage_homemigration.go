@@ -251,8 +251,9 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata,
 			md, err = ts.GetMetadata(ctx, p)
 			if err != nil {
 				fs.logger.Error("api: storage_homemigration: GetMetadata: error getting md just after creating homedir")
-				return nil, err
+				return nil, errors.New("force reload")
 			}
+
 			migID := fmt.Sprintf("%s:%s", mountID, md.Id)
 			migPath := path.Join(mountPrefix, md.Path)
 

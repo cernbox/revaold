@@ -19,7 +19,6 @@ type authManager struct {
 }
 
 func New(hostname string, port int, basedn, filter, bindclientID, bindpassword string) api.AuthManager {
-	fmt.Println(hostname, port, basedn, filter, bindclientID, bindpassword)
 	return &authManager{
 		hostname:     hostname,
 		port:         port,
@@ -37,7 +36,6 @@ func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret 
 	}
 	defer l.Close()
 
-	fmt.Println(am.bindUsername, am.bindPassword)
 	// First bind with a read only user
 	err = l.Bind(am.bindUsername, am.bindPassword)
 	if err != nil {
@@ -62,8 +60,11 @@ func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret 
 		return nil, api.NewError(api.UserNotFoundErrorCode)
 	}
 
+	for _, e := range sr.Entries {
+		e.Print()
+	}
+
 	userdn := sr.Entries[0].DN
-	fmt.Println(userdn)
 
 	// Bind as the user to verify their password
 	err = l.Bind(userdn, clientSecret)

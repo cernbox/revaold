@@ -25,6 +25,7 @@ func (tm *tokenManager) ForgeUserToken(ctx context.Context, user *api.User) (str
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
 	claims := token.Claims.(jwt.MapClaims)
 	claims["account_id"] = user.AccountId
+	claims["display_name"] = user.DisplayName
 	claims["groups"] = user.Groups
 	claims["exp"] = time.Now().Add(time.Second * time.Duration(3600))
 	tokenString, err := token.SignedString([]byte(tm.signSecret))
@@ -56,6 +57,8 @@ func (tm *tokenManager) DismantleUserToken(ctx context.Context, token string) (*
 		return nil, errors.New("account_id claim is not a string")
 	}
 
+	displayName, _ := claims["display_name"].(string) // no displayname is not an error
+
 	rawGroups, ok := claims["groups"].([]interface{})
 	if !ok {
 		return nil, errors.New("groups claim is not a []interface{}")
@@ -72,8 +75,9 @@ func (tm *tokenManager) DismantleUserToken(ctx context.Context, token string) (*
 	}
 
 	user := &api.User{
-		AccountId: accountID,
-		Groups:    groups,
+		AccountId:   accountID,
+		Groups:      groups,
+		DisplayName: displayName,
 	}
 	return user, nil
 }

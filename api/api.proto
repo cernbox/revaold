@@ -139,6 +139,7 @@ message UserResponse {
 message User {
 	string account_id = 1;
 	repeated string groups = 2;
+	string display_name = 3;
 }
 
 enum StatusCode {

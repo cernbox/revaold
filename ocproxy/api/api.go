@@ -201,7 +201,7 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, _ := reva_api.ContextGetUser(ctx)
-	owner := user.AccountId
+	//owner := user.AccountId
 	ownerDisplayName := user.DisplayName
 	basename := path.Base(md.EosFile)
 	target := fmt.Sprintf("%s (id:%s)", basename, shareID)
@@ -211,7 +211,7 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 		mailBody = "To: %s@cern.ch\r\n" +
 			"Subject: %s shared folder '%s' with you\r\n" +
 			"\r\n" +
-			"%s (%s) shared the folder '%s' with you (%s).\r\n" +
+			"%s shared the folder '%s' with you (%s).\r\n" +
 			"If you are logged in as %s you can go to 'https://cernbox.cern.ch' and click the tab 'Shared with you' to find the shared folder called '%s'.\r\n" +
 			"If you want to sync the share in your desktop, add a new folder with this path (FAQ: https://cern.service-now.com/service-portal/article.do?n=KB0003663 ):\r\n\r\n" +
 			"'%s'\r\n" +
@@ -219,19 +219,19 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 			"Best regards,\r\n" +
 			"CERNBox Team"
 
-		mailBody = fmt.Sprintf(mailBody, recipient, ownerDisplayName, basename, ownerDisplayName, owner, basename, recipient, recipient, target, md.EosFile)
+		mailBody = fmt.Sprintf(mailBody, recipient, ownerDisplayName, basename, ownerDisplayName, basename, recipient, recipient, target, md.EosFile)
 	} else {
 		mailBody = "To: %s@cern.ch\r\n" +
 			"Subject: %s shared folder '%s' with you\r\n" +
 			"\r\n" +
-			"%s (%s) shared the folder '%s' with the e-group '%s' that you are part of it.\r\n" +
+			"%s shared the folder '%s' with the e-group '%s' that you are part of it.\r\n" +
 			"If you go to 'https://cernbox.cern.ch' and click the tab 'Shared with you' you will find the shared folder called '%s'.\r\n" +
 			"If you want to sync the share in your desktop, add a new folder with this path (FAQ: https://cern.service-now.com/service-portal/article.do?n=KB0003663 ):\r\n\r\n" +
 			"'%s'\r\n" +
 			"\r\n" +
 			"Best regards,\r\n" +
 			"CERNBox Team"
-		mailBody = fmt.Sprintf(mailBody, recipient, ownerDisplayName, basename, ownerDisplayName, owner, basename, recipient, target, md.EosFile)
+		mailBody = fmt.Sprintf(mailBody, recipient, ownerDisplayName, basename, ownerDisplayName, basename, recipient, target, md.EosFile)
 
 	}
 

@@ -43,6 +43,9 @@ func init() {
 
 	gc.Add("apps-drawio-url", "https://drawio.web.cern.ch", "The DrawIO URL")
 
+	gc.Add("apps-mail-server", "cernmx.cern.ch:25", "An IMAP mail server where to send mails")
+	gc.Add("apps-mail-server-from-address", "cernbox-noreply@cern.ch", "The sender of the mail (FROM header)")
+
 	gc.Add("cache-size", 1000000, "cache size for md records")
 	gc.Add("cache-eviction", 86400, "cache eviction time in seconds for md records")
 
@@ -74,6 +77,8 @@ func main() {
 		DrawIOURL:             gc.GetString("apps-drawio-url"),
 		CacheSize:             gc.GetInt("cache-size"),
 		CacheEviction:         gc.GetInt("cache-eviction"),
+		MailServer:            gc.GetString("apps-mail-server"),
+		MailServerFromAddress: gc.GetString("apps-mail-server-from-address"),
 	}
 
 	_, err := api.New(opts)

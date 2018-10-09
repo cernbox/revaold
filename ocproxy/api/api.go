@@ -9,13 +9,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
-	"errors"
 	"fmt"
 	"html/template"
 	"image/color"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/smtp"
 	"net/url"
 	gourl "net/url"
 	"os"
@@ -35,6 +35,7 @@ import (
 	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	"github.com/rwcarlsen/goexif/exif"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -160,8 +161,218 @@ func (p *proxy) registerRoutes() {
 	// drawio routes
 	p.router.HandleFunc("/index.php/apps/drawio/ajax/settings", p.drawioSettings).Methods("GET")
 
+	// onlyoffice routes
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.getOnlyOfficeSettings).Methods("GET")
+	//p.router.HandleFunc("/index.php/apps/onlyoffice/{path}", p.).Methods("GET")
+
+	// mailer routes
+	p.router.HandleFunc("/index.php/apps/mailer/sendmail", p.tokenAuth(p.sendMail)).Methods("POST")
+
 }
 
+func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		err = errors.Wrap(err, "error reading form")
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	recipient := r.Form.Get("recipient")
+	shareType := r.Form.Get("shareType")
+	shareID := r.Form.Get("id")
+
+	share, err := p.getFolderShare(ctx, shareID)
+	if err != nil {
+		err = errors.Wrap(err, "error getting folder share")
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	md, err := p.getCachedMetadata(ctx, share.Path)
+	if err != nil {
+		err = errors.Wrap(err, "error getting md for path: "+share.Path)
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	user, _ := reva_api.ContextGetUser(ctx)
+	owner := user.AccountId
+	ownerDisplayName := user.DisplayName
+	basename := path.Base(md.EosFile)
+	target := fmt.Sprintf("%s (id:%s)", basename, shareID)
+
+	mailBody := ""
+	if shareType == "0" { // user
+		mailBody = "To: %s@cern.ch\r\n" +
+			"Subject: %s shared folder '%s' with you\r\n" +
+			"\r\n" +
+			"%s (%s) shared the folder '%s' with you (%s).\r\n" +
+			"If you are logged in as %s you can go to 'https://cernbox.cern.ch' and click the tab 'Shared with you' to find the shared folder called '%s'.\r\n" +
+			"If you want to sync the share in your desktop, add a new folder with this path (FAQ: https://cern.service-now.com/service-portal/article.do?n=KB0003663 ):\r\n\r\n" +
+			"'%s'\r\n" +
+			"\r\n" +
+			"Best regards,\r\n" +
+			"CERNBox Team"
+
+		mailBody = fmt.Sprintf(mailBody, recipient, ownerDisplayName, basename, ownerDisplayName, owner, basename, recipient, recipient, target, md.EosFile)
+	} else {
+		mailBody = "To: %s@cern.ch\r\n" +
+			"Subject: %s shared folder '%s' with you\r\n" +
+			"\r\n" +
+			"%s (%s) shared the folder '%s' with the e-group '%s' that you are part of it.\r\n" +
+			"If you go to 'https://cernbox.cern.ch' and click the tab 'Shared with you' you will find the shared folder called '%s'.\r\n" +
+			"If you want to sync the share in your desktop, add a new folder with this path (FAQ: https://cern.service-now.com/service-portal/article.do?n=KB0003663 ):\r\n\r\n" +
+			"'%s'\r\n" +
+			"\r\n" +
+			"Best regards,\r\n" +
+			"CERNBox Team"
+		mailBody = fmt.Sprintf(mailBody, recipient, ownerDisplayName, basename, ownerDisplayName, owner, basename, recipient, target, md.EosFile)
+
+	}
+
+	to := []string{recipient + "@cern.ch"}
+	err = smtp.SendMail(p.mailServer, nil, p.mailServerFromAddress, to, []byte(mailBody))
+	var msg string
+	if err != nil {
+		err = errors.Wrap(err, "error sending mail")
+		p.logger.Error("", zap.Error(err))
+		msg = fmt.Sprintf("Error sending mail to: %s@cern.ch", recipient)
+		return
+	} else {
+		msg = fmt.Sprintf("Mail sent to: %s@cern.ch", recipient)
+	}
+
+	payload := struct {
+		Message string `json:"message"`
+	}{msg}
+	encoded, _ := json.Marshal(payload)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
+}
+
+func (p *proxy) getOnlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
+	settings := `
+{
+   "formats":{
+      "docx":{
+         "mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document",
+         "type":"text",
+         "edit":true,
+         "def":true
+      },
+      "xlsx":{
+         "mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+         "type":"spreadsheet",
+         "edit":true,
+         "def":true
+      },
+      "pptx":{
+         "mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation",
+         "type":"presentation",
+         "edit":true,
+         "def":true
+      },
+      "ppsx":{
+         "mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow",
+         "type":"presentation",
+         "edit":true,
+         "def":true
+      },
+      "txt":{
+         "mime":"text\/plain",
+         "type":"text",
+         "edit":true,
+         "def":false
+      },
+      "csv":{
+         "mime":"text\/csv",
+         "type":"spreadsheet",
+         "edit":true,
+         "def":false
+      },
+      "odt":{
+         "mime":"application\/vnd.oasis.opendocument.text",
+         "type":"text",
+         "conv":true
+      },
+      "ods":{
+         "mime":"application\/vnd.oasis.opendocument.spreadsheet",
+         "type":"spreadsheet",
+         "conv":true
+      },
+      "odp":{
+         "mime":"application\/vnd.oasis.opendocument.presentation",
+         "type":"presentation",
+         "conv":true
+      },
+      "doc":{
+         "mime":"application\/msword",
+         "type":"text",
+         "conv":true
+      },
+      "xls":{
+         "mime":"application\/vnd.ms-excel",
+         "type":"spreadsheet",
+         "conv":true
+      },
+      "ppt":{
+         "mime":"application\/vnd.ms-powerpoint",
+         "type":"presentation",
+         "conv":true
+      },
+      "pps":{
+         "mime":"application\/vnd.ms-powerpoint",
+         "type":"presentation",
+         "conv":true
+      },
+      "epub":{
+         "mime":"application\/epub+zip",
+         "type":"text",
+         "conv":true
+      },
+      "rtf":{
+         "mime":"text\/rtf",
+         "type":"text",
+         "conv":true
+      },
+      "mht":{
+         "mime":"message\/rfc822",
+         "conv":true
+      },
+      "html":{
+         "mime":"text\/html",
+         "type":"text",
+         "conv":true
+      },
+      "htm":{
+         "mime":"text\/html",
+         "type":"text",
+         "conv":true
+      },
+      "xps":{
+         "mime":"application\/vnd.ms-xpsdocument",
+         "type":"text"
+      },
+      "pdf":{
+         "mime":"application\/pdf",
+         "type":"text"
+      },
+      "djvu":{
+         "mime":"image\/vnd.djvu",
+         "type":"text"
+      }
+   },
+   "sameTab":true
+}
+`
+
+	w.Write([]byte(settings))
+}
 func (p *proxy) isSyncClient(r *http.Request) bool {
 	agent := strings.ToLower(r.UserAgent())
 	if strings.Contains(agent, "mirall") {
@@ -1126,6 +1337,9 @@ type Options struct {
 
 	CacheSize     int
 	CacheEviction int
+
+	MailServer            string
+	MailServerFromAddress string
 }
 
 func (opt *Options) init() {
@@ -1259,6 +1473,9 @@ func New(opt *Options) (http.Handler, error) {
 		cacheEviction: time.Duration(opt.CacheEviction) * time.Second,
 
 		tr: tr,
+
+		mailServer:            opt.MailServer,
+		mailServerFromAddress: opt.MailServerFromAddress,
 	}
 
 	proxy.registerRoutes()
@@ -1305,6 +1522,9 @@ type proxy struct {
 	shareCache    gcache.Cache
 	cacheEviction time.Duration
 	tr            *http.Transport
+
+	mailServer            string
+	mailServerFromAddress string
 }
 
 // TODO(labkode): store this global var inside the proxy

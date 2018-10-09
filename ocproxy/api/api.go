@@ -439,18 +439,14 @@ func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
 	payload := fmt.Sprintf(`
 	{
 	   "formats":{
-	      "xml":{
-		 "mime":"text\/xml; charset=utf-8",
-		 "type":"text"
-	      },
 	      "drawio":{
 		 "mime":"application\/x-drawio",
 		 "type":"text"
 	      }
 	   },
 	   "settings":{
-	      "overrideXml":"yes",
-	      "offlineMode":"no"
+	      "overrideXml":"no",
+	      "offlineMode":"yes"
 	   },
 	   "urls":{
 	      "originUrl":"%s",

@@ -251,6 +251,8 @@ func getCustomMime(ext string) string {
 		return "application/root"
 	case ".ipynb":
 		return "application/pynb"
+	case ".drawio":
+		return "application/x-drawio"
 	default:
 		return ""
 	}

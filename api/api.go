@@ -156,12 +156,13 @@ type ShareManager interface {
 
 	ListReceivedShares(ctx context.Context) ([]*FolderShare, error)
 	GetReceivedFolderShare(ctx context.Context, shareID string) (*FolderShare, error)
+	UnmountReceivedShare(ctx context.Context, shareID string) error
+
 	/*
 		ListFolderRecipients(ctx context.Context, path string) ([]*ShareRecipient, error)
 		GetFolderSharesInPath(ctx context.Context, path string) ([]*FolderShare, error)
 
 		MountReceivedShare(ctx context.Context, shareID string) error
-		UnmountReceivedShare(ctx context.Context, shareID string) error
 	*/
 }
 

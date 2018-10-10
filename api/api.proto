@@ -382,6 +382,13 @@ message FolderShare {
 	uint64 ctime = 6;
 	uint64 mtime = 7;
 	string target = 8;
+	State state = 9;
+
+	enum State {
+		ACCEPTED = 0;
+		PENDING = 1;
+		REJECTED = 2;
+	}
 }
 
 

@@ -13,6 +13,7 @@ import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +30,50 @@ type shareManager struct {
 	db  *sql.DB
 	vfs api.VirtualStorage
 	um  api.UserManager
+}
+
+func (sm *shareManager) UnmountReceivedShare(ctx context.Context, id string) error {
+	u, err := getUserFromContext(ctx)
+	if err != nil {
+		err = errors.Wrap(err, "error getting user context")
+		return err
+	}
+
+	err = sm.rejectShare(ctx, u.AccountId, id)
+	if err != nil {
+		err = errors.Wrapf(err, "error rejecting db share: id=%s user=%s", id, u.AccountId)
+		return err
+	}
+
+	return nil
+}
+
+func (sm *shareManager) rejectShare(ctx context.Context, receiver, id string) error {
+	intID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		err = errors.Wrapf(err, "cannot parse id to int64: id=%s", id)
+		return err
+	}
+
+	_, err = sm.getDBShareWithMe(ctx, receiver, id)
+	if err != nil {
+		err = errors.Wrapf(err, "error getting share: id=%s user=%s", id, receiver)
+		return err
+	}
+
+	query := "update oc_share set accepted=2 where id=?"
+	stmt, err := sm.db.Prepare(query)
+	if err != nil {
+		err = errors.Wrapf(err, "error preparing statement: id=%s", id)
+		return err
+	}
+
+	_, err = stmt.Exec(intID)
+	if err != nil {
+		err = errors.Wrapf(err, "error updating db: id=%s", id)
+		return err
+	}
+	return nil
 }
 
 func (sm *shareManager) GetReceivedFolderShare(ctx context.Context, id string) (*api.FolderShare, error) {
@@ -376,6 +421,7 @@ type dbShare struct {
 	ShareType   int
 	STime       int
 	FileTarget  string
+	State       int
 }
 
 func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id string) (*dbShare, error) {
@@ -395,6 +441,7 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 		stime       int
 		permissions int
 		fileTarget  string
+		state       int
 	)
 
 	groups, err := sm.um.GetUserGroups(ctx, accountID)
@@ -412,19 +459,19 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 	var query string
 
 	if len(groups) > 1 {
-		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where id=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
+		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
 		queryArgs = append(queryArgs, groupArgs...)
 	} else {
-		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where id=? and (share_with=?)"
+		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=?)"
 	}
 
-	if err := sm.db.QueryRow(query, queryArgs...).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget); err != nil {
+	if err := sm.db.QueryRow(query, queryArgs...).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget, &state); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
 		}
 		return nil, err
 	}
-	dbShare := &dbShare{ID: int(intID), UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType, FileTarget: fileTarget}
+	dbShare := &dbShare{ID: int(intID), UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType, FileTarget: fileTarget, State: state}
 	return dbShare, nil
 
 }
@@ -445,10 +492,10 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	var query string
 
 	if len(groups) > 1 {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and uid_owner!=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
 		queryArgs = append(queryArgs, groupArgs...)
 	} else {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (share_type=? or share_type=?) and uid_owner!=? and (share_with=?)"
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=?)"
 	}
 	rows, err := sm.db.Query(query, queryArgs...)
 	if err != nil {

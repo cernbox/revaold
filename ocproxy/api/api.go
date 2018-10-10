@@ -4360,6 +4360,28 @@ func (p *proxy) acceptShare(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) rejectShare(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	shareID := mux.Vars(r)["share_id"]
+	gCtx := GetContextWithAuth(ctx)
+
+	client := p.getShareClient()
+	req := &reva_api.ReceivedShareReq{ShareId: shareID}
+	res, err := client.UnmountReceivedShare(gCtx, req)
+	if err != nil {
+		err = errors.Wrapf(err, "error unmounting received share: id=%s", shareID)
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.Status != reva_api.StatusCode_OK {
+		err = errors.New("unexpected response from unmounting share")
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (p *proxy) isNotFoundError(err error) bool {

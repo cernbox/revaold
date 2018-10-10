@@ -5,6 +5,7 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -51,6 +52,14 @@ func (s *svc) MountReceivedShare(ctx context.Context, req *api.ReceivedShareReq)
 }
 
 func (s *svc) UnmountReceivedShare(ctx context.Context, req *api.ReceivedShareReq) (*api.EmptyResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	err := s.shareManager.UnmountReceivedShare(ctx, req.ShareId)
+	if err != nil {
+		err = errors.Wrapf(err, "error unmounting received share: id=%s", req.ShareId)
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
 	return &api.EmptyResponse{}, nil
 }
 

@@ -61,14 +61,14 @@ func (sm *shareManager) rejectShare(ctx context.Context, receiver, id string) er
 		return err
 	}
 
-	query := "update oc_share set accepted=2 where id=?"
+	query := "insert into oc_share_acl(id, rejected_by) values(?, ?)"
 	stmt, err := sm.db.Prepare(query)
 	if err != nil {
 		err = errors.Wrapf(err, "error preparing statement: id=%s", id)
 		return err
 	}
 
-	_, err = stmt.Exec(intID)
+	_, err = stmt.Exec(intID, receiver)
 	if err != nil {
 		err = errors.Wrapf(err, "error updating db: id=%s", id)
 		return err
@@ -459,10 +459,12 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 	var query string
 
 	if len(groups) > 1 {
-		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
+		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
 		queryArgs = append(queryArgs, groupArgs...)
+		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=?)"
+		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=?) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
+		queryArgs = append(queryArgs, accountID)
 	}
 
 	if err := sm.db.QueryRow(query, queryArgs...).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget, &state); err != nil {
@@ -492,10 +494,12 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	var query string
 
 	if len(groups) > 1 {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + "))"
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
 		queryArgs = append(queryArgs, groupArgs...)
+		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=?)"
+		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=?) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
+		queryArgs = append(queryArgs, accountID)
 	}
 	rows, err := sm.db.Query(query, queryArgs...)
 	if err != nil {

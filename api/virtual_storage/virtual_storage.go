@@ -519,7 +519,7 @@ func (v *vfs) isMixedPath(p string) (bool, string, string) {
 		return false, "", ""
 	}
 
-	otokens := strings.Split(tokens[1], "/")
+	otokens := strings.Split(strings.Join(tokens[1:], ":"), "/")
 	id := tokens[0] + ":" + otokens[0]
 
 	return true, id, path.Join(otokens[1:]...)

@@ -3462,6 +3462,8 @@ func (p *proxy) getRemoteShares(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	onlySharedWithOthers := r.URL.Query().Get("only_shared_with_others") == "true"
+	onlySharedByLink := r.URL.Query().Get("only_shared_by_link") == "true"
 	originalPath := r.URL.Query().Get("path")
 	path, ctx := p.stripCBOXMappedPath(r, originalPath)
 
@@ -3472,33 +3474,44 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ocsShares, err := p.getPublicLinkShares(ctx)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	ocsShares := []*OCSShare{}
 
-	folderShares, err := p.getFolderShares(ctx)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-
-	}
-
-	ocsShares = append(ocsShares, folderShares...)
-
-	// TODO(labkode): do filtering reva side
-	// if path is set, filter to only shares from that path
-	if path != "" {
-		filtered := []*OCSShare{}
-		for _, v := range ocsShares {
-			if v.Path == originalPath { // compate to req path as path has cbox mapping magic
-				filtered = append(filtered, v)
-			}
+	if onlySharedByLink {
+		publicLinks, err := p.getPublicLinkShares(ctx, path)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-		ocsShares = filtered
+		ocsShares = publicLinks
+
+	} else if onlySharedWithOthers {
+		folderShares, err := p.getFolderShares(ctx, path)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+
+		}
+		ocsShares = folderShares
+	} else {
+		publicLinks, err := p.getPublicLinkShares(ctx, path)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		ocsShares = publicLinks
+
+		folderShares, err := p.getFolderShares(ctx, path)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+
+		}
+
+		ocsShares = append(ocsShares, folderShares...)
 	}
 
 	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
@@ -3519,9 +3532,15 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-func (p *proxy) getPublicLinkShares(ctx context.Context) ([]*OCSShare, error) {
+func (p *proxy) getPublicLinkShares(ctx context.Context, onlyForPath string) ([]*OCSShare, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getShareClient().ListPublicLinks(gCtx, &reva_api.EmptyReq{})
+
+	var revaPath string
+	if onlyForPath != "" {
+		revaPath = p.getRevaPath(ctx, onlyForPath)
+	}
+
+	stream, err := p.getShareClient().ListPublicLinks(gCtx, &reva_api.ListPublicLinksReq{Path: revaPath})
 	if err != nil {
 		return nil, err
 	}
@@ -3541,6 +3560,7 @@ func (p *proxy) getPublicLinkShares(ctx context.Context) ([]*OCSShare, error) {
 			return nil, err
 		}
 		publicLinks = append(publicLinks, plr.PublicLink)
+		fmt.Println("public link", plr.PublicLink)
 
 	}
 
@@ -3599,9 +3619,15 @@ func (p *proxy) getReceivedFolderShares(ctx context.Context) ([]*OCSShare, error
 
 }
 
-func (p *proxy) getFolderShares(ctx context.Context) ([]*OCSShare, error) {
+func (p *proxy) getFolderShares(ctx context.Context, onlyForPath string) ([]*OCSShare, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getShareClient().ListFolderShares(gCtx, &reva_api.ListFolderSharesReq{})
+
+	var revaPath string
+	if onlyForPath != "" {
+		revaPath = p.getRevaPath(ctx, onlyForPath)
+	}
+
+	stream, err := p.getShareClient().ListFolderShares(gCtx, &reva_api.ListFolderSharesReq{Path: revaPath})
 	if err != nil {
 		return nil, err
 	}
@@ -3753,7 +3779,7 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		md = fileMD
 
 	} else {
-		folderMD, err := p.getCachedMetadata(ctx, pl.Path)
+		folderMD, err := p.getMetadata(ctx, pl.Path)
 		if err != nil {
 			p.logger.Error("error getting the cached metadata for pl path: "+pl.Path, zap.Error(err))
 			return nil, err
@@ -6579,13 +6605,15 @@ func execute(cmd *exec.Cmd) (string, string, int) {
 }
 
 func (p *proxy) getCachedMetadata(ctx context.Context, path string) (*reva_api.Metadata, error) {
-	v, err := p.shareCache.Get(path)
-	if err == nil {
-		if md, ok := v.(*reva_api.Metadata); ok {
-			p.logger.Debug("ocproxy: api: getCachedMetadata: md found in cache", zap.String("path", path))
-			return md, nil
+	/*
+		v, err := p.shareCache.Get(path)
+		if err == nil {
+			if md, ok := v.(*reva_api.Metadata); ok {
+				p.logger.Debug("ocproxy: api: getCachedMetadata: md found in cache", zap.String("path", path))
+				return md, nil
+			}
 		}
-	}
+	*/
 
 	md, err := p.getMetadata(ctx, path)
 	if err != nil {

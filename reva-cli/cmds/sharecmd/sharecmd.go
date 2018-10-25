@@ -243,7 +243,7 @@ func listPublicLinks(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	stream, err := client.ListPublicLinks(ctx, &api.EmptyReq{})
+	stream, err := client.ListPublicLinks(ctx, &api.ListPublicLinksReq{})
 	if err != nil {
 		return cli.NewExitError(err, 1)
 	}

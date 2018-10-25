@@ -136,7 +136,7 @@ func (fs *linkStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata
 }
 
 func (fs *linkStorage) listRoot(ctx context.Context) ([]*api.Metadata, error) {
-	links, err := fs.linkManager.ListPublicLinks(ctx)
+	links, err := fs.linkManager.ListPublicLinks(ctx, "")
 	if err != nil {
 		return nil, err
 	}

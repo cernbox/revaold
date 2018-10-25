@@ -123,14 +123,23 @@ func (sm *shareManager) ListReceivedShares(ctx context.Context) ([]*api.FolderSh
 
 }
 
-func (sm *shareManager) ListFolderShares(ctx context.Context) ([]*api.FolderShare, error) {
+func (sm *shareManager) ListFolderShares(ctx context.Context, filterByPath string) ([]*api.FolderShare, error) {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	dbShares, err := sm.getDBShares(ctx, u.AccountId)
+	var shareID string
+	if filterByPath != "" {
+		md, err := sm.vfs.GetMetadata(ctx, filterByPath)
+		if err != nil {
+			return nil, err
+		}
+		shareID = md.MigId
+	}
+
+	dbShares, err := sm.getDBShares(ctx, u.AccountId, shareID)
 	if err != nil {
 		return nil, err
 	}
@@ -567,9 +576,16 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 
 }
 
-func (sm *shareManager) getDBShares(ctx context.Context, accountID string) ([]*dbShare, error) {
+func (sm *shareManager) getDBShares(ctx context.Context, accountID, filterByFileID string) ([]*dbShare, error) {
 	query := "select id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where uid_owner=? and (share_type=? or share_type=?) "
-	rows, err := sm.db.Query(query, accountID, 0, 1)
+	params := []interface{}{accountID, 0, 1}
+	if filterByFileID != "" {
+		prefix, itemSource := splitFileID(filterByFileID)
+		query += "and fileid_prefix=? and item_source=?"
+		params = append(params, prefix, itemSource)
+	}
+
+	rows, err := sm.db.Query(query, params...)
 	if err != nil {
 		return nil, err
 	}

@@ -140,7 +140,7 @@ type PublicLinkManager interface {
 	UpdatePublicLink(ctx context.Context, id string, opt *PublicLinkOptions) (*PublicLink, error)
 	InspectPublicLink(ctx context.Context, id string) (*PublicLink, error)
 	InspectPublicLinkByToken(ctx context.Context, token string) (*PublicLink, error)
-	ListPublicLinks(ctx context.Context) ([]*PublicLink, error)
+	ListPublicLinks(ctx context.Context, filterByPath string) ([]*PublicLink, error)
 	RevokePublicLink(ctx context.Context, token string) error
 
 	AuthenticatePublicLink(ctx context.Context, token, password string) (*PublicLink, error)
@@ -152,7 +152,7 @@ type ShareManager interface {
 	GetFolderShare(ctx context.Context, shareID string) (*FolderShare, error)
 	Unshare(ctx context.Context, shareID string) error
 	UpdateFolderShare(ctx context.Context, shareID string, updateReadOnly, readOnly bool) (*FolderShare, error)
-	ListFolderShares(ctx context.Context) ([]*FolderShare, error)
+	ListFolderShares(ctx context.Context, filterByPath string) ([]*FolderShare, error)
 
 	ListReceivedShares(ctx context.Context) ([]*FolderShare, error)
 	GetReceivedFolderShare(ctx context.Context, shareID string) (*FolderShare, error)

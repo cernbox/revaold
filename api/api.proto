@@ -45,7 +45,7 @@ service Share {
 	rpc UpdatePublicLink(UpdateLinkReq) returns  (PublicLinkResponse) {}
 	rpc InspectPublicLink(ShareIDReq) returns (PublicLinkResponse) {}
 	rpc RevokePublicLink(ShareIDReq) returns  (EmptyResponse) {}
-	rpc ListPublicLinks(EmptyReq) returns (stream PublicLinkResponse) {}
+	rpc ListPublicLinks(ListPublicLinksReq) returns (stream PublicLinkResponse) {}
 	
 	// with user context, relative to user logged in
 	rpc AddFolderShare(NewFolderShareReq) returns (FolderShareResponse) {}
@@ -411,6 +411,10 @@ message UpdateFolderShareReq {
 
 message UnshareFolderReq {
 	string id = 1;
+}
+
+message ListPublicLinksReq {
+	string path = 1;
 }
 
 message ListFolderSharesReq {

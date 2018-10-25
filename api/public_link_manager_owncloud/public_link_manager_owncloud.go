@@ -348,17 +348,48 @@ func (lm *linkManager) InspectPublicLink(ctx context.Context, id string) (*api.P
 	return pb, nil
 }
 
-func (lm *linkManager) ListPublicLinks(ctx context.Context) ([]*api.PublicLink, error) {
+func (lm *linkManager) ListPublicLinks(ctx context.Context, filterByPath string) ([]*api.PublicLink, error) {
 	l := ctx_zap.Extract(ctx)
 	u, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	dbShares, err := lm.getDBShares(ctx, u.AccountId)
+	var fileID string
+	if filterByPath != "" {
+		md, err := lm.vfs.GetMetadata(ctx, filterByPath)
+		if err != nil {
+			return nil, err
+		}
+
+		fmt.Println("ldhugo", md)
+		if !md.IsDir {
+			// conver to version folder
+			versionFolder := getVersionFolder(md.Path)
+			md, err := lm.vfs.GetMetadata(ctx, versionFolder)
+			if err != nil {
+				return nil, err
+			}
+			if md.MigId != "" {
+				fileID = md.MigId
+			} else {
+				fileID = md.Id
+			}
+
+		} else {
+			if md.MigId != "" {
+				fileID = md.MigId
+			} else {
+				fileID = md.Id
+			}
+		}
+	}
+
+	dbShares, err := lm.getDBShares(ctx, u.AccountId, fileID)
 	if err != nil {
 		return nil, err
 	}
+
 	publicLinks := []*api.PublicLink{}
 	for _, dbShare := range dbShares {
 		pb, err := lm.convertToPublicLink(ctx, dbShare)
@@ -500,9 +531,19 @@ func (lm *linkManager) getDBShare(ctx context.Context, accountID, id string) (*d
 	return dbShare, nil
 
 }
-func (lm *linkManager) getDBShares(ctx context.Context, accountID string) ([]*dbShare, error) {
-	query := "select id, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type, coalesce(share_name, '') as share_name from oc_share where share_type=? and uid_owner=?"
-	rows, err := lm.db.Query(query, 3, accountID)
+func (lm *linkManager) getDBShares(ctx context.Context, accountID, fileID string) ([]*dbShare, error) {
+	query := "select id, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, coalesce(token,'') as token, coalesce(expiration, '') as expiration, stime, permissions, item_type, coalesce(share_name, '') as share_name from oc_share where share_type=? and uid_owner=? "
+	params := []interface{}{3, accountID}
+
+	if fileID != "" {
+		prefix, itemSource := splitFileID(fileID)
+		query += "and fileid_prefix=? and item_source=?"
+		params = append(params, prefix, itemSource)
+	}
+
+	fmt.Println("hugo", query, params)
+
+	rows, err := lm.db.Query(query, params...)
 	if err != nil {
 		return nil, err
 	}
@@ -554,6 +595,7 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 	}
 
 	fileID := joinFileID(dbShare.Prefix, dbShare.ItemSource)
+	fmt.Println("hugo db share convert", dbShare)
 
 	var itemType api.PublicLink_ItemType
 	if dbShare.ItemType == "folder" {
@@ -567,6 +609,7 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		//md, err := lm.vfs.GetMetadata(newCtx, fileID)
 		md, err := lm.getCachedMetadata(newCtx, fileID)
 		if err != nil {
+			fmt.Println("hugo", err, fileID)
 			l := ctx_zap.Extract(ctx)
 			l.Error("error getting metadata for public link", zap.Error(err))
 			return nil, err
@@ -582,6 +625,7 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		//md, err = lm.getCachedMetadata(newCtx, filename)
 		md, err = lm.vfs.GetMetadata(newCtx, filename)
 		if err != nil {
+			fmt.Println("hugo", err, fileID)
 			return nil, err
 		}
 		_, id := splitFileID(md.Id)
@@ -606,13 +650,15 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 }
 func (lm *linkManager) getCachedMetadata(ctx context.Context, key string) (*api.Metadata, error) {
 	l := ctx_zap.Extract(ctx)
-	v, err := lm.cache.Get(key)
-	if err == nil {
-		if md, ok := v.(*api.Metadata); ok {
-			l.Debug("revad: api: getCachedMetadata:  md found in cache", zap.String("path", key))
-			return md, nil
+	/*
+		v, err := lm.cache.Get(key)
+		if err == nil {
+			if md, ok := v.(*api.Metadata); ok {
+				l.Debug("revad: api: getCachedMetadata:  md found in cache", zap.String("path", key))
+				return md, nil
+			}
 		}
-	}
+	*/
 
 	md, err := lm.vfs.GetMetadata(ctx, key)
 	if err != nil {

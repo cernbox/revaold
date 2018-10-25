@@ -366,13 +366,16 @@ func (lm *linkManager) ListPublicLinks(ctx context.Context, filterByPath string)
 		if !md.IsDir {
 			// conver to version folder
 			versionFolder := getVersionFolder(md.Path)
-			md, err := lm.vfs.GetMetadata(ctx, versionFolder)
-			if err != nil {
-				return nil, err
-			}
-			if md.MigId != "" {
-				fileID = md.MigId
+			mdVersion, err := lm.vfs.GetMetadata(ctx, versionFolder)
+			if err == nil {
+				if mdVersion.MigId != "" {
+					fileID = mdVersion.MigId
+				} else {
+					fileID = mdVersion.Id
+				}
 			} else {
+				// the version folder does not exist, this means that the file is not being shared by public link
+				// in that case we use the inode of the files to do the search as it will never be stored in the db.
 				fileID = md.Id
 			}
 

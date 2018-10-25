@@ -66,7 +66,7 @@ func (s *svc) UnmountReceivedShare(ctx context.Context, req *api.ReceivedShareRe
 func (s *svc) ListFolderShares(req *api.ListFolderSharesReq, stream api.Share_ListFolderSharesServer) error {
 	ctx := stream.Context()
 	l := ctx_zap.Extract(ctx)
-	shares, err := s.shareManager.ListFolderShares(ctx)
+	shares, err := s.shareManager.ListFolderShares(ctx, req.Path)
 	if err != nil {
 		l.Error("error listing folder shares", zap.Error(err))
 		return err
@@ -128,10 +128,10 @@ func (s *svc) UnshareFolder(ctx context.Context, req *api.UnshareFolderReq) (*ap
 	return &api.EmptyResponse{}, nil
 }
 
-func (s *svc) ListPublicLinks(req *api.EmptyReq, stream api.Share_ListPublicLinksServer) error {
+func (s *svc) ListPublicLinks(req *api.ListPublicLinksReq, stream api.Share_ListPublicLinksServer) error {
 	ctx := stream.Context()
 	l := ctx_zap.Extract(ctx)
-	links, err := s.linkManager.ListPublicLinks(ctx)
+	links, err := s.linkManager.ListPublicLinks(ctx, req.Path)
 	if err != nil {
 		l.Error("error listing public links", zap.Error(err))
 		return err

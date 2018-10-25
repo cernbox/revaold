@@ -3714,7 +3714,7 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 	user, _ := reva_api.ContextGetUser(ctx)
 	owner := user.AccountId
 
-	md, err := p.getCachedMetadata(ctx, share.Path)
+	md, err := p.getMetadata(ctx, share.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -4130,6 +4130,7 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write(encoded)
+		return
 	}
 
 	p.logger.Warn("share not found: " + shareID)
@@ -6605,15 +6606,13 @@ func execute(cmd *exec.Cmd) (string, string, int) {
 }
 
 func (p *proxy) getCachedMetadata(ctx context.Context, path string) (*reva_api.Metadata, error) {
-	/*
-		v, err := p.shareCache.Get(path)
-		if err == nil {
-			if md, ok := v.(*reva_api.Metadata); ok {
-				p.logger.Debug("ocproxy: api: getCachedMetadata: md found in cache", zap.String("path", path))
-				return md, nil
-			}
+	v, err := p.shareCache.Get(path)
+	if err == nil {
+		if md, ok := v.(*reva_api.Metadata); ok {
+			p.logger.Debug("ocproxy: api: getCachedMetadata: md found in cache", zap.String("path", path))
+			return md, nil
 		}
-	*/
+	}
 
 	md, err := p.getMetadata(ctx, path)
 	if err != nil {

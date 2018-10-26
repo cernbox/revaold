@@ -1,6 +1,21 @@
 {
   "mounts":   [
     {
+      "mount_id": "ocm",
+      "mount_point": "/ocm",
+      "mount_options": {
+      },
+      "storage_driver": "ocm",
+      "storage_options": {
+      },
+      "storage_wrappers": [
+        {
+          "name": "ocm",
+          "priority": 0
+        }	      
+      ]
+    },
+    {
       "mount_id": "oldhome",
       "mount_point": "/oldhome",
       "mount_options": {

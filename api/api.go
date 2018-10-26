@@ -159,9 +159,16 @@ type ShareManager interface {
 	UpdateFolderShare(ctx context.Context, shareID string, updateReadOnly, readOnly bool) (*FolderShare, error)
 	ListFolderShares(ctx context.Context, filterByPath string) ([]*FolderShare, error)
 
+	AddOCMShare(ctx context.Context, path string, recipient string) (*OCMShare, error)
+	GetOCMShare(ctx context.Context, shareID string) (*OCMShare, error)
+	ListOCMShares(ctx context.Context) ([]*OCMShare, error)
+	GetReceivedOCMShare(ctx context.Context, shareID string) (*FolderShare, error)
+
 	ListReceivedShares(ctx context.Context) ([]*FolderShare, error)
 	GetReceivedFolderShare(ctx context.Context, shareID string) (*FolderShare, error)
 	UnmountReceivedShare(ctx context.Context, shareID string) error
+
+	ListProviders(ctx context.Context) ([]*Provider, error)
 
 	/*
 		ListFolderRecipients(ctx context.Context, path string) ([]*ShareRecipient, error)

@@ -54,10 +54,17 @@ service Share {
 	rpc UnshareFolder(UnshareFolderReq) returns (EmptyResponse) {}
 	rpc GetFolderShare(ShareIDReq) returns (FolderShareResponse) {}
 
+	// with user context, relative to user logged in
+	rpc AddOCMShare(NewOCMReq) returns (OCMShareResponse) {}
+	rpc GetOCMShare(ShareIDReq) returns (OCMShareResponse) {}
+	rpc ListOCMShares(ListOCMSharesReq) returns (stream OCMShareResponse) {}
+
 	// with user context, relative to the user logged in, in this case, the receiver
 	rpc ListReceivedShares(EmptyReq) returns (stream ReceivedShareResponse) {}
 	rpc MountReceivedShare(ReceivedShareReq) returns (EmptyResponse) {}
 	rpc UnmountReceivedShare(ReceivedShareReq) returns (EmptyResponse) {} 
+
+	rpc ListProviders(EmptyReq) returns (stream ProvidersResponse) {}
 }
 
 service Preview {
@@ -215,6 +222,8 @@ message Metadata {
 	// Migration extended metadata records
 	string mig_id = 17;
 	string mig_path = 18;
+
+	bool is_ocm = 19;
 }
 
 message PathReq {
@@ -402,6 +411,29 @@ message FolderShare {
 	}
 }
 
+message OCMShareResponse {
+	StatusCode status = 1;
+	OCMShare ocmShare = 2;
+}
+
+message OCMShare {
+	string id = 1;
+	string path = 2;
+	string owner_id = 3;
+	string recipient = 4;
+	bool read_only = 5;
+	uint64 ctime = 6;
+	uint64 mtime = 7;
+	string target = 8;
+	State state = 9;
+
+	enum State {
+		ACCEPTED = 0;
+		PENDING = 1;
+		REJECTED = 2;
+	}
+}
+
 
 message ReceivedShareResponse {
 	StatusCode status = 1;
@@ -412,6 +444,11 @@ message NewFolderShareReq {
 	string path = 1;  
 	ShareRecipient recipient = 2;
 	bool read_only = 3;
+}
+
+message NewOCMReq {
+	string path = 1;  
+	string recipient = 2;
 }
 
 message UpdateFolderShareReq {
@@ -432,7 +469,19 @@ message ListFolderSharesReq {
 	string path = 1;
 }
 
+message ListOCMSharesReq {
+	string path = 1;
+}
+
 message ReceivedShareReq {
 	string share_id = 1;
 }
 
+message Provider {
+	string domain = 1;
+}
+
+message ProvidersResponse {
+	StatusCode status = 1;
+	Provider  provider = 2;
+}

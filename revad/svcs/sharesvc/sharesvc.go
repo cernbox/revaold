@@ -81,6 +81,24 @@ func (s *svc) ListFolderShares(req *api.ListFolderSharesReq, stream api.Share_Li
 	return nil
 }
 
+func (s *svc) ListOCMShares(req *api.ListOCMSharesReq, stream api.Share_ListOCMSharesServer) error {
+	ctx := stream.Context()
+	l := ctx_zap.Extract(ctx)
+	shares, err := s.shareManager.ListOCMShares(ctx)
+	if err != nil {
+		l.Error("error listing folder shares", zap.Error(err))
+		return err
+	}
+	for _, share := range shares {
+		ocmShareRes := &api.OCMShareResponse{OcmShare: share}
+		if err := stream.Send(ocmShareRes); err != nil {
+			l.Error("error streaming folder share", zap.Error(err))
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *svc) GetFolderShare(ctx context.Context, req *api.ShareIDReq) (*api.FolderShareResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	share, err := s.shareManager.GetFolderShare(ctx, req.Id)
@@ -96,6 +114,21 @@ func (s *svc) GetFolderShare(ctx context.Context, req *api.ShareIDReq) (*api.Fol
 
 }
 
+func (s *svc) GetOCMShare(ctx context.Context, req *api.ShareIDReq) (*api.OCMShareResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	share, err := s.shareManager.GetOCMShare(ctx, req.Id)
+	if err != nil {
+		if api.IsErrorCode(err, api.FolderShareNotFoundErrorCode) {
+			return &api.OCMShareResponse{Status: api.StatusCode_FOLDER_SHARE_NOT_FOUND}, nil
+		}
+		l.Error("error gettting folder share", zap.Error(err))
+		return nil, err
+	}
+	res := &api.OCMShareResponse{OcmShare: share}
+	return res, nil
+
+}
+
 func (s *svc) AddFolderShare(ctx context.Context, req *api.NewFolderShareReq) (*api.FolderShareResponse, error) {
 	l := ctx_zap.Extract(ctx)
 	share, err := s.shareManager.AddFolderShare(ctx, req.Path, req.Recipient, req.ReadOnly)
@@ -105,6 +138,17 @@ func (s *svc) AddFolderShare(ctx context.Context, req *api.NewFolderShareReq) (*
 	}
 	folderShareRes := &api.FolderShareResponse{FolderShare: share}
 	return folderShareRes, nil
+}
+
+func (s *svc) AddOCMShare(ctx context.Context, req *api.NewOCMReq) (*api.OCMShareResponse, error) {
+	l := ctx_zap.Extract(ctx)
+	share, err := s.shareManager.AddOCMShare(ctx, req.Path, req.Recipient)
+	if err != nil {
+		l.Error("error creating folder share", zap.Error(err))
+		return nil, err
+	}
+	ocmShareRes := &api.OCMShareResponse{OcmShare: share}
+	return ocmShareRes, nil
 }
 
 func (s *svc) UpdateFolderShare(ctx context.Context, req *api.UpdateFolderShareReq) (*api.FolderShareResponse, error) {
@@ -207,4 +251,22 @@ func (s *svc) UpdatePublicLink(ctx context.Context, req *api.UpdateLinkReq) (*ap
 	}
 	publicLinkRes := &api.PublicLinkResponse{PublicLink: publicLink}
 	return publicLinkRes, nil
+}
+
+func (s *svc) ListProviders(req *api.EmptyReq, stream api.Share_ListProvidersServer) error {
+	ctx := stream.Context()
+	l := ctx_zap.Extract(ctx)
+	providers, err := s.shareManager.ListProviders(ctx)
+	if err != nil {
+		l.Error("error listing received providers", zap.Error(err))
+		return err
+	}
+	for _, provider := range providers {
+		providerRes := &api.ProvidersResponse{Provider: provider}
+		if err := stream.Send(providerRes); err != nil {
+			l.Error("error streaming provider", zap.Error(err))
+			return err
+		}
+	}
+	return nil
 }

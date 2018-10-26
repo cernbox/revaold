@@ -59,6 +59,7 @@ func (v *vfs) GetMount(p string) (api.Mount, error) {
 	}
 
 	for _, m := range v.mounts {
+
 		if strings.HasPrefix(p, m.GetMountPoint()) {
 			return m, nil
 		}

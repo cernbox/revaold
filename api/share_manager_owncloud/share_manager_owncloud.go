@@ -136,7 +136,12 @@ func (sm *shareManager) ListFolderShares(ctx context.Context, filterByPath strin
 		if err != nil {
 			return nil, err
 		}
-		shareID = md.MigId
+
+		if md.MigId != "" {
+			shareID = md.MigId
+		} else {
+			shareID = md.Id
+		}
 	}
 
 	dbShares, err := sm.getDBShares(ctx, u.AccountId, shareID)

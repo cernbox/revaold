@@ -1190,7 +1190,7 @@ type storageStat struct {
 	UploadMaxFilesize int    `json:"uploadMaxFilesize"`
 	MaxHumanFilesize  string `json:"maxHumanFilesize"`
 	FreeSpace         int    `json:"freeSpace"`
-	UsedSpacePercent  int    `json:"userSpacePercent"`
+	UsedSpacePercent  int    `json:"usedSpacePercent"`
 	Owner             string `json:"owner"`
 	OwnerDisplayName  string `json:"ownerDisplayName"`
 }
@@ -1217,11 +1217,12 @@ func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
 		p.logger.Error("wrong grpc status", zap.Int("status", int(res.Status)))
 		return
 	}
+
 	stat := &storageStat{
 		UploadMaxFilesize: 10 * 1024 * 1024 * 1024, // 10 GiB
 		MaxHumanFilesize:  "Upload (max. 10GB)",
 		FreeSpace:         int(res.TotalBytes), // 2TiB
-		UsedSpacePercent:  int((res.UsedBytes / res.TotalBytes) * 100),
+		UsedSpacePercent:  int((float32(res.UsedBytes) / float32(res.TotalBytes)) * 100),
 		Owner:             owner,
 		OwnerDisplayName:  owner,
 	}

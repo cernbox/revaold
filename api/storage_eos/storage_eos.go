@@ -31,6 +31,7 @@ type eosStorage struct {
 	mountpoint    string
 	logger        *zap.Logger
 	showHiddenSys bool
+	forceReadOnly bool
 }
 
 type Options struct {
@@ -66,6 +67,9 @@ type Options struct {
 	// ShowHiddenSysFiles shows internal EOS files like
 	// .sys.v# and .sys.a# files.
 	ShowHiddenSysFiles bool `json:"show_hidden_sys_files"`
+
+	// ForceReadOnly does not allow writes into the storage.
+	ForceReadOnly bool `json:"force_read_only"`
 }
 
 func (opt *Options) init() {
@@ -121,6 +125,7 @@ func New(opt *Options) (api.Storage, error) {
 		logger:        opt.Logger,
 		mountpoint:    opt.Namespace,
 		showHiddenSys: opt.ShowHiddenSysFiles,
+		forceReadOnly: opt.ForceReadOnly,
 	}
 	return eosStorage, nil
 }
@@ -207,6 +212,9 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, path string) (*api.Metada
 		return nil, err
 	}
 	fi := fs.convertToMetadata(eosFileInfo)
+	if fs.forceReadOnly {
+		fi.IsReadOnly = true
+	}
 	return fi, nil
 }
 
@@ -231,7 +239,13 @@ func (fs *eosStorage) ListFolder(ctx context.Context, path string) ([]*api.Metad
 			}
 
 		}
-		finfos = append(finfos, fs.convertToMetadata(eosFileInfo))
+
+		finfo := fs.convertToMetadata(eosFileInfo)
+		if fs.forceReadOnly {
+			finfo.IsReadOnly = true
+		}
+
+		finfos = append(finfos, finfo)
 	}
 	return finfos, nil
 }

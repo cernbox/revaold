@@ -570,8 +570,8 @@ func applyMigrationLogic() {
 		panic(err)
 	}
 
-	homeMount := mount.New("home", "/home", &api.MountOptions{ReadOnly: oldHomeMount.GetMountOptions().ReadOnly, SharingDisabled: oldHomeMount.GetMountOptions().SharingDisabled}, storage)
-	userMount := mount.New("user", "/eos/user", &api.MountOptions{ReadOnly: oldUserMount.GetMountOptions().ReadOnly, SharingDisabled: oldUserMount.GetMountOptions().SharingDisabled}, userStorage)
+	homeMount := mount.New("home", "/home", &api.MountOptions{}, storage)
+	userMount := mount.New("user", "/eos/user", &api.MountOptions{}, userStorage)
 	vs.AddMount(context.Background(), homeMount)
 	vs.AddMount(context.Background(), userMount)
 }

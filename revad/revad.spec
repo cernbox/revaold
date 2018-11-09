@@ -4,7 +4,7 @@
 
 Name: revad
 Summary: REVA is a gRPC backend server for CERNBox
-Version: 0.0.27
+Version: 0.0.28
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -53,6 +53,8 @@ rm -rf %buildroot/
 %config(noreplace) /etc/revad/revad.yaml
 
 %changelog
+* Fri Nov 9 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.28
+- Add force_read_only flag to eos storages
 * Fri Nov 2 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.27
 - Fix filtering by path when mount is not using migration ids.
 * Thu Oct 25 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.26

@@ -73,9 +73,9 @@ func main() {
 
 	loadMountTable(mountTable)
 
-	// TODO(labkode): remove these hacks for the migration scenario
-	applyMigrationLogic()
-	applyMigrationLogicForProjects()
+	// TODO(labkode): remove this hack for the migration scenario
+	//applyMigrationLogic()
+	//applyMigrationLogicForProjects()
 
 	server := grpc.NewServer(
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(

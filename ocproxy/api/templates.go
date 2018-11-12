@@ -40,6 +40,9 @@ var publicLinkTemplate string = `
     		<link rel="stylesheet" href="/apps/gallery/css/slideshow.css">
     		<link rel="stylesheet" href="/apps/gallery/css/gallerybutton.css">
     		<link rel="stylesheet" href="/apps/files_pdfviewer/css/style.css">
+    		<link rel="stylesheet" href="/apps/rootviewer/css/style.css">
+    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootPainter.min.css">
+    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootInterface.min.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -104,6 +107,13 @@ var publicLinkTemplate string = `
 		<script src="/apps/gallery/js/slideshowzoomablepreview.js"></script>
 		<script src="/apps/gallery/js/gallerybutton.js"></script>
 		<script src="/apps/gallery/js/vendor/dompurify/src/purify.js"></script>
+
+		<script src="/apps/rootviewer/js/script.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootCore.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/d3.v3.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootPainter.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
 		<script>
 		(function ($, OC) {
 
@@ -558,6 +568,9 @@ var publicLinkTemplateFile = `
     		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
     		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
     		<link rel="stylesheet" href="/apps/files_pdfviewer/css/style.css">
+    		<link rel="stylesheet" href="/apps/rootviewer/css/style.css">
+    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootPainter.min.css">
+    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootInterface.min.css">
 		<script src="/index.php/core/js/oc.js"></script>
 		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
 		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -614,6 +627,13 @@ var publicLinkTemplateFile = `
 		<script src="/apps/files/js/files.js"></script>
 		<script src="/apps/files/js/filelist.js"></script>
 		<script src="/apps/files/js/keyboardshortcuts.js"></script>
+
+		<script src="/apps/rootviewer/js/script.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootCore.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/d3.v3.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootPainter.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
+		<script src="/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
 		<script>
 		(function ($, OC) {
 			$(document).ready(function () {

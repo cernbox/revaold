@@ -168,6 +168,74 @@ func (p *proxy) registerRoutes() {
 	// mailer routes
 	p.router.HandleFunc("/index.php/apps/mailer/sendmail", p.tokenAuth(p.sendMail)).Methods("POST")
 
+	// rootviewer routes
+	p.router.HandleFunc("/index.php/apps/rootviewer/load", p.tokenAuth(p.loadRootFile))
+	p.router.HandleFunc("/index.php/apps/rootviewer/publicload", p.tokenAuth(p.loadPublicRootFile))
+
+}
+
+func (p *proxy) loadPublicRootFile(w http.ResponseWriter, r *http.Request) {
+	p.loadRootFile(w, r)
+}
+
+func (p *proxy) loadRootFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	filename := r.URL.Query().Get("filename")
+
+	revaPath := p.getRevaPath(ctx, filename)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// TODO(labkode): stop loading huge files, set max to 1mib?
+	if int(md.Size) > p.viewerMaxFileSize {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		p.logger.Warn("file is too big to be opened in the browser", zap.Int("max_size", p.viewerMaxFileSize), zap.Int("file_size", int(md.Size)))
+		msg := fmt.Sprintf("The file is too big to be opened in the browser (maximum size is %d  bytes)", p.viewerMaxFileSize)
+		w.Write([]byte(fmt.Sprintf(`{ "message": "%s" }`, msg)))
+		return
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	pathReq := &reva_api.PathReq{Path: revaPath}
+	stream, err := p.getStorageClient().ReadFile(gCtx, pathReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fileContents := []byte{}
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != reva_api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				fileContents = append(fileContents, dc.Data...)
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(fileContents)
 }
 
 func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {

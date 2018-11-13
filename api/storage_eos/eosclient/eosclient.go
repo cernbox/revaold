@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/cernbox/reva/api"
 	"github.com/gofrs/uuid"
@@ -345,9 +346,10 @@ func (c *Client) ListDeletedEntries(ctx context.Context, username string) ([]*De
 	if err != nil {
 		return nil, err
 	}
-	// TODO(labkode): add protection if slave is configured and alive to count how many files are in the trashbin before
-	// triggering the recycle ls call that could break the instance because of unavailable memory.
-	cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "recycle", "ls", "-m")
+
+	// list only current day deletions to not kill the mgm when there are many files.
+	today := time.Now().Format("2006/01/02")
+	cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "recycle", "ls", today, "-m")
 	stdout, _, err := c.execute(cmd)
 	if err != nil {
 		return nil, err

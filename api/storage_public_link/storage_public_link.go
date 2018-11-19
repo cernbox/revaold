@@ -98,6 +98,7 @@ func (fs *linkStorage) SetACL(ctx context.Context, path string, readOnly bool, r
 func (fs *linkStorage) UnsetACL(ctx context.Context, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
 	return api.NewError(api.StorageNotSupportedErrorCode)
 }
+
 func (fs *linkStorage) UpdateACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
 	return api.NewError(api.StorageNotSupportedErrorCode)
 }
@@ -165,6 +166,10 @@ func (fs *linkStorage) ListFolder(ctx context.Context, name string) ([]*api.Meta
 		return nil, err
 	}
 
+	if link.DropOnly {
+		return nil, dropOnlyError(link.Id)
+	}
+
 	linkMetadata, err := fs.getLinkMetadata(ctx, link)
 	if err != nil {
 		return nil, err
@@ -194,6 +199,10 @@ func (fs *linkStorage) Download(ctx context.Context, name string) (io.ReadCloser
 		return nil, err
 	}
 
+	if link.DropOnly {
+		return nil, dropOnlyError(link.Id)
+	}
+
 	p = path.Join(link.Path, p)
 	return fs.vfs.Download(ctx, p)
 }
@@ -202,6 +211,20 @@ func (fs *linkStorage) Upload(ctx context.Context, name string, r io.ReadCloser)
 	link, p, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return err
+	}
+
+	if link.DropOnly {
+		// we cannot append a uuid to the filename as the ocproxy and other clients
+		// may rely on stat-upload-stat mechanism to check for a valid write, thus changing
+		// the filename will trigger a not found error and thus aborting the operation.
+		// To allow for uuid appended to filenames we need a mapping from link to uuid,
+		// which I discourage as it adds another redirection and more complexity to the system.
+		// The workaround is to perfrom a stat pre-uploaed and abort if filename already exsits.
+		_, err := fs.GetMetadata(ctx, name)
+		if err == nil {
+			// filename alrady exists, we abort
+			return api.NewError(api.StorageAlreadyExistsErrorCode)
+		}
 	}
 
 	p = path.Join(link.Path, p)
@@ -213,6 +236,11 @@ func (fs *linkStorage) Move(ctx context.Context, oldName, newName string) error 
 	if err != nil {
 		return err
 	}
+
+	if oldLink.DropOnly {
+		return dropOnlyError(oldLink.Id)
+	}
+
 	newLink, newPath, ctx, err := fs.getLink(ctx, newName)
 	if err != nil {
 		return err
@@ -241,6 +269,9 @@ func (fs *linkStorage) CreateDir(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
+	if link.DropOnly {
+		return dropOnlyError(link.Id)
+	}
 
 	p = path.Join(link.Path, p)
 	return fs.vfs.CreateDir(ctx, p)
@@ -250,6 +281,9 @@ func (fs *linkStorage) Delete(ctx context.Context, name string) error {
 	link, p, ctx, err := fs.getLink(ctx, name)
 	if err != nil {
 		return err
+	}
+	if link.DropOnly {
+		return dropOnlyError(link.Id)
 	}
 
 	p = path.Join(link.Path, p)
@@ -279,3 +313,7 @@ func (fs *linkStorage) ListRecycle(ctx context.Context, path string) ([]*api.Rec
 func (fs *linkStorage) RestoreRecycleEntry(ctx context.Context, restoreKey string) error {
 	return api.NewError(api.StorageNotSupportedErrorCode)
 }
+
+type dropOnlyError string
+
+func (e dropOnlyError) Error() string { return "link is drop only: " + string(e) }

@@ -123,9 +123,11 @@ type Storage interface {
 type PublicLinkOptions struct {
 	Password         string
 	ReadOnly         bool
+	DropOnly         bool
 	Expiration       uint64
 	UpdatePassword   bool
 	UpdateReadOnly   bool
+	UpdateDropOnly   bool
 	UpdateExpiration bool
 }
 

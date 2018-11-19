@@ -305,6 +305,7 @@ message NewLinkReq {
 	bool read_only = 2;
 	string password = 3;
 	uint64 expires = 4;
+	bool drop_only = 5;
 }
 
 message UpdateLinkReq {
@@ -315,6 +316,8 @@ message UpdateLinkReq {
 	uint64 expiration = 5;
 	bool read_only = 6;
 	bool update_read_only = 7;
+	bool drop_only = 8;
+	bool update_drop_only = 9;
 }
 
 message PublicLinkResponse {
@@ -351,6 +354,7 @@ message PublicLink {
 	ItemType item_type = 8;
 	string owner_id = 9;
 	string name = 10;
+	bool drop_only = 11;
 
 	enum ItemType {
 		FILE = 0;

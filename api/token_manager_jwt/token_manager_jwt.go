@@ -93,6 +93,7 @@ func (tm *tokenManager) ForgePublicLinkToken(ctx context.Context, pl *api.Public
 	claims["protected"] = pl.Protected
 	claims["expires"] = pl.Expires
 	claims["read_only"] = pl.ReadOnly
+	claims["drop_only"] = pl.DropOnly
 	claims["mtime"] = pl.Mtime
 	claims["item_type"] = pl.ItemType
 	claims["share_name"] = pl.Name
@@ -145,6 +146,10 @@ func (tm *tokenManager) DismantlePublicLinkToken(ctx context.Context, token stri
 	if !ok {
 		return nil, errors.New("read_only claim is not a bool")
 	}
+	dropOnly, ok := claims["drop_only"].(bool)
+	if !ok {
+		return nil, errors.New("drop_only claim is not a bool")
+	}
 	path, ok := claims["path"].(string)
 	if !ok {
 		return nil, errors.New("path claim is not a string")
@@ -175,6 +180,7 @@ func (tm *tokenManager) DismantlePublicLinkToken(ctx context.Context, token stri
 		Mtime:     uint64(mtime),
 		ItemType:  api.PublicLink_ItemType(itemType),
 		Name:      shareName,
+		DropOnly:  dropOnly,
 	}
 	return pl, nil
 }

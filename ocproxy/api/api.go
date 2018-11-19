@@ -3287,11 +3287,12 @@ func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (p *proxy) createPublicLinkShare(ctx context.Context, newShare *NewShareOCSRequest, readOnly bool, expiration int64, w http.ResponseWriter, r *http.Request) {
+func (p *proxy) createPublicLinkShare(ctx context.Context, newShare *NewShareOCSRequest, readOnly, dropOnly bool, expiration int64, w http.ResponseWriter, r *http.Request) {
 	gCtx := GetContextWithAuth(ctx)
 	newLinkReq := &reva_api.NewLinkReq{
 		Path:     newShare.Path,
 		ReadOnly: readOnly,
+		DropOnly: dropOnly,
 		Password: newShare.Password.Value,
 		Expires:  uint64(expiration),
 	}
@@ -3461,8 +3462,16 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 	newShare.Path = p.getRevaPath(ctx, newShare.Path)
 
 	var readOnly bool = true
+	var dropOnly bool = false
 	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) >= PermissionReadWrite {
 		readOnly = false
+		dropOnly = false
+	} else if newShare.Permissions.Set && Permission(newShare.Permissions.Value) >= PermissionDropOnly {
+		readOnly = false
+		dropOnly = true
+	} else {
+		readOnly = true
+		dropOnly = false
 	}
 
 	var expiration int64
@@ -3500,7 +3509,7 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 	newShare.Name = path.Base(md.Path)
 
 	if newShare.ShareType == ShareTypePublicLink {
-		p.createPublicLinkShare(ctx, newShare, readOnly, expiration, w, r)
+		p.createPublicLinkShare(ctx, newShare, readOnly, dropOnly, expiration, w, r)
 		return
 	} else if newShare.ShareType == ShareTypeUser || newShare.ShareType == ShareTypeGroup {
 		p.createFolderShare(ctx, newShare, readOnly, w, r)
@@ -3629,7 +3638,6 @@ func (p *proxy) getPublicLinkShares(ctx context.Context, onlyForPath string) ([]
 			return nil, err
 		}
 		publicLinks = append(publicLinks, plr.PublicLink)
-		fmt.Println("public link", plr.PublicLink)
 
 	}
 
@@ -3861,6 +3869,8 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 	var permissions Permission
 	if pl.ReadOnly {
 		permissions = PermissionRead
+	} else if pl.DropOnly {
+		permissions = PermissionDropOnly
 	} else {
 		permissions = PermissionReadWrite
 	}
@@ -4280,13 +4290,14 @@ func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.Response
 }
 
 // TODO(labkode): check for updateReadOnly
-func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSRequest, updateExpiration, updatePassword, updatePermissions bool, expiration int64, readOnly bool, w http.ResponseWriter, r *http.Request) {
+func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSRequest, updateExpiration, updatePassword, updatePermissions bool, expiration int64, readOnly, dropOnly bool, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	updateLinkReq := &reva_api.UpdateLinkReq{
 		UpdateExpiration: updateExpiration,
 		UpdatePassword:   updatePassword,
 		UpdateReadOnly:   updatePermissions,
 		ReadOnly:         readOnly,
+		DropOnly:         dropOnly,
 		Password:         newShare.Password.Value,
 		Expiration:       uint64(expiration),
 		Id:               shareID,
@@ -4403,8 +4414,16 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var readOnly bool = true
+	var dropOnly bool = false
 	if newShare.Permissions.Set && Permission(newShare.Permissions.Value) >= PermissionReadWrite {
 		readOnly = false
+		dropOnly = false
+	} else if newShare.Permissions.Set && Permission(newShare.Permissions.Value) >= PermissionDropOnly {
+		readOnly = false
+		dropOnly = true
+	} else {
+		readOnly = true
+		dropOnly = false
 	}
 
 	updateExpiration := false
@@ -4436,7 +4455,7 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if found {
-		p.updatePublicLinkShare(shareID, newShare, updateExpiration, updatePassword, updatePermissions, expiration, readOnly, w, r)
+		p.updatePublicLinkShare(shareID, newShare, updateExpiration, updatePassword, updatePermissions, expiration, readOnly, dropOnly, w, r)
 		return
 	}
 
@@ -4520,6 +4539,7 @@ const (
 
 	PermissionRead      Permission = 1
 	PermissionReadWrite Permission = 15
+	PermissionDropOnly  Permission = 4
 
 	ItemTypeFile   ItemType = "file"
 	ItemTypeFolder ItemType = "folder"
@@ -4681,16 +4701,26 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 			OverwriteHost string
 		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost}
 
-		tpl, err := template.New("public_link").Parse(publicLinkTemplate)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			p.logger.Error("", zap.Error(err))
-			return
+		if pl.DropOnly {
+			tpl, err := template.New("public_link_drop_only").Parse(publicLinkDropOnly)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				p.logger.Error("", zap.Error(err))
+				return
+			}
+			tpl.Execute(w, data)
+
+		} else {
+			tpl, err := template.New("public_link").Parse(publicLinkTemplate)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				p.logger.Error("", zap.Error(err))
+				return
+			}
+
+			tpl.Execute(w, data)
 		}
-
-		tpl.Execute(w, data)
 		return
-
 	}
 
 	data := struct {
@@ -5522,7 +5552,6 @@ func (p *proxy) put(w http.ResponseWriter, r *http.Request) {
 			p.writeError(mdRes.Status, w, r)
 			return
 		}
-
 	}
 
 	md := mdRes.Metadata

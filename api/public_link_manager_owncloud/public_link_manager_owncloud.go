@@ -178,6 +178,8 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 	permissions := 15
 	if opt.ReadOnly {
 		permissions = 1
+	} else if opt.DropOnly {
+		permissions = 4
 	}
 
 	token := genToken()
@@ -283,9 +285,11 @@ func (lm *linkManager) UpdatePublicLink(ctx context.Context, id string, opt *api
 		stmtPairs["expiration"] = t
 	}
 
-	if opt.UpdateReadOnly {
+	if opt.UpdateReadOnly || opt.UpdateDropOnly {
 		if opt.ReadOnly {
 			stmtPairs["permissions"] = 1
+		} else if opt.DropOnly {
+			stmtPairs["permissions"] = 4
 		} else {
 			stmtPairs["permissions"] = 15
 		}
@@ -362,7 +366,6 @@ func (lm *linkManager) ListPublicLinks(ctx context.Context, filterByPath string)
 			return nil, err
 		}
 
-		fmt.Println("ldhugo", md)
 		if !md.IsDir {
 			// conver to version folder
 			versionFolder := getVersionFolder(md.Path)
@@ -544,8 +547,6 @@ func (lm *linkManager) getDBShares(ctx context.Context, accountID, fileID string
 		params = append(params, prefix, itemSource)
 	}
 
-	fmt.Println("hugo", query, params)
-
 	rows, err := lm.db.Query(query, params...)
 	if err != nil {
 		return nil, err
@@ -598,7 +599,6 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 	}
 
 	fileID := joinFileID(dbShare.Prefix, dbShare.ItemSource)
-	fmt.Println("hugo db share convert", dbShare)
 
 	var itemType api.PublicLink_ItemType
 	if dbShare.ItemType == "folder" {
@@ -612,7 +612,6 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		//md, err := lm.vfs.GetMetadata(newCtx, fileID)
 		md, err := lm.getCachedMetadata(newCtx, fileID)
 		if err != nil {
-			fmt.Println("hugo", err, fileID)
 			l := ctx_zap.Extract(ctx)
 			l.Error("error getting metadata for public link", zap.Error(err))
 			return nil, err
@@ -628,7 +627,6 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		//md, err = lm.getCachedMetadata(newCtx, filename)
 		md, err = lm.vfs.GetMetadata(newCtx, filename)
 		if err != nil {
-			fmt.Println("hugo", err, fileID)
 			return nil, err
 		}
 		_, id := splitFileID(md.Id)
@@ -643,6 +641,7 @@ func (lm *linkManager) convertToPublicLink(ctx context.Context, dbShare *dbShare
 		Path:      fileID,
 		Expires:   expires,
 		ReadOnly:  dbShare.Permissions == 1,
+		DropOnly:  dbShare.Permissions == 4,
 		ItemType:  itemType,
 		OwnerId:   dbShare.Owner,
 		Name:      dbShare.ShareName,

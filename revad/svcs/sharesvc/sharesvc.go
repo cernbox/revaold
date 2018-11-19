@@ -151,6 +151,7 @@ func (s *svc) CreatePublicLink(ctx context.Context, req *api.NewLinkReq) (*api.P
 		Password:   req.Password,
 		Expiration: req.Expires,
 		ReadOnly:   req.ReadOnly,
+		DropOnly:   req.DropOnly,
 	}
 
 	publicLink, err := s.linkManager.CreatePublicLink(ctx, req.Path, opts)
@@ -192,9 +193,11 @@ func (s *svc) UpdatePublicLink(ctx context.Context, req *api.UpdateLinkReq) (*ap
 		Password:         req.Password,
 		Expiration:       req.Expiration,
 		ReadOnly:         req.ReadOnly,
+		DropOnly:         req.DropOnly,
 		UpdatePassword:   req.UpdatePassword,
 		UpdateExpiration: req.UpdateExpiration,
 		UpdateReadOnly:   req.UpdateReadOnly,
+		UpdateDropOnly:   req.DropOnly,
 	}
 
 	publicLink, err := s.linkManager.UpdatePublicLink(ctx, req.Id, opts)

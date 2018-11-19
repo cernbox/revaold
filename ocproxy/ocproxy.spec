@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.36
+Version: 0.0.37
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon Nov 19 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.37
+- Add drop-only support for public links
 * Mon Nov 12 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.36
 - Add ROOT Viewer support
 * Fri Nov 9 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.35

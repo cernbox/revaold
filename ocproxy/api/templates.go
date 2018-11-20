@@ -955,10 +955,10 @@ var publicLinkDropOnly = `
 		<div id="notification"></div>
 		<div class="uploadForm"><div>
 	</div>
+</div>
 	<footer>
 		<p class="info">
 		<a href="https://cernbox.web.cern.ch" target="_blank" rel="noreferrer">CERNBox</a> &ndash; {{ .Note }}</p>
 	</footer>
-</div>
 </html>
 `

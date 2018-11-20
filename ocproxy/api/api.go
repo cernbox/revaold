@@ -34,6 +34,7 @@ import (
 
 	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
+	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rwcarlsen/goexif/exif"
@@ -6579,6 +6580,19 @@ func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
 			// apply  public link
 			revaPath = strings.TrimPrefix(ocPath, p.ownCloudPublicLinkPrefix)
 			revaPath = path.Join(p.revaPublicLinkPrefix, pl.Token, revaPath)
+
+			// if public link is drop only we add random uuid to avoid
+			// clashes on file upload.
+			if pl.DropOnly {
+				// if path points to publc link we do not add
+				// the uuid, as the link will not be resolved.
+				if ocPath != "/" {
+					uuid := uuid.Must(uuid.NewV4()).String()
+					dir, fn := path.Split(revaPath)
+					fn = fmt.Sprintf("%s-%s", uuid, fn)
+					revaPath = path.Join(dir, fn)
+				}
+			}
 		}
 	} else {
 		if strings.HasPrefix(ocPath, p.ownCloudSharePrefix) {

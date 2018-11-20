@@ -173,10 +173,6 @@ func (p *proxy) registerRoutes() {
 	// drawio routes
 	p.router.HandleFunc("/index.php/apps/drawio/ajax/settings", p.drawioSettings).Methods("GET")
 
-	// onlyoffice routes
-	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.getOnlyOfficeSettings).Methods("GET")
-	//p.router.HandleFunc("/index.php/apps/onlyoffice/{path}", p.).Methods("GET")
-
 	// mailer routes
 	p.router.HandleFunc("/index.php/apps/mailer/sendmail", p.tokenAuth(p.sendMail)).Methods("POST")
 
@@ -184,6 +180,27 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/rootviewer/load", p.tokenAuth(p.loadRootFile))
 	p.router.HandleFunc("/index.php/apps/rootviewer/publicload", p.tokenAuth(p.loadPublicRootFile))
 
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.tokenAuth(p.onlyOfficeSettings))
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{id}", p.tokenAuth(p.onlyOfficeConfig))
+
+}
+
+func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	fileId := mux.Vars(r)["id"]
+	revaPath := p.getRevaPath(ctx, fileId)
+	_, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
+func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","conv":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","conv":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","conv":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
 }
 
 func (p *proxy) loadPublicRootFile(w http.ResponseWriter, r *http.Request) {
@@ -338,124 +355,6 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-func (p *proxy) getOnlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
-	settings := `
-{
-   "formats":{
-      "docx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document",
-         "type":"text",
-         "edit":true,
-         "def":true
-      },
-      "xlsx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-         "type":"spreadsheet",
-         "edit":true,
-         "def":true
-      },
-      "pptx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation",
-         "type":"presentation",
-         "edit":true,
-         "def":true
-      },
-      "ppsx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow",
-         "type":"presentation",
-         "edit":true,
-         "def":true
-      },
-      "txt":{
-         "mime":"text\/plain",
-         "type":"text",
-         "edit":true,
-         "def":false
-      },
-      "csv":{
-         "mime":"text\/csv",
-         "type":"spreadsheet",
-         "edit":true,
-         "def":false
-      },
-      "odt":{
-         "mime":"application\/vnd.oasis.opendocument.text",
-         "type":"text",
-         "conv":true
-      },
-      "ods":{
-         "mime":"application\/vnd.oasis.opendocument.spreadsheet",
-         "type":"spreadsheet",
-         "conv":true
-      },
-      "odp":{
-         "mime":"application\/vnd.oasis.opendocument.presentation",
-         "type":"presentation",
-         "conv":true
-      },
-      "doc":{
-         "mime":"application\/msword",
-         "type":"text",
-         "conv":true
-      },
-      "xls":{
-         "mime":"application\/vnd.ms-excel",
-         "type":"spreadsheet",
-         "conv":true
-      },
-      "ppt":{
-         "mime":"application\/vnd.ms-powerpoint",
-         "type":"presentation",
-         "conv":true
-      },
-      "pps":{
-         "mime":"application\/vnd.ms-powerpoint",
-         "type":"presentation",
-         "conv":true
-      },
-      "epub":{
-         "mime":"application\/epub+zip",
-         "type":"text",
-         "conv":true
-      },
-      "rtf":{
-         "mime":"text\/rtf",
-         "type":"text",
-         "conv":true
-      },
-      "mht":{
-         "mime":"message\/rfc822",
-         "conv":true
-      },
-      "html":{
-         "mime":"text\/html",
-         "type":"text",
-         "conv":true
-      },
-      "htm":{
-         "mime":"text\/html",
-         "type":"text",
-         "conv":true
-      },
-      "xps":{
-         "mime":"application\/vnd.ms-xpsdocument",
-         "type":"text"
-      },
-      "pdf":{
-         "mime":"application\/pdf",
-         "type":"text"
-      },
-      "djvu":{
-         "mime":"image\/vnd.djvu",
-         "type":"text"
-      }
-   },
-   "sameTab":true
-}
-`
-
-	w.Write([]byte(settings))
-}
 func (p *proxy) isSyncClient(r *http.Request) bool {
 	agent := strings.ToLower(r.UserAgent())
 	if strings.Contains(agent, "mirall") {

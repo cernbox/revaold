@@ -25,7 +25,12 @@ const (
 	rootUser      = "root"
 	rootGroup     = "root"
 	versionPrefix = ".sys.v#."
+
+	versionAquamarine = eosVersion("aquamarine")
+	versionCitrine    = eosVersion("citrine")
 )
+
+type eosVersion string
 
 type Options struct {
 	// Location of the eos binary.
@@ -129,7 +134,90 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 	return outBuf.String(), errBuf.String(), err
 }
 
+func (c *Client) getVersion(ctx context.Context) (eosVersion, error) {
+	unixUser, err := getUnixUser(rootUser)
+	if err != nil {
+		return "", err
+	}
+
+	cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "version")
+	stdout, _, err := c.execute(cmd)
+	if err != nil {
+		return "", err
+	}
+	return c.parseVersion(ctx, stdout), nil
+}
+
+func (c *Client) parseVersion(ctx context.Context, raw string) eosVersion {
+	var serverVersion string
+	rawLines := strings.Split(raw, "\n")
+	for _, rl := range rawLines {
+		if rl == "" {
+			continue
+		}
+		if strings.HasPrefix(rl, "EOS_SERVER_VERSION") {
+			serverVersion = strings.Split(strings.Split(rl, " ")[0], "=")[1]
+			break
+		}
+	}
+
+	if strings.HasPrefix(serverVersion, "4.") {
+		return versionCitrine
+	}
+	return versionAquamarine
+}
+
+//Usage: eos acl [-l|--list] [-R|--recursive][--sys|--user] <rule> <path>
+//
+//    --help         Print help
+//-R, --recursive    Apply on directories recursively
+//-l, --list         List ACL rules
+//    --user           Handle/list user.acl rules on directory
+//    --sys            Handle/list sys.acl rules on directory
+//<rule> is created based on chmod rules.
+//Every rule begins with [u|g|egroup] followed with : and identifier.
+//
+//Afterwards can be:
+//= for setting new permission .
+//: for modification of existing permission.
+//
+//This is followed by the rule definition.
+//Every ACL flag can be added with + or removed with -, or in case
+//of setting new ACL permission just enter the ACL flag.
+func (c *Client) addACLCitrine(ctx context.Context, username, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	var target = recipient.Identity
+	if recipient.Type == api.ShareRecipient_USER {
+		unixUser, err := getUnixUser(target)
+		if err != nil {
+			return err
+		}
+		target = unixUser.Uid
+	}
+
+	aclType := getAclType(recipient.Type)
+	perm := getEosPerm(readOnly)
+
+	// setting of the sys.acl is only possible from root user
+	unixUser, err := getUnixUser(rootUser)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "acl", "--sys", "--recursive", fmt.Sprintf("%s:%s=%s", aclType, target, perm), path)
+	_, _, err = c.execute(cmd)
+	return err
+}
+
 func (c *Client) AddACL(ctx context.Context, username, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	version, err := c.getVersion(ctx)
+	if err != nil {
+		return err
+	}
+
+	if version == versionCitrine {
+		return c.addACLCitrine(ctx, username, path, readOnly, recipient, shareList)
+	}
+
 	aclManager, err := c.getACLForPath(ctx, username, path)
 	if err != nil {
 		return err
@@ -165,6 +253,15 @@ func (c *Client) AddACL(ctx context.Context, username, path string, readOnly boo
 }
 
 func (c *Client) RemoveACL(ctx context.Context, username, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	version, err := c.getVersion(ctx)
+	if err != nil {
+		return err
+	}
+
+	if version == versionCitrine {
+		return c.removeACLCitrine(ctx, username, path, recipient, shareList)
+	}
+
 	aclManager, err := c.getACLForPath(ctx, username, path)
 	if err != nil {
 		return err
@@ -191,6 +288,30 @@ func (c *Client) RemoveACL(ctx context.Context, username, path string, recipient
 	_, _, err = c.execute(cmd)
 	return err
 
+}
+
+func (c *Client) removeACLCitrine(ctx context.Context, username, path string, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
+	var target = recipient.Identity
+	if recipient.Type == api.ShareRecipient_USER {
+		unixUser, err := getUnixUser(target)
+		if err != nil {
+			return err
+		}
+		target = unixUser.Uid
+	}
+
+	aclType := getAclType(recipient.Type)
+	perm := "" // empty string will remove entry
+
+	// setting of the sys.acl is only possible from root user
+	unixUser, err := getUnixUser(rootUser)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "acl", "--sys", "--recursive", fmt.Sprintf("%s:%s=%s", aclType, target, perm), path)
+	_, _, err = c.execute(cmd)
+	return err
 }
 
 func (c *Client) UpdateACL(ctx context.Context, username, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
@@ -815,15 +936,8 @@ func (m *aclManager) getUnixGroup(unixGroup string) *aclEntry {
 }
 
 func (m *aclManager) deleteUser(ctx context.Context, username string) error {
-	// EOS from Citrine stores usernames as uids,  so we need to set the uid of the user
-	// instead of his username.
-	unixUser, err := getUnixUser(username)
-	uid := unixUser.Uid
-	if err != nil {
-		return err
-	}
 	for i, e := range m.aclEntries {
-		if e.recipient == uid && e.aclType == aclTypeUser {
+		if e.recipient == username && e.aclType == aclTypeUser {
 			m.aclEntries = append(m.aclEntries[:i], m.aclEntries[i+1:]...)
 		}
 	}
@@ -832,7 +946,8 @@ func (m *aclManager) deleteUser(ctx context.Context, username string) error {
 
 func (m *aclManager) addUser(ctx context.Context, username string, readOnly bool) error {
 	m.deleteUser(ctx, username)
-	perm := m.readOnlyToEOSPermissions(readOnly)
+
+	perm := getEosPerm(readOnly)
 	sysAcl := strings.Join([]string{string(aclTypeUser), username, perm}, ":")
 	newEntry, err := newAclEntry(ctx, sysAcl)
 	if err != nil {
@@ -853,7 +968,7 @@ func (m *aclManager) deleteGroup(ctx context.Context, group string) {
 
 func (m *aclManager) addGroup(ctx context.Context, group string, readOnly bool) error {
 	m.deleteGroup(ctx, group)
-	perm := m.readOnlyToEOSPermissions(readOnly)
+	perm := getEosPerm(readOnly)
 	sysAcl := strings.Join([]string{string(aclTypeGroup), group, perm}, ":")
 	newEntry, err := newAclEntry(ctx, sysAcl)
 	if err != nil {
@@ -874,7 +989,7 @@ func (m *aclManager) deleteUnixGroup(ctx context.Context, unixGroup string) {
 
 func (m *aclManager) addUnixGroup(ctx context.Context, unixGroup string, readOnly bool) error {
 	m.deleteUnixGroup(ctx, unixGroup)
-	perm := m.readOnlyToEOSPermissions(readOnly)
+	perm := getEosPerm(readOnly)
 	sysAcl := strings.Join([]string{string(aclTypeUnixGroup), unixGroup, perm}, ":")
 	newEntry, err := newAclEntry(ctx, sysAcl)
 	if err != nil {
@@ -884,7 +999,7 @@ func (m *aclManager) addUnixGroup(ctx context.Context, unixGroup string, readOnl
 	return nil
 }
 
-func (m *aclManager) readOnlyToEOSPermissions(readOnly bool) string {
+func getEosPerm(readOnly bool) string {
 	if readOnly {
 		return "rx"
 	}
@@ -928,4 +1043,15 @@ func (a *aclEntry) hasReadPermissions() bool {
 
 func (a *aclEntry) serialize() string {
 	return strings.Join([]string{string(a.aclType), a.recipient, a.permissions}, ":")
+}
+
+func getAclType(t api.ShareRecipient_RecipientType) aclType {
+	switch t {
+	case api.ShareRecipient_USER:
+		return aclTypeUser
+	case api.ShareRecipient_GROUP:
+		return aclTypeGroup
+	default:
+		return aclTypeUnixGroup
+	}
 }

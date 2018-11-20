@@ -814,13 +814,20 @@ func (m *aclManager) getUnixGroup(unixGroup string) *aclEntry {
 	return nil
 }
 
-func (m *aclManager) deleteUser(ctx context.Context, username string) {
+func (m *aclManager) deleteUser(ctx context.Context, username string) error {
+	// EOS from Citrine stores usernames as uids,  so we need to set the uid of the user
+	// instead of his username.
+	unixUser, err := getUnixUser(username)
+	uid := unixUser.Uid
+	if err != nil {
+		return err
+	}
 	for i, e := range m.aclEntries {
-		if e.recipient == username && e.aclType == aclTypeUser {
+		if e.recipient == uid && e.aclType == aclTypeUser {
 			m.aclEntries = append(m.aclEntries[:i], m.aclEntries[i+1:]...)
-			return
 		}
 	}
+	return nil
 }
 
 func (m *aclManager) addUser(ctx context.Context, username string, readOnly bool) error {

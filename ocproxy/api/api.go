@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
@@ -181,20 +182,186 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/rootviewer/publicload", p.tokenAuth(p.loadPublicRootFile))
 
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.tokenAuth(p.onlyOfficeSettings))
-	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{id}", p.tokenAuth(p.onlyOfficeConfig))
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{path:.*}", p.tokenAuth(p.onlyOfficeConfig))
+	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/track/{path:.*}", p.onlyOfficeTrack).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
 
 }
 
-func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
+func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	fmt.Println("ONLYOFFICE: " + string(data))
+	payload := struct {
+		Err int `json:"error"`
+	}{
+		Err: 0,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	//encoded = []byte(`"{"message": "error tracking"}`)
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	//	w.WriteHeader(http.StatusBadRequest)
+	w.Write(encoded)
+}
+
+func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	fileId := mux.Vars(r)["id"]
-	revaPath := p.getRevaPath(ctx, fileId)
-	_, err := p.getMetadata(ctx, revaPath)
+	fn := mux.Vars(r)["path"]
+	revaPath := p.getRevaPath(ctx, fn)
+	//md, err := p.getMetadata(ctx, revaPath)
+	//if err != nil {
+	//	p.logger.Error("", zap.Error(err))
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
+
+	gCtx := GetContextWithAuth(ctx)
+	pathReq := &reva_api.PathReq{Path: revaPath}
+	stream, err := p.getStorageClient().ReadFile(gCtx, pathReq)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	w.WriteHeader(http.StatusOK)
+
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != reva_api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				w.Write(dc.Data)
+			}
+		}
+	}
+
+}
+
+func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	accessToken, _ := reva_api.ContextGetAccessToken(ctx)
+	fn := mux.Vars(r)["path"]
+	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fileType := strings.TrimPrefix(path.Ext(revaPath), ".")
+	key := md.Id
+	//key := "superkey"
+	title := md.Path
+	documentType := "presentation" // spreadsheet or text
+	callbackUrl := "https://labradorbox.cern.ch/index.php/apps/onlyoffice/storage/track" + md.Path + "?x-acess-token=" + accessToken
+	goBackUrl := "https://labrdorbox.cern.ch/index.php" // TODO(labkode)
+	lang := "en"
+
+	mode := "edit"
+	if md.IsReadOnly {
+		mode = "view"
+	}
+
+	user, _ := reva_api.ContextGetUser(ctx)
+	userId := user.AccountId
+	displayName := user.DisplayName
+
+	// TODO(labkode): maybe base64 is not good enough, check what they expect as doc id in the express router (nodejs)
+	// onlyoffice API server does not like doc ids with colon :
+	//[labkode@labradorbox cernbox]$ curl https://cbox-wopi-01.cern.ch:9443/v5.2.3-64//doc/home:27167144273772544/c/info?t=1542811227805
+	//<!DOCTYPE html>
+	//<html lang="en">
+	//<head>
+	//<meta charset="utf-8">
+	//<title>Error</title>
+	//</head>
+	//<body>
+	//<pre>Cannot GET /doc/home:27167144273772544/c/info</pre>
+	//</body>
+	//</html>
+	key = base64.StdEncoding.EncodeToString([]byte(key))[0:10]
+	key = uuid.Must(uuid.NewV4()).String()
+	//key = "hellokey" // key must be less 20 chars
+
+	url := fmt.Sprintf("https://labradorbox.cern.ch/index.php/apps/onlyoffice/storage/download" + md.Path + "?x-access-token=" + accessToken)
+
+	msg := `{
+  "document": {
+    "fileType": "%s",
+    "key": "%s",
+    "title": "%s",
+    "url": "%s"
+  },
+  "documentType": "%s",
+  "editorConfig": {
+    "callbackUrl": "%s",
+    "customization": {
+      "goback": {
+        "url": "%s"
+      }
+    },
+    "lang": "%s",
+    "mode": "%s",
+    "user": {
+      "id": "%s",
+      "name": "%s"
+    }
+  },
+  "type": "%s"
+} `
+	msg = fmt.Sprintf(msg, fileType, key, title, url, documentType, callbackUrl, goBackUrl, lang, mode, userId, displayName, "desktop")
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
+
+	/*
+			$params = [
+		            "document" => [
+		                "fileType" => $ext,
+		                "key" => DocumentService::GenerateRevisionId($key),
+		                "title" => $fileName,
+		                "url" => $fileUrl,
+		            ],
+		            "documentType" => $format["type"],
+		            "editorConfig" => [
+		                "callbackUrl" => $callback,
+		                "customization" => [
+		                    "goback" => [
+		                        "url" => $folderLink
+		                    ]
+		                ],
+		                "lang" => str_replace("_", "-", \OC::$server->getL10NFactory("")->get("")->getLanguageCode()),
+		                "mode" => (empty($callback) ? "view" : "edit"),
+		                "user" => [
+		                    "id" => $userId,
+		                    "name" => $this->userSession->getUser()->getDisplayName()
+		                ]
+		            ],
+		            "type" => $type
+		        ];
+	*/
 }
 
 func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {

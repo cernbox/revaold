@@ -45,7 +45,7 @@ var ListRevisionsCommand = cli.Command{
 var DownloadRevisionCommand = cli.Command{
 	Name:      "rev-download",
 	Usage:     "Download a revision of a file",
-	ArgsUsage: "Usage: rev-download <path> <rev-key>",
+	ArgsUsage: "Usage: rev-download <path> <rev-key> <local-path>",
 	Action:    downloadRevision,
 }
 

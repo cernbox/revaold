@@ -4,7 +4,7 @@
 
 Name: reva-cli
 Summary: reva-cli is the cli tool to interact with the reva-cli daemon.
-Version: 0.0.4
+Version: 0.0.5
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -41,6 +41,8 @@ rm -rf %buildroot/
 /usr/local/bin/*
 
 %changelog
+* Tue Nov 27 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.5
+- Fix download version command
 * Tue Oct 25 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.4
 - Fix spec file
 * Tue Oct 25 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.3

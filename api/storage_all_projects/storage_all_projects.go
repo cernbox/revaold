@@ -482,16 +482,55 @@ func (fs *allProjectsStorage) Delete(ctx context.Context, name string) error {
 	return fs.vs.Delete(newCtx, targetPath)
 }
 
-func (fs *allProjectsStorage) ListRevisions(ctx context.Context, path string) ([]*api.Revision, error) {
-	return nil, api.NewError(api.StorageNotSupportedErrorCode)
+func (fs *allProjectsStorage) ListRevisions(ctx context.Context, name string) ([]*api.Revision, error) {
+	project, relPath, err := fs.getProject(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	md, err := fs.getProjectMetadata(ctx, project)
+	if err != nil {
+		fs.logger.Error("error getting metadata for project", zap.Error(err))
+		return nil, err
+	}
+
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
+	targetPath := path.Join(md.Path, relPath)
+	return fs.vs.ListRevisions(newCtx, targetPath)
 }
 
-func (fs *allProjectsStorage) DownloadRevision(ctx context.Context, path, revisionKey string) (io.ReadCloser, error) {
-	return nil, api.NewError(api.StorageNotSupportedErrorCode)
+func (fs *allProjectsStorage) DownloadRevision(ctx context.Context, name, revisionKey string) (io.ReadCloser, error) {
+	project, relPath, err := fs.getProject(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+
+	md, err := fs.getProjectMetadata(ctx, project)
+	if err != nil {
+		fs.logger.Error("error getting metadata for project", zap.Error(err))
+		return nil, err
+	}
+
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
+	targetPath := path.Join(md.Path, relPath)
+	return fs.vs.DownloadRevision(newCtx, targetPath, revisionKey)
 }
 
-func (fs *allProjectsStorage) RestoreRevision(ctx context.Context, path, revisionKey string) error {
-	return api.NewError(api.StorageNotSupportedErrorCode)
+func (fs *allProjectsStorage) RestoreRevision(ctx context.Context, name, revisionKey string) error {
+	project, relPath, err := fs.getProject(ctx, name)
+	if err != nil {
+		return err
+	}
+
+	md, err := fs.getProjectMetadata(ctx, project)
+	if err != nil {
+		fs.logger.Error("error getting metadata for project", zap.Error(err))
+		return err
+	}
+
+	newCtx := api.ContextSetUser(ctx, &api.User{AccountId: project.Owner})
+	targetPath := path.Join(md.Path, relPath)
+	return fs.vs.RestoreRevision(newCtx, targetPath, revisionKey)
 }
 
 func (fs *allProjectsStorage) EmptyRecycle(ctx context.Context, path string) error {

@@ -429,7 +429,7 @@ func (c *Client) Read(ctx context.Context, username, path string) (io.ReadCloser
 	rand := "eosread-" + uuid.String()
 	localTarget := fmt.Sprintf("%s/%s", c.opt.CacheDirectory, rand)
 	xrdPath := fmt.Sprintf("%s//%s", c.opt.URL, path)
-	cmd := exec.CommandContext(ctx, "/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", xrdPath, localTarget, fmt.Sprintf("-OSeos.ruid=%s&eos.rgid=%s", unixUser.Uid, unixUser.Gid))
+	cmd := exec.CommandContext(ctx, "/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", xrdPath, localTarget, fmt.Sprintf("-OSeos.ruid=%s&eos.rgid=%s&eos.app=reva_eosclient", unixUser.Uid, unixUser.Gid))
 	_, _, err = c.execute(cmd)
 	if err != nil {
 		return nil, err
@@ -456,7 +456,7 @@ func (c *Client) Write(ctx context.Context, username, path string, stream io.Rea
 		return err
 	}
 	xrdPath := fmt.Sprintf("%s//%s", c.opt.URL, path)
-	cmd := exec.CommandContext(ctx, "/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", fd.Name(), xrdPath, fmt.Sprintf("-ODeos.ruid=%s&eos.rgid=%s", unixUser.Uid, unixUser.Gid))
+	cmd := exec.CommandContext(ctx, "/usr/bin/xrdcopy", "--nopbar", "--silent", "-f", fd.Name(), xrdPath, fmt.Sprintf("-ODeos.ruid=%s&eos.rgid=%s&eos.app=reva_eosclient", unixUser.Uid, unixUser.Gid))
 	_, _, err = c.execute(cmd)
 	return err
 }

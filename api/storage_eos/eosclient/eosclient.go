@@ -744,6 +744,13 @@ func (c *Client) mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 		return nil, err
 	}
 
+	// parse ctime if set
+	var ctime uint64 = 0
+	if val, ok := kv["ctime"]; ok && val != "" {
+		val, _ := strconv.ParseUint(strings.Split(val, ".")[0], 10, 64)
+		ctime = val
+	}
+
 	isDir := false
 	if _, ok := kv["files"]; ok {
 		isDir = true
@@ -761,6 +768,9 @@ func (c *Client) mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 		Instance:  c.opt.URL,
 		SysACL:    kv["sys.acl"],
 		TreeCount: treeCount,
+		UID:       kv["uid"],
+		GID:       kv["gid"],
+		CTime:     ctime,
 	}
 	return fi, nil
 }
@@ -777,6 +787,9 @@ type FileInfo struct {
 	Instance  string
 	SysACL    string
 	TreeCount uint64
+	UID       string
+	GID       string
+	CTime     uint64
 }
 
 type DeletedEntry struct {

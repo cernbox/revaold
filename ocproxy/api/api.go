@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/md5"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
@@ -188,6 +187,29 @@ func (p *proxy) registerRoutes() {
 
 }
 
+const (
+	trackerStatusNotFound int = iota
+	trackerStatusEditing
+	trackerStatusMustSave
+	trackerStatusCorrupted
+	trackerStatusClosed
+)
+
+// see https://api.onlyoffice.com/editors/callback
+type callbackRequest struct {
+	Actions []struct {
+		Type   int    `json:"type"`
+		Userid string `json:"userid"`
+	} `json:"actions"`
+	ChangesURL   string      `json:"changesurl"`
+	History      interface{} `json:"history"`
+	Key          string      `json:"key"`
+	Status       int         `json:"status"`
+	URL          string      `json:"url"`
+	Users        []string    `json:"users"`
+	ForceSaveURL int         `json:"forcesaveurl"`
+}
+
 func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -195,20 +217,37 @@ func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Println("ONLYOFFICE: " + string(data))
-	payload := struct {
-		Err int `json:"error"`
-	}{
-		Err: 0,
-	}
-	encoded, err := json.Marshal(payload)
-	if err != nil {
+
+	req := &callbackRequest{}
+	if err := json.Unmarshal(data, req); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	//encoded = []byte(`"{"message": "error tracking"}`)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	//	w.WriteHeader(http.StatusBadRequest)
-	w.Write(encoded)
+
+	fmt.Println(req)
+
+	if req.Status == trackerStatusEditing || req.Status == trackerStatusClosed {
+		payload := struct {
+			Err int `json:"error"`
+		}{
+			Err: 0,
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		//encoded = []byte(`"{"message": "error tracking"}`)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		//	w.WriteHeader(http.StatusBadRequest)
+		w.Write(encoded)
+		return
+	}
+
+	//ONLYOFFICE: {"key":"65020dfd-cd75-42b1-a118-a0886f1669c8","status":2,"url":"https://cbox-wopi-01.cern.ch:9443/cache/files/65020dfd-cd75-42b1-a118-a0886f1669c8_4907/output.pptx/output.pptx?md5=8q6RMPp1L17mQE7OdDPfdQ==&expires=1543412647&disposition=attachment&ooname=output.pptx","changesurl":"https://cbox-wopi-01.cern.ch:9443/cache/files/65020dfd-cd75-42b1-a118-a0886f1669c8_4907/changes.zip/changes.zip?md5=9HDBPxh1BKUpXqRpPR46Uw==&expires=1543412647&disposition=attachment&ooname=output.zip","history":{"serverVersion":"5.2.3","changes":[{"created":"2018-11-28 13:26:51","user":{"id":"gonzalhu","name":"Hugo Gonzalez Labrador,31 1-002,+41227663986, ()"}}]},"users":["gonzalhu"],"actions":[{"type":0,"userid":"gonzalhu"}],"lastsave":"2018-11-28T13:28:00.417Z","notmodified":false}
+
+	w.WriteHeader(http.StatusInternalServerError)
+	return
 }
 
 func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
@@ -302,7 +341,6 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	//<pre>Cannot GET /doc/home:27167144273772544/c/info</pre>
 	//</body>
 	//</html>
-	key = base64.StdEncoding.EncodeToString([]byte(key))[0:10]
 	key = uuid.Must(uuid.NewV4()).String()
 	//key = "hellokey" // key must be less 20 chars
 

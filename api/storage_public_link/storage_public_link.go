@@ -213,6 +213,10 @@ func (fs *linkStorage) Upload(ctx context.Context, name string, r io.ReadCloser)
 		return err
 	}
 
+	if link.ReadOnly {
+		return readOnlyError(link.Id)
+	}
+
 	if link.DropOnly {
 		// we cannot append a uuid to the filename as the ocproxy and other clients
 		// may rely on stat-upload-stat mechanism to check for a valid write, thus changing
@@ -235,6 +239,10 @@ func (fs *linkStorage) Move(ctx context.Context, oldName, newName string) error 
 	oldLink, oldPath, ctx, err := fs.getLink(ctx, oldName)
 	if err != nil {
 		return err
+	}
+
+	if oldLink.ReadOnly {
+		return readOnlyError(oldLink.Id)
 	}
 
 	if oldLink.DropOnly {
@@ -269,6 +277,11 @@ func (fs *linkStorage) CreateDir(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
+
+	if link.ReadOnly {
+		return readOnlyError(link.Id)
+	}
+
 	if link.DropOnly {
 		return dropOnlyError(link.Id)
 	}
@@ -282,6 +295,11 @@ func (fs *linkStorage) Delete(ctx context.Context, name string) error {
 	if err != nil {
 		return err
 	}
+
+	if link.ReadOnly {
+		return readOnlyError(link.Id)
+	}
+
 	if link.DropOnly {
 		return dropOnlyError(link.Id)
 	}
@@ -317,3 +335,7 @@ func (fs *linkStorage) RestoreRecycleEntry(ctx context.Context, restoreKey strin
 type dropOnlyError string
 
 func (e dropOnlyError) Error() string { return "link is drop only: " + string(e) }
+
+type readOnlyError string
+
+func (e readOnlyError) Error() string { return "link is read only: " + string(e) }

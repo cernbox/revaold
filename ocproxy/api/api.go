@@ -127,7 +127,7 @@ func (p *proxy) registerRoutes() {
 
 	// public link routes
 	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET", "POST")
-	p.router.HandleFunc("/index.php/s/{token}/download", p.tokenAuth(p.downloadArchivePL)).Methods("GET")
+	p.router.HandleFunc("/index.php/s/{token}/download", p.publicLinkAuth(p.tokenAuth(p.downloadArchivePL))).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_sharing/ajax/publicpreview.php", p.tokenAuth(p.getPublicPreview)).Methods("GET")
 
 	// app routes
@@ -6488,6 +6488,22 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 		return metadata.NewOutgoingContext(ctx, header)
 	}
 	return ctx
+}
+
+func (p *proxy) publicLinkAuth(h http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		token := mux.Vars(r)["token"]
+
+		// try to authenticate the link with empty password
+		client := p.getAuthClient()
+		res, err := client.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: ""})
+		if err == nil && res.Status == reva_api.StatusCode_OK {
+			// inject token in request
+			r.Header.Set("x-access-token", res.Token)
+		}
+		h(w, r)
+	})
 }
 
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {

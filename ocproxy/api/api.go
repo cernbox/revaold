@@ -37,6 +37,7 @@ import (
 
 	reva_api "github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/canary"
+	"github.com/cernbox/reva/ocproxy/api/static"
 
 	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
@@ -184,6 +185,7 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{path:.*}", p.tokenAuth(p.onlyOfficeConfig))
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/track/{path:.*}", p.tokenAuth(p.onlyOfficeTrack)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/new", p.tokenAuth(p.onlyOfficeNew)).Methods("POST")
 
 }
 
@@ -208,6 +210,113 @@ type callbackRequest struct {
 	URL          string      `json:"url"`
 	Users        []string    `json:"users"`
 	ForceSaveURL int         `json:"forcesaveurl"`
+}
+
+func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		err = errors.Wrap(err, "error reading form")
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	dir := r.Form.Get("dir")
+	name := r.Form.Get("name")
+	fn := path.Join(dir, name)
+	revaPath := p.getRevaPath(ctx, fn)
+
+	newFile := "new" + path.Ext(fn)
+	data, err := static.Asset("var/www/html/cernbox/apps/onlyoffice/assets/en/" + newFile)
+	if err != nil {
+		p.logger.Error(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// write to file
+	gCtx := GetContextWithAuth(ctx)
+	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if txInfoRes.Status != reva_api.StatusCode_OK {
+		p.writeError(txInfoRes.Status, w, r)
+		return
+	}
+
+	txInfo := txInfoRes.TxInfo
+
+	stream, err := p.getStorageClient().WriteChunk(gCtx)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// TODO(labkode); adjust buffer size to maximun opening file fize
+	buffer := make([]byte, 1024*1024*3)
+	offset := uint64(0)
+	numChunks := uint64(0)
+
+	reader := bytes.NewReader(data)
+	for {
+		n, err := reader.Read(buffer)
+		if n > 0 {
+			dc := &reva_api.TxChunk{
+				TxId:   txInfo.TxId,
+				Length: uint64(n),
+				Data:   buffer,
+				Offset: offset,
+			}
+			if err := stream.Send(dc); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			numChunks++
+			offset += uint64(n)
+
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writeSummaryRes, err := stream.CloseAndRecv()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if writeSummaryRes.Status != reva_api.StatusCode_OK {
+		p.writeError(writeSummaryRes.Status, w, r)
+		return
+	}
+
+	// all the chunks have been sent, we need to close the tx
+	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if emptyRes.Status != reva_api.StatusCode_OK {
+		p.writeError(emptyRes.Status, w, r)
+		return
+	}
+
+	// set fileinfo output
+
 }
 
 func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
@@ -417,6 +526,13 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","conv":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","conv":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","conv":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	settings := &onlyOfficeSettings{}
+	json.Unmarshal([]byte(msg), settings)
+	return settings.Formats[ext].Type
+
+}
 func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	accessToken, _ := reva_api.ContextGetAccessToken(ctx)
@@ -430,10 +546,8 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileType := strings.TrimPrefix(path.Ext(revaPath), ".")
-	key := md.Id
-	//key := "superkey"
 	title := md.Path
-	documentType := "presentation" // spreadsheet or text
+	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
 	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
 	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.hostname, path.Dir(fn))
 	lang := "en"
@@ -460,10 +574,16 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	//<pre>Cannot GET /doc/home:27167144273772544/c/info</pre>
 	//</body>
 	//</html>
-	key = uuid.Must(uuid.NewV4()).String()
-	//key = "hellokey" // key must be less 20 chars
 
-	url := fmt.Sprintf("https://labradorbox.cern.ch/index.php/apps/onlyoffice/storage/download" + md.Path + "?x-access-token=" + accessToken)
+	// poor man approach to get 20 characters unique sessions
+	// request sent to onlyoffice to increase this value.
+	parts := strings.Split(md.Id, ":")
+	key := parts[len(parts)-1]
+
+	p.logger.Info(fmt.Sprintf("onlyoffice key=%s for path=%s", key, fn))
+	//key := uuid.Must(uuid.NewV4()).String()
+
+	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download", p.hostname) + md.Path + "?x-access-token=" + accessToken
 
 	msg := `{
   "document": {
@@ -519,6 +639,17 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 		            "type" => $type
 		        ];
 	*/
+}
+
+type onlyOfficeFormatInfo struct {
+	Mime string `json:"mime"`
+	Type string `json:"type"`
+	Edit bool   `json:"edit"`
+	Def  bool   `json:"def"`
+}
+type onlyOfficeSettings struct {
+	Formats map[string]*onlyOfficeFormatInfo `json:"formats"`
+	SameTab bool                             `json:"sameTab"`
 }
 
 func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {

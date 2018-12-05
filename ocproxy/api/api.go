@@ -182,7 +182,7 @@ func (p *proxy) registerRoutes() {
 
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.tokenAuth(p.onlyOfficeSettings))
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{path:.*}", p.tokenAuth(p.onlyOfficeConfig))
-	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/track/{path:.*}", p.onlyOfficeTrack).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/track/{path:.*}", p.tokenAuth(p.onlyOfficeTrack)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
 
 }
@@ -211,20 +211,20 @@ type callbackRequest struct {
 }
 
 func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	fn := mux.Vars(r)["path"]
+	revaPath := p.getRevaPath(ctx, fn)
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	fmt.Println("ONLYOFFICE: " + string(data))
 
 	req := &callbackRequest{}
 	if err := json.Unmarshal(data, req); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println(req)
 
 	if req.Status == trackerStatusEditing || req.Status == trackerStatusClosed {
 		payload := struct {
@@ -240,6 +240,125 @@ func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
 		//encoded = []byte(`"{"message": "error tracking"}`)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		//	w.WriteHeader(http.StatusBadRequest)
+		w.Write(encoded)
+		return
+	}
+
+	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted {
+		url := req.URL
+		resp, err := http.Get(url)
+		if err != nil {
+			p.logger.Error(err.Error())
+			payload := struct {
+				Err     int    `json:"error"`
+				Message string `json:"message"`
+			}{
+				Err:     1,
+				Message: "error downloading file from url",
+			}
+			encoded, err := json.Marshal(payload)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			//encoded = []byte(`"{"message": "error tracking"}`)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			//	w.WriteHeader(http.StatusBadRequest)
+			w.Write(encoded)
+			return
+		}
+
+		// write to file
+		gCtx := GetContextWithAuth(ctx)
+		txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if txInfoRes.Status != reva_api.StatusCode_OK {
+			p.writeError(txInfoRes.Status, w, r)
+			return
+		}
+
+		txInfo := txInfoRes.TxInfo
+
+		stream, err := p.getStorageClient().WriteChunk(gCtx)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// TODO(labkode); adjust buffer size to maximun opening file fize
+		buffer := make([]byte, 1024*1024*3)
+		offset := uint64(0)
+		numChunks := uint64(0)
+
+		reader := resp.Body
+		for {
+			n, err := reader.Read(buffer)
+			if n > 0 {
+				dc := &reva_api.TxChunk{
+					TxId:   txInfo.TxId,
+					Length: uint64(n),
+					Data:   buffer,
+					Offset: offset,
+				}
+				if err := stream.Send(dc); err != nil {
+					p.logger.Error("", zap.Error(err))
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				numChunks++
+				offset += uint64(n)
+
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
+		writeSummaryRes, err := stream.CloseAndRecv()
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if writeSummaryRes.Status != reva_api.StatusCode_OK {
+			p.writeError(writeSummaryRes.Status, w, r)
+			return
+		}
+
+		// all the chunks have been sent, we need to close the tx
+		emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if emptyRes.Status != reva_api.StatusCode_OK {
+			p.writeError(emptyRes.Status, w, r)
+			return
+		}
+
+		payload := struct {
+			Err int `json:"error"`
+		}{
+			Err: 0,
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(encoded)
 		return
 	}
@@ -315,8 +434,8 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	//key := "superkey"
 	title := md.Path
 	documentType := "presentation" // spreadsheet or text
-	callbackUrl := "https://labradorbox.cern.ch/index.php/apps/onlyoffice/storage/track" + md.Path + "?x-acess-token=" + accessToken
-	goBackUrl := "https://labrdorbox.cern.ch/index.php" // TODO(labkode)
+	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
+	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.hostname, path.Dir(fn))
 	lang := "en"
 
 	mode := "edit"
@@ -1650,6 +1769,7 @@ type Options struct {
 	CanaryManager    *canary.Manager
 	CanaryForceClean bool
 	CanaryCookieTTL  int
+	Hostname string
 }
 
 func (opt *Options) init() {
@@ -1799,6 +1919,7 @@ func New(opt *Options) (http.Handler, error) {
 		canaryManager:    opt.CanaryManager,
 		canaryForceClean: opt.CanaryForceClean,
 		canaryCookieTTL:  opt.CanaryCookieTTL,
+		hostname: opt.Hostname,
 	}
 
 	proxy.registerRoutes()
@@ -1854,6 +1975,7 @@ type proxy struct {
 	canaryManager    *canary.Manager
 	canaryForceClean bool
 	canaryCookieTTL  int
+	hostname string
 }
 
 // TODO(labkode): store this global var inside the proxy

@@ -213,6 +213,57 @@ type callbackRequest struct {
 	ForceSaveURL int         `json:"forcesaveurl"`
 }
 
+/*
+	$entry = [];
+
+	$entry['id'] = $i['fileid'];
+	$entry['parentId'] = $i['parent'];
+	$entry['mtime'] = $i['mtime'] * 1000;
+	// only pick out the needed attributes
+	$entry['name'] = $i->getName();
+	$entry['permissions'] = $i['permissions'];
+	$entry['mimetype'] = $i['mimetype'];
+	$entry['size'] = $i['size'];
+	$entry['type'] = $i['type'];
+	$entry['etag'] = $i['etag'];
+	if (isset($i['tags'])) {
+		$entry['tags'] = $i['tags'];
+	}
+	if (isset($i['displayname_owner'])) {
+		$entry['shareOwner'] = $i['displayname_owner'];
+	}
+	if (isset($i['is_share_mount_point'])) {
+		$entry['isShareMountPoint'] = $i['is_share_mount_point'];
+	}
+	$mountType = null;
+	if ($i->isShared()) {
+		$mountType = 'shared';
+	} elseif ($i->isMounted()) {
+		$mountType = 'external';
+	}
+	if ($mountType !== null) {
+		if ($i->getInternalPath() === '') {
+			$mountType .= '-root';
+		}
+		$entry['mountType'] = $mountType;
+	}
+	if (isset($i['extraData'])) {
+		$entry['extraData'] = $i['extraData'];
+	}
+	return $entry;
+
+*/
+
+type ocFileInfo struct {
+	Size     int    `json:"size"`
+	FileType string `json:"type"`
+	Etag     string `json:"etag"`
+	Id       string `json:"id"`
+	Mtime    int    `json:"mtime"`
+	Mime     string `json:"mime"`
+	Name     string `json:"name"`
+}
+
 func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	err := r.ParseForm()
@@ -297,6 +348,7 @@ func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
+
 	}
 	if writeSummaryRes.Status != reva_api.StatusCode_OK {
 		p.writeError(writeSummaryRes.Status, w, r)
@@ -317,7 +369,36 @@ func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// set fileinfo output
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
+	info := &ocFileInfo{
+		Id:    md.Id,
+		Size:  int(md.Size),
+		Mtime: int(md.Mtime),
+		Mime:  md.Mime,
+		Etag:  md.Etag,
+		Name:  path.Base(md.Path),
+	}
+
+	if md.IsDir {
+		info.FileType = "dir"
+	} else {
+		info.FileType = "file"
+	}
+
+	encoded, err := json.Marshal(info)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
 }
 
 func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {

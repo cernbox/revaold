@@ -256,6 +256,8 @@ func getCustomMime(ext string) string {
 		return "application/pynb"
 	case ".drawio":
 		return "application/x-drawio"
+	case ".vsdx":
+		return "application/x-drawio"
 	default:
 		return ""
 	}

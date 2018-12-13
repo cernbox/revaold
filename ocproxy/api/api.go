@@ -514,10 +514,6 @@ func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
 	      "drawio":{
 		 "mime":"application\/x-drawio",
 		 "type":"text"
-	      },
-	      "vsdx":{
-		 "mime":"application\/vsdx",
-		 "type":"text"
 	      }
 	   },
 	   "settings":{

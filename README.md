@@ -1,3 +1,4 @@
 # REVA
 
-Documentation: [https://cernbox.github.io/reva/](https://cernbox.github.io/reva/)
+Previous code lives in github.com/cernbox/revaold.
+

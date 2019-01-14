@@ -7,11 +7,11 @@ import (
 
 	"github.com/codegangsta/cli"
 
-	"github.com/cernbox/reva/api"
-	"github.com/cernbox/reva/reva-cli/cmds/authcmd"
-	"github.com/cernbox/reva/reva-cli/cmds/sharecmd"
-	"github.com/cernbox/reva/reva-cli/cmds/storagecmd"
-	"github.com/cernbox/reva/reva-cli/util"
+	"github.com/cernbox/revaold/api"
+	"github.com/cernbox/revaold/reva-cli/cmds/authcmd"
+	"github.com/cernbox/revaold/reva-cli/cmds/sharecmd"
+	"github.com/cernbox/revaold/reva-cli/cmds/storagecmd"
+	"github.com/cernbox/revaold/reva-cli/util"
 
 	"golang.org/x/net/context"
 )

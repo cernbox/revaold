@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/cernbox/reva/api"
-	"github.com/cernbox/reva/reva-cli/util"
+	"github.com/cernbox/revaold/api"
+	"github.com/cernbox/revaold/reva-cli/util"
 
 	"github.com/codegangsta/cli"
 	"github.com/ryanuber/columnize"

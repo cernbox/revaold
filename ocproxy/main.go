@@ -6,7 +6,7 @@ import (
 
 	"github.com/cernbox/gohub/goconfig"
 	"github.com/cernbox/gohub/gologger"
-	"github.com/cernbox/reva/ocproxy/api"
+	"github.com/cernbox/revaold/ocproxy/api"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )

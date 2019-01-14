@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	"github.com/cernbox/reva/api"
+	"github.com/cernbox/revaold/api"
 	"gopkg.in/ldap.v2"
 )
 

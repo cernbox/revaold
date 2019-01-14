@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cernbox/reva/api"
+	"github.com/cernbox/revaold/api"
 	"github.com/gofrs/uuid"
 	"go.uber.org/zap"
 )

@@ -1,7 +1,7 @@
 package sharesvc
 
 import (
-	"github.com/cernbox/reva/api"
+	"github.com/cernbox/revaold/api"
 	"golang.org/x/net/context"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"

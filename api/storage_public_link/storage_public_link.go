@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/cernbox/reva/api"
+	"github.com/cernbox/revaold/api"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )

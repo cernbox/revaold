@@ -6,7 +6,7 @@ import (
 	gopath "path"
 	"strings"
 
-	"github.com/cernbox/reva/api"
+	"github.com/cernbox/revaold/api"
 
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"

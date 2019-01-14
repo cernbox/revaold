@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/cernbox/reva/reva-cli/cmds"
+	"github.com/cernbox/revaold/reva-cli/cmds"
 	"github.com/codegangsta/cli"
 )
 

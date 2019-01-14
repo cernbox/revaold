@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/cernbox/reva/api"
+	"github.com/cernbox/revaold/api"
 	"io/ioutil"
 	"net/http"
 

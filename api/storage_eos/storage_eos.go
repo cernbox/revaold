@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cernbox/reva/api"
-	"github.com/cernbox/reva/api/storage_eos/eosclient"
+	"github.com/cernbox/revaold/api"
+	"github.com/cernbox/revaold/api/storage_eos/eosclient"
 	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )

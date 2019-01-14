@@ -3,7 +3,7 @@ package eosclient
 import (
 	"context"
 	"fmt"
-	"github.com/cernbox/reva/api"
+	"github.com/cernbox/revaold/api"
 	"testing"
 )
 

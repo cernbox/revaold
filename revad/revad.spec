@@ -53,7 +53,7 @@ rm -rf %buildroot/
 %config(noreplace) /etc/revad/revad.yaml
 
 %changelog
-* Mon Feb 18 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.35
+* Mon Feb 18 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.35
 - Add restart=always to systemd
 * Thu Dec 13 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.34
 - Add vsd mimetype

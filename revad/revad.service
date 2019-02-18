@@ -11,6 +11,7 @@ ExecStart=/usr/local/bin/revad
 StandardOutput=null
 StandardError=syslog
 LimitNOFILE=49152
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

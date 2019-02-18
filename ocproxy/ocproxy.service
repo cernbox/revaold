@@ -11,6 +11,7 @@ ExecStart=/usr/local/bin/ocproxy
 StandardOutput=null
 StandardError=syslog
 LimitNOFILE=49152
+Restart=always
 
 [Install]
 WantedBy=multi-user.target

@@ -38,8 +38,7 @@ import (
 
 	reva_api "github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/canary"
-	"github.com/cernbox/reva/ocproxy/api/static"
-
+	"github.com/cernbox/revaold/ocproxy/api/static"
 	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
 	"github.com/gofrs/uuid"

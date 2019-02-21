@@ -669,6 +669,10 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 
 	// key cannot contain colon (:), use ._. as separator
 	key := md.Id
+	// if migration id set, use it
+	if md.MigId != "" {
+		key = md.MigId
+	}
 	key = strings.Replace(key, ":", "._.", -1)
 	p.onlyOfficeMutex.Lock()
 	p.onlyOfficeMap[md.EosFile] = key

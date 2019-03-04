@@ -52,6 +52,7 @@ func init() {
 	gc.Add("apps-mail-server-from-address", "cernbox-noreply@cern.ch", "The sender of the mail (FROM header)")
 	
 	gc.Add("apps-onlyoffice-document-server", "example.org", "the location of the onlyoffice server")
+	gc.Add("apps-gantt-server", "https://gantt-viewer.web.cern.ch", "the location of the gantt server")
 
 	gc.Add("cache-size", 1000000, "cache size for md records")
 	gc.Add("cache-eviction", 86400, "cache eviction time in seconds for md records")
@@ -111,6 +112,7 @@ func main() {
 		CanaryCookieTTL:       gc.GetInt("canary-cookie-ttl"),
 		Hostname:              gc.GetString("hostname"),
 		OnlyOfficeDocumentServer: gc.GetString("apps-onlyoffice-document-server"),
+		GanttServer: gc.GetString("apps-gantt-server"),
 	}
 
 	_, err := api.New(opts)

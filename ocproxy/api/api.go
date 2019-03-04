@@ -187,8 +187,25 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/new", p.tokenAuth(p.onlyOfficeNew)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/config", p.onlyOfficeMainConfig).Methods("GET")
+	
+	// gant routes
+	p.router.HandleFunc("/index.php/apps/gantt/config", p.getGanttConfig).Methods("GET")
 
 
+}
+
+func (p *proxy) getGanttConfig(w http.ResponseWriter, r *http.Request) {
+       settings := fmt.Sprintf(`
+{
+       "viewer-server": "%s",
+       "formats": [{
+               "mime": "application/x-gantt",
+               "type": "project"
+       }]
+}
+`, p.ganttServer)
+
+       w.Write([]byte(settings))
 }
 
 const (
@@ -613,6 +630,8 @@ func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
 	return settings.Formats[ext].Type
 
 }
+
+
 func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	accessToken, _ := reva_api.ContextGetAccessToken(ctx)
@@ -2018,6 +2037,8 @@ type Options struct {
 	Hostname string
 
 	OnlyOfficeDocumentServer string
+
+	GanttServer string
 }
 
 func (opt *Options) init() {
@@ -2172,6 +2193,8 @@ func New(opt *Options) (http.Handler, error) {
 		onlyOfficeMutex: &sync.Mutex{},
 		onlyOfficeMap:   map[string]string{},
 		onlyOfficeDocumentServer: opt.OnlyOfficeDocumentServer,
+
+		ganttServer: opt.GanttServer,
 	}
 
 	proxy.registerRoutes()
@@ -2232,6 +2255,8 @@ type proxy struct {
 	onlyOfficeMutex *sync.Mutex
 	onlyOfficeMap   map[string]string
 	onlyOfficeDocumentServer string
+
+	ganttServer string
 }
 
 // TODO(labkode): store this global var inside the proxy

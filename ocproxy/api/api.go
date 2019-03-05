@@ -11,7 +11,11 @@ import (
 	"encoding/xml"
 	"fmt"
 	"html/template"
+	"image"
 	"image/color"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -4943,6 +4947,41 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	ex, err := exif.Decode(reader)
 	if err == nil {
 		rotate, flip = exifOrientation(ex)
+	}
+
+	_, err = reader.Seek(0, 0)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	config, _, err := image.DecodeConfig(reader)
+	if err != nil {
+		p.logger.Error("error decoding image config", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var maxH int64 = 1200
+	var maxW int64 = 1200
+
+	sourceW := int64(config.Width)
+	sourceH := int64(config.Height)
+
+	sourceRatio := float64(sourceW) / float64(sourceH)
+	thumbRatio := float64(maxW) / float64(maxH)
+
+	// adjust aspect ratio
+	if sourceW <= maxW && sourceH < maxH {
+		width = sourceW
+		height = sourceH
+	} else if thumbRatio > sourceRatio {
+		width = int64(float64(maxH) * sourceRatio)
+		height = maxH
+	} else {
+		width = maxW
+		height = int64(float64(maxW) / sourceRatio)
 	}
 
 	_, err = reader.Seek(0, 0)

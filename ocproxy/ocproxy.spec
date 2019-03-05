@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.42
+Version: 0.0.43
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue Mar 05 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.43
+- Fix image preview aspect ratio 
 * Mon Feb 18 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.42
 - Add restart=always to systemd
 * Thu Dec 13 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.41

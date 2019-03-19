@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/cernbox/revaold/api"
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
+	ctx_zap "github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )
 
@@ -51,35 +51,42 @@ func (fs *allProjectsStorage) getProject(ctx context.Context, name string) (*api
 }
 
 func (fs *allProjectsStorage) GetPathByID(ctx context.Context, id string) (string, error) {
-	id = "oldeosproject:" + id
-	eosPath, err := fs.vs.GetPathByID(ctx, id)
-	if err != nil {
-		fs.logger.Error("error getting path from id", zap.Error(err))
-		return "", err
+	//return id, nil
+	// we don't support access by fileid on this storage
+	return "", api.NewError(api.StorageNotSupportedErrorCode)
+	/*
+		fs.logger.Debug("allprojects: givenid=" + id)
+		id = "oldproject:" + id
+		fs.logger.Debug("allprojects: migid=" + id)
+		eosPath, err := fs.vs.GetPathByID(ctx, id)
+		if err != nil {
+			fs.logger.Error("error getting path from id", zap.Error(err))
+			return "", err
 
-	}
+		}
 
-	right := strings.Trim(strings.TrimPrefix(eosPath, "/eos/project/"), "/") // csc or c/cbox or csc/Docs or c/cbox/Docs
-	tokens := strings.Split(right, "/")
+		right := strings.Trim(strings.TrimPrefix(eosPath, "/eos/project/"), "/") // csc or c/cbox or csc/Docs or c/cbox/Docs
+		tokens := strings.Split(right, "/")
 
-	var projectName string
-	var relPath string
-	if len(tokens) >= 1 {
-		if len(tokens[0]) == 1 { // c/cernbox
-			projectName = tokens[1]
-			if len(tokens) > 2 {
-				relPath = path.Join(tokens[2:]...)
-			}
-		} else {
-			projectName = tokens[0] // csc
-			if len(tokens) > 1 {
-				relPath = path.Join(tokens[1:]...)
+		var projectName string
+		var relPath string
+		if len(tokens) >= 1 {
+			if len(tokens[0]) == 1 { // c/cernbox
+				projectName = tokens[1]
+				if len(tokens) > 2 {
+					relPath = path.Join(tokens[2:]...)
+				}
+			} else {
+				projectName = tokens[0] // csc
+				if len(tokens) > 1 {
+					relPath = path.Join(tokens[1:]...)
+				}
 			}
 		}
-	}
 
-	path := path.Join("/", projectName, relPath)
-	return path, nil
+		path := path.Join("/", projectName, relPath)
+		return path, nil
+	*/
 }
 
 type accessLevel int
@@ -122,7 +129,7 @@ func (fs *allProjectsStorage) getProjectAccess(ctx context.Context, user string,
 }
 
 func (fs *allProjectsStorage) accessLevelFromGroups(ctx context.Context, groups []string, project *api.Project) accessLevel {
-	var level accessLevel = accessLevelNothing
+	level := accessLevelNothing
 	for _, g := range groups {
 		if g == project.AdminGroup {
 			return accessLevelAdmin

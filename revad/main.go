@@ -24,6 +24,7 @@ import (
 	"github.com/cernbox/revaold/api/storage_eos"
 	"github.com/cernbox/revaold/api/storage_homemigration"
 	"github.com/cernbox/revaold/api/storage_local"
+	"github.com/cernbox/revaold/api/storage_projectmigration"
 	"github.com/cernbox/revaold/api/storage_public_link"
 	"github.com/cernbox/revaold/api/storage_share"
 	"github.com/cernbox/revaold/api/storage_usermigration"
@@ -38,13 +39,13 @@ import (
 	"github.com/cernbox/revaold/revad/svcs/storagesvc"
 	"github.com/cernbox/revaold/revad/svcs/taggersvc"
 
-	"github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/grpc-ecosystem/go-grpc-middleware/auth"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
-	"github.com/grpc-ecosystem/go-grpc-middleware/recovery"
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags"
-	"github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
-	"github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_auth "github.com/grpc-ecosystem/go-grpc-middleware/auth"
+	grpc_zap "github.com/grpc-ecosystem/go-grpc-middleware/logging/zap"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
+	grpc_ctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 
 	"github.com/gofrs/uuid"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -72,8 +73,9 @@ func main() {
 
 	loadMountTable(mountTable)
 
-	// TODO(labkode): remove this hack for the migration scenario
+	// TODO(labkode): remove these hacks for the migration scenario
 	applyMigrationLogic()
+	applyMigrationLogicForProjects()
 
 	server := grpc.NewServer(
 		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
@@ -574,4 +576,57 @@ func applyMigrationLogic() {
 	userMount := mount.New("user", "/eos/user", &api.MountOptions{}, userStorage)
 	vs.AddMount(context.Background(), homeMount)
 	vs.AddMount(context.Background(), userMount)
+
+}
+
+func applyMigrationLogicForProjects() {
+	oldProjectMount, err := vs.GetMount("/old/project")
+	if err != nil {
+		panic(err)
+	}
+
+	newProjectMap := map[string]api.Storage{}
+	for _, l := range "abcdefghijklmnopqrstuvwxyz" {
+		letter := string(l)
+		m, err := vs.GetMount(fmt.Sprintf("/new/project/%s", letter))
+		if err != nil {
+			panic(err)
+		}
+		newProjectMap[letter] = m.GetStorage()
+	}
+
+	migratorOpts := &redismigrator.Options{
+		Address:            gc.GetString("mig-redis-tcp-address"),
+		DialTimeout:        gc.GetInt("mig-redis-dial-timeout"),
+		IdleCheckFrequency: gc.GetInt("mig-redis-idle-check-frequency"),
+		IdleTimeout:        gc.GetInt("mig-redis-idle-timeout"),
+		Logger:             logger,
+		MaxRetries:         gc.GetInt("mig-redis-max-retries"),
+		PoolSize:           gc.GetInt("mig-redis-pool-size"),
+		PoolTimeout:        gc.GetInt("mig-redis-pool-timeout"),
+		ReadTimeout:        gc.GetInt("mig-redis-read-timeout"),
+		WriteTimeout:       gc.GetInt("mig-redis-write-timeout"),
+		Password:           gc.GetString("mig-redis-password"),
+	}
+
+	migrator, err := redismigrator.New(migratorOpts)
+	if err != nil {
+		logger.Error("", zap.Error(err))
+		panic(err)
+	}
+
+	opts := &storage_projectmigration.Options{
+		OldProject:    oldProjectMount.GetStorage(),
+		Logger:        logger,
+		NewProjectMap: newProjectMap,
+		Migrator:      migrator,
+	}
+
+	storage, err := storage_projectmigration.New(opts)
+	if err != nil {
+		panic(err)
+	}
+
+	projectMount := mount.New("project", "/eos/project", &api.MountOptions{}, storage)
+	vs.AddMount(context.Background(), projectMount)
 }

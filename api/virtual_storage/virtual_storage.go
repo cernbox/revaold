@@ -9,7 +9,7 @@ import (
 
 	"github.com/cernbox/revaold/api"
 	"github.com/gofrs/uuid"
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
+	ctx_zap "github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"go.uber.org/zap"
 )
 

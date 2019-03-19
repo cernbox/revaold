@@ -6691,8 +6691,13 @@ func (p *proxy) getPlainOCPath(ctx context.Context, revaPath string) string {
 
 func (p *proxy) getOCId(ctx context.Context, id string) string {
 	tokens := strings.Split(id, ":")
+	// logic for home migration
 	if tokens[0] == "oldhome" || strings.HasPrefix(tokens[0], "eoshome-") {
 		tokens[0] = "home"
+	}
+	// logic for project migration
+	if tokens[0] == "oldproject" || strings.HasPrefix(tokens[0], "newproject-") {
+		tokens[0] = "projects"
 	}
 	return strings.Join(tokens, ":")
 }
@@ -6723,11 +6728,32 @@ func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 				ocPath = strings.TrimPrefix(revaPath, p.revaPersonalProjectsPrefix)
 				ocPath = path.Join(p.ownCloudPersonalProjectsPrefix, ocPath)
 			} else {
-				// migration logic, strip /oldhome or /eoshome-l from reva path
-				ocPath = strings.Trim(revaPath, "/")
-				parts := strings.Split(ocPath, "/")
-				parts[0] = ""
-				ocPath = path.Join("/", p.ownCloudHomePrefix, path.Join(parts...))
+				// this is migration logic, like getting shares or favs will
+				// give us back the migrated id and migrated path like
+				// /oldhome or eosproject-a
+				if strings.HasPrefix(revaPath, "/old/project") {
+					// remove oldproject prefix and replace by projects
+					// revaPath is /old/project/l/labradorprojecttest/somehting/docs
+					ocPath = strings.TrimPrefix(revaPath, "/old/project")
+					ocPath = strings.TrimPrefix(ocPath, "/") // remove first slash
+					parts := strings.Split(ocPath, "/")      // [l, labradorprojecttest, docs]
+					parts[0] = ""                            // remove letter
+					ocPath = path.Join("/", p.ownCloudPersonalProjectsPrefix, path.Join(parts...))
+				} else if strings.HasPrefix(revaPath, "/new/project") {
+					// remove newproject prefix and replace by projects
+					// revaPath is /new/project/l/labradorprojecttest/somehting/docs
+					ocPath = strings.TrimPrefix(revaPath, "/new/project")
+					ocPath = strings.TrimPrefix(ocPath, "/") // remove first slash
+					parts := strings.Split(ocPath, "/")      // [l, labradorprojecttest, docs]
+					parts[0] = ""                            // remove letter
+					ocPath = path.Join("/", p.ownCloudPersonalProjectsPrefix, path.Join(parts...))
+				} else {
+					// migration logic, strip /oldhome or /eoshome-l from reva path
+					ocPath = strings.Trim(revaPath, "/")
+					parts := strings.Split(ocPath, "/")
+					parts[0] = ""
+					ocPath = path.Join("/", p.ownCloudHomePrefix, path.Join(parts...))
+				}
 			}
 		}
 	}

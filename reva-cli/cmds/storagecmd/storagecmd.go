@@ -148,7 +148,7 @@ func listFolder(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	lines := []string{"#Type|Id|Size|MTime|ETag|ReadOnly|Shareable|Path"}
+	lines := []string{"#Type|Id|MigId|Size|MTime|ETag|ReadOnly|Shareable|Path|MigPath"}
 	for {
 		mdRes, err := stream.Recv()
 		if err == io.EOF {
@@ -165,7 +165,7 @@ func listFolder(c *cli.Context) error {
 		if md.IsDir {
 			_type = "dir"
 		}
-		line := fmt.Sprintf("%s|%s|%d|%d|%s|%t|%t|%s", _type, md.Id, md.Size, md.Mtime, md.Etag, md.IsReadOnly, md.IsShareable, md.Path)
+		line := fmt.Sprintf("%s|%s|%s|%d|%d|%s|%t|%t|%s|%s", _type, md.Id, md.MigId, md.Size, md.Mtime, md.Etag, md.IsReadOnly, md.IsShareable, md.Path, md.MigPath)
 		lines = append(lines, line)
 	}
 	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))

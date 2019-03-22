@@ -129,7 +129,7 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 		}
 	}
 	if c.opt.EnableLogging {
-		c.opt.Logger.Info("eosclient: cmd", zap.String("args", fmt.Sprintf("%v", cmd.Args)), zap.Int("exist_status", exitStatus), zap.Error(err))
+		c.opt.Logger.Info("eosclient: cmd", zap.String("args", fmt.Sprintf("%v", cmd.Args)), zap.Int("exist_status", exitStatus), zap.String("url", c.opt.URL), zap.Error(err))
 	}
 	return outBuf.String(), errBuf.String(), err
 }

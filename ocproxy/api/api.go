@@ -3837,6 +3837,7 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 		ShareWith:            &shareWith,
 		ShareWithDisplayName: shareWith,
 	}
+	//p.logger.Debug("reva folder share to oc share", zap.String("folder_share", fmt.Sprintf("%+v", share)), zap.String("ocs_share", fmt.Sprintf("%+v", ocsShare)))
 	return ocsShare, nil
 }
 func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLink) (*OCSShare, error) {
@@ -6740,12 +6741,15 @@ func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 					parts[0] = ""                            // remove letter
 					ocPath = path.Join("/", p.ownCloudPersonalProjectsPrefix, path.Join(parts...))
 				} else if strings.HasPrefix(revaPath, "/new/project") {
+					// the new project mounts are special, one needs to query them like
+					// /new/project/a/a/alabasta. Note the double "a".
+					// We need to remove the double "a" before converting back to oc path.
 					// remove newproject prefix and replace by projects
 					// revaPath is /new/project/l/labradorprojecttest/somehting/docs
-					ocPath = strings.TrimPrefix(revaPath, "/new/project")
-					ocPath = strings.TrimPrefix(ocPath, "/") // remove first slash
-					parts := strings.Split(ocPath, "/")      // [l, labradorprojecttest, docs]
-					parts[0] = ""                            // remove letter
+					ocPath = strings.TrimPrefix(revaPath, "/new/project/") // "a/a/alabasta"
+					parts := strings.Split(ocPath, "/")      // [a, a, alabasta]
+					parts[0] = ""                            // remove first letter
+					parts[1] = ""				 // remove second letter
 					ocPath = path.Join("/", p.ownCloudPersonalProjectsPrefix, path.Join(parts...))
 				} else {
 					// migration logic, strip /oldhome or /eoshome-l from reva path

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strings"
 
 	"github.com/cernbox/revaold/api"
 	"go.uber.org/zap"
@@ -55,22 +56,27 @@ func (fs *eosStorage) GetPathByID(ctx context.Context, id string) (string, error
 
 func (fs *eosStorage) getStorageForProject(ctx context.Context, fn string) (api.Storage, string, string) {
 	// obtain letter from path
+	relative := strings.TrimPrefix(fn, "/")
+	parts := strings.Split(relative, "/") // ["l", "labradorprojecttest"]
 	fs.logger.Debug("migration: home project: fn=" + fn)
-	letter := "l"
-	projectName := "labradorprojecttest"
+	if len(parts) < 2 {
+		fs.logger.Info("migration: forwarding project request to oldproject", zap.String("path", fn))
+		return fs.oldProject, "oldproject", "/old/project"
+	}
+	letter := parts[0]      // "l"
+	projectName := parts[1] // "labradorprojecttest"
 	key := fmt.Sprintf("/eos/project/%s/%s", letter, projectName)
-	//key := fmt.Sprintf("/eos/project/%s/%s", letter, u.AccountId)
-	fs.logger.Debug("migration key", zap.String("key", key))
+	fs.logger.Debug("migration: key", zap.String("key", key))
 
 	migrated := fs.isProjectMigrated(ctx, key)
 
 	if !migrated {
-		fs.logger.Info("forwarding project request to oldproject", zap.String("path", fn))
+		fs.logger.Info("migration: forwarding project request to oldproject", zap.String("path", fn))
 		return fs.oldProject, "oldproject", "/old/project"
 	}
 
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
-	fs.logger.Info("forwarding project request to newproject", zap.String("path", fn))
+	fs.logger.Info("migration: forwarding project request to newproject", zap.String("path", fn))
 	return s, mountID, mountPrefix
 }
 

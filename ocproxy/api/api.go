@@ -2164,27 +2164,27 @@ func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
          }
 */
 type OCSShare struct {
-	ID                   string     `json:"id"`
-	ShareType            ShareType  `json:"share_type"`
-	UIDOwner             string     `json:"uid_owner"`
-	DisplayNameOwner     string     `json:"displayname_owner"`
-	Permissions          Permission `json:"permissions"`
-	ShareTime            int        `json:"stime"`
-	Token                string     `json:"token"`
-	UIDFileOwner         string     `json:"uid_file_owner"`
-	DisplayNameFileOwner string     `json:"displayname_file_owner"`
-	Path                 string     `json:"path"`
-	ItemType             ItemType   `json:"item_type"`
-	MimeType             string     `json:"mimetype"`
-	ItemSource           string     `json:"item_source"`
-	FileSource           string     `json:"file_source"`
-	FileTarget           string     `json:"file_target"`
-	ShareWith            *string    `json:"share_with"`
-	ShareWithDisplayName string     `json:"share_with_displayname"`
-	Name                 string     `json:"name"`
-	URL                  string     `json:"url"`
-	State                ShareState `json:"state"`
-	Expiration           string     `json:"expiration,omitempty"`
+	ID                   string     `json:"id" xml:"id"`
+	ShareType            ShareType  `json:"share_type" xml:"share_type"`
+	UIDOwner             string     `json:"uid_owner" xml:"uid_owner"`
+	DisplayNameOwner     string     `json:"displayname_owner" xml:"displayname_owner"`
+	Permissions          Permission `json:"permissions" xml:"permissions"`
+	ShareTime            int        `json:"stime" xml:"stime"`
+	Token                string     `json:"token" xml:"token"`
+	UIDFileOwner         string     `json:"uid_file_owner" xml:"uid_file_owner"`
+	DisplayNameFileOwner string     `json:"displayname_file_owner" xml:"displayname_file_owner"`
+	Path                 string     `json:"path" xml:"path"`
+	ItemType             ItemType   `json:"item_type" xml:"item_type"`
+	MimeType             string     `json:"mimetype" xml:"mimetype"`
+	ItemSource           string     `json:"item_source" xml:"item_source"`
+	FileSource           string     `json:"file_source" xml:"file_source"`
+	FileTarget           string     `json:"file_target" xml:"file_target"`
+	ShareWith            *string    `json:"share_with" xml:"share_with"`
+	ShareWithDisplayName string     `json:"share_with_displayname" xml:"share_with_displayname"`
+	Name                 string     `json:"name" xml:"name"`
+	URL                  string     `json:"url" xml:"url"`
+	State                ShareState `json:"state" xml:"state"`
+	Expiration           string     `json:"expiration,omitempty" xml:"expiration,omitempty"`
 }
 
 type NewShareOCSRequest struct {
@@ -4249,19 +4249,42 @@ func (p *proxy) createPublicLinkShare(ctx context.Context, newShare *NewShareOCS
 		return
 	}
 
+	p.writeOCSResponse(w, r, ocsShare)
+
+}
+
+func (p *proxy) writeOCSResponse(w http.ResponseWriter, r *http.Request, data interface{}) {
+
+	format := r.URL.Query().Get("format")
+
+	useXML := true
+	if format == "json" {
+		useXML = false
+	}
+
 	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
-	payload := &OCSPayload{Meta: meta, Data: ocsShare}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
+	payload := &OCSPayload{Meta: meta, Data: data}
+
+	var encoded []byte
+	var err error
+	if useXML {
+		encoded, err = xml.Marshal(payload)
+	} else {
+		ocsRes := &OCSResponse{OCS: payload}
+		encoded, err = json.Marshal(ocsRes)
+	}
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	if useXML {
+		w.Header().Set("Content-Type", "application/xml")
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
-
 }
 
 func (p *proxy) createFolderShare(ctx context.Context, newShare *NewShareOCSRequest, readOnly bool, w http.ResponseWriter, r *http.Request) {
@@ -4301,20 +4324,10 @@ func (p *proxy) createFolderShare(ctx context.Context, newShare *NewShareOCSRequ
 		return
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
-	payload := &OCSPayload{Meta: meta, Data: ocsShare}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
+	p.writeOCSResponse(w, r, ocsShare)
 
 }
+
 func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	newShare := &NewShareOCSRequest{}
@@ -5485,16 +5498,17 @@ const (
 )
 
 type ResponseMeta struct {
-	Status       string `json:"status"`
-	StatusCode   int    `json:"statuscode"`
-	Message      string `json:"message"`
-	TotalItems   string `json:"totalitems"`
-	ItemsPerPage string `json:"itemsperpage"`
+	Status       string `json:"status" xml:"status"`
+	StatusCode   int    `json:"statuscode" xml:"statuscode"`
+	Message      string `json:"message" xml:"message"`
+	TotalItems   string `json:"totalitems" xml:"totalitems"`
+	ItemsPerPage string `json:"itemsperpage" xml:"itemsperpage"`
 }
 
 type OCSPayload struct {
-	Meta *ResponseMeta `json:"meta"`
-	Data interface{}   `json:"data"`
+	XMLName xml.Name      `xml:"ocs" json:"-"`
+	Meta    *ResponseMeta `json:"meta" xml:"meta"`
+	Data    interface{}   `json:"data" xml:"data"`
 }
 
 type OCSResponse struct {

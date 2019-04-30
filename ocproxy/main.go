@@ -27,6 +27,7 @@ func init() {
 
 	gc.Add("data-chunks-folder", "", "folder where to store data chunks before they are commited to REVA.")
 	gc.Add("temporary-folder", "", "folder where to store temporary data. Empty means use the OS temporary folder.")
+	gc.Add("thumbnails-folder", "", "folder where to store thumbnails. Empty means use the OS temporary folder.")
 	gc.Add("max-upload-file-size", 8589934592, "maximum file size for upload files.")
 	gc.Add("jwt-sign-key", "bar", "secret to sign JWT tokens.")
 	gc.Add("reva-tcp-address", "localhost:9999", "tcp address of the REVA server.")
@@ -61,6 +62,7 @@ func main() {
 
 	opts := &api.Options{
 		Router:                router,
+		ThumbnailsFolder:      gc.GetString("thumbnails-folder"),
 		TemporaryFolder:       gc.GetString("temporary-folder"),
 		ChunksFolder:          gc.GetString("data-chunks-folder"),
 		REVAHost:              gc.GetString("reva-tcp-address"),

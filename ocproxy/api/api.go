@@ -1376,6 +1376,7 @@ type NewShareOCSRequest struct {
 
 type Options struct {
 	Logger            *zap.Logger
+	ThumbnailsFolder string
 	TemporaryFolder   string
 	ChunksFolder      string
 	MaxUploadFileSize uint64
@@ -1418,6 +1419,9 @@ type Options struct {
 func (opt *Options) init() {
 	if opt.TemporaryFolder == "" {
 		opt.TemporaryFolder = os.TempDir()
+	}
+	if opt.ThumbnailsFolder == "" {
+		opt.ThumbnailsFolder = os.TempDir()
 	}
 	if opt.ChunksFolder == "" {
 		opt.ChunksFolder = filepath.Join(opt.TemporaryFolder, "chunks")
@@ -1494,6 +1498,10 @@ func New(opt *Options) (http.Handler, error) {
 		return nil, err
 	}
 
+	if err := os.MkdirAll(opt.ThumbnailsFolder, 0755); err != nil {
+		return nil, err
+	}
+
 	if err := os.MkdirAll(opt.ChunksFolder, 0755); err != nil {
 		return nil, err
 	}
@@ -1530,6 +1538,7 @@ func New(opt *Options) (http.Handler, error) {
 
 		chunksFolder:    opt.ChunksFolder,
 		temporaryFolder: opt.TemporaryFolder,
+		thumbnailsFolder: opt.ThumbnailsFolder,
 
 		maxNumFilesForArchive: opt.MaxNumFilesForArchive,
 		maxSizeForArchive:     opt.MaxSizeForArchive,
@@ -1557,6 +1566,7 @@ func New(opt *Options) (http.Handler, error) {
 }
 
 type proxy struct {
+	thumbnailsFolder string
 	temporaryFolder   string
 	chunksFolder      string
 	maxUploadFileSize int64
@@ -4870,7 +4880,7 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	// check if the file is already stored
 	key := fmt.Sprintf("%s-%s-%d-%d", reqPath, md.Etag, width, height)
 	thumbname := getMD5Hash(key)
-	target := path.Join(p.temporaryFolder, thumbname)
+	target := path.Join(p.thumbnailsFolder, thumbname)
 	p.logger.Info("preparing preview", zap.String("path", reqPath), zap.String("key", key), zap.String("target", target))
 
 	if _, err := os.Stat(target); err == nil {
@@ -5090,7 +5100,7 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 	// check if the file is already stored
 	key := fmt.Sprintf("%s-%s-%d-%d", reqPath, md.Etag, width, height)
 	thumbname := getMD5Hash(key)
-	target := path.Join(p.temporaryFolder, thumbname)
+	target := path.Join(p.thumbnailsFolder, thumbname)
 	p.logger.Info("preparing preview", zap.String("path", reqPath), zap.String("key", key), zap.String("target", target))
 
 	if _, err := os.Stat(target); err == nil {
@@ -6747,9 +6757,9 @@ func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 					// remove newproject prefix and replace by projects
 					// revaPath is /new/project/l/labradorprojecttest/somehting/docs
 					ocPath = strings.TrimPrefix(revaPath, "/new/project/") // "a/a/alabasta"
-					parts := strings.Split(ocPath, "/")      // [a, a, alabasta]
-					parts[0] = ""                            // remove first letter
-					parts[1] = ""				 // remove second letter
+					parts := strings.Split(ocPath, "/")                    // [a, a, alabasta]
+					parts[0] = ""                                          // remove first letter
+					parts[1] = ""                                          // remove second letter
 					ocPath = path.Join("/", p.ownCloudPersonalProjectsPrefix, path.Join(parts...))
 				} else {
 					// migration logic, strip /oldhome or /eoshome-l from reva path

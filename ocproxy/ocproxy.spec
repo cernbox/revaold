@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.46
+Version: 0.0.47
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue Apr 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.47
+- Add configurable thumbnails folder
 * Fri Mar 22 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.46
 - Fix path remap for new projects from Share with others
 * Fri Mar 22 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.45

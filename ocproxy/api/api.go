@@ -1784,7 +1784,7 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(revaPath))
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+path.Base(revaPath)+"\"")
 	w.WriteHeader(http.StatusOK)
 	var reader io.Reader
 	for {
@@ -2333,7 +2333,7 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 			Expires: time.Now().Add(time.Second * 30)})
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", archiveName))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", archiveName))
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.WriteHeader(http.StatusOK)
 
@@ -2514,7 +2514,7 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 			Expires: time.Now().Add(time.Second * 30)})
 	}
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", archiveName))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", archiveName))
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.WriteHeader(http.StatusOK)
 

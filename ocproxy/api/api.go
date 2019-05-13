@@ -1770,7 +1770,7 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, filename)
-	_, err := p.getMetadata(ctx, revaPath)
+	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1785,6 +1785,7 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+path.Base(revaPath)+"\"")
+	w.Header().Set("Content-Length", strconv.FormatUint(md.Size, 10))
 	w.WriteHeader(http.StatusOK)
 	var reader io.Reader
 	for {
@@ -2334,6 +2335,7 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", archiveName))
+	w.Header().Set("Content-Length", strconv.Itoa(sizeCount))
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.WriteHeader(http.StatusOK)
 
@@ -2515,6 +2517,7 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", archiveName))
+	w.Header().Set("Content-Length", strconv.Itoa(sizeCount))
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.WriteHeader(http.StatusOK)
 
@@ -5306,6 +5309,7 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 	//w.Header().Set("Content-Disposition", "attachment; filename="+path.Base(md.Path))
 	// TODO(labkode): when accesing a file pl, the path is empty, so the download appears as download, using the eos info is more friendly
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+path.Base(md.EosFile)+"\"")
+	w.Header().Set("Content-Length", strconv.FormatUint(md.Size, 10))
 	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.Header().Set("Expires", "0")
 	w.Header().Set("Pragma", "no-cache")

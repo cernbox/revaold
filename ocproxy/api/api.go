@@ -2,6 +2,7 @@ package api
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"context"
 	"crypto/md5"
@@ -2316,9 +2317,18 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO(labkode): add request ID to the archive name so we can trace back archive.
-	archiveName := "download.tar"
+	archiveName := "download"
 	if len(files) == 1 && dir != "/" {
-		archiveName = path.Base(files[0]) + ".tar"
+		archiveName = path.Base(files[0])
+	}
+
+	ua := r.Header.Get("User-Agent")
+	inWindows := strings.Contains(ua, "Windows")
+
+	if inWindows {
+		archiveName += ".zip"
+	} else {
+		archiveName += ".tar"
 	}
 
 	p.logger.Debug("archive name: " + archiveName)
@@ -2335,9 +2345,18 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", archiveName))
-	w.Header().Set("Content-Length", strconv.Itoa(sizeCount))
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.WriteHeader(http.StatusOK)
+
+	if inWindows {
+		p.writeZip(ctx, w, files)
+	} else {
+		p.writeTar(ctx, w, files)
+	}
+
+}
+
+func (p *proxy) writeTar(ctx context.Context, w http.ResponseWriter, files []string) {
 
 	gCtx := GetContextWithAuth(ctx)
 
@@ -2419,7 +2438,91 @@ func (p *proxy) downloadArchivePL(w http.ResponseWriter, r *http.Request) {
 			p.logger.Error("", zap.Error(err))
 		}
 	}
+}
 
+func (p *proxy) writeZip(ctx context.Context, w http.ResponseWriter, files []string) {
+
+	gCtx := GetContextWithAuth(ctx)
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+	for _, fn := range files {
+		err := p.Walk(ctx, fn, func(path string, md *reva_api.Metadata, err error) error {
+			if err != nil {
+				return err
+			}
+
+			// tar archive gets corrupted is header name is empty
+			if md.Path != "" {
+
+				p.logger.Debug("walking", zap.String("filename", path))
+				hdr := &zip.FileHeader{
+					Name:    strings.TrimPrefix(md.Path, "/"),
+					Modified: time.Unix(int64(md.Mtime), 0),
+				}
+
+				if md.IsDir {
+					hdr.Name += "/"
+				} else {
+					hdr.UncompressedSize64 = uint64(md.Size)
+				}
+
+				 writer, err := zw.CreateHeader(hdr)
+				
+				if err != nil {
+					p.logger.Error("", zap.Error(err), zap.String("fn", fn))
+					return err
+				}
+
+				// if file, write file contents into the tar archive
+				if !md.IsDir {
+
+					revaPath := p.getRevaPath(ctx, md.Path)
+					stream, err := p.getStorageClient().ReadFile(gCtx, &reva_api.PathReq{Path: revaPath})
+					if err != nil {
+						p.logger.Error("", zap.Error(err))
+						return err
+					}
+
+					for {
+						dcRes, err := stream.Recv()
+						if err == io.EOF {
+							return nil
+						}
+						if err != nil {
+							p.logger.Error("", zap.Error(err))
+							return err
+						}
+						if dcRes.Status != reva_api.StatusCode_OK {
+							p.logger.Error("", zap.Int("status", int(dcRes.Status)))
+							return reva_api.NewError(reva_api.StorageNotSupportedErrorCode)
+						}
+
+						dc := dcRes.DataChunk
+
+						if dc != nil {
+							if dc.Length > 0 {
+								if _, err := writer.Write(dc.Data); err != nil {
+									p.logger.Error("", zap.Error(err))
+									return err
+								}
+							}
+						}
+					}
+
+				} else {
+					return nil
+
+				}
+			} else {
+				return nil
+			}
+		})
+
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+		}
+	}
 }
 
 /*
@@ -2460,9 +2563,18 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO(labkode): add request ID to the archive name so we can trace back archive.
-	archiveName := "download.tar"
+	archiveName := "download"
 	if len(files) == 1 {
-		archiveName = path.Base(files[0]) + ".tar"
+		archiveName = path.Base(files[0])
+	}
+
+	ua := r.Header.Get("User-Agent")
+	inWindows := strings.Contains(ua, "Windows")
+
+	if inWindows {
+		archiveName += ".zip"
+	} else {
+		archiveName += ".tar"
 	}
 
 	p.logger.Debug("archive name: " + archiveName)
@@ -2517,88 +2629,14 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", archiveName))
-	w.Header().Set("Content-Length", strconv.Itoa(sizeCount))
 	w.Header().Set("Content-Transfer-Encoding", "binary")
 	w.WriteHeader(http.StatusOK)
 
-	gCtx := GetContextWithAuth(ctx)
-
-	tw := tar.NewWriter(w)
-	defer tw.Close()
-	for _, fn := range files {
-		err := p.Walk(ctx, fn, func(path string, md *reva_api.Metadata, err error) error {
-			if err != nil {
-				return err
-			}
-
-			p.logger.Debug("walking", zap.String("filename", path))
-			hdr := &tar.Header{
-				Name:    strings.TrimPrefix(md.Path, "/"),
-				Mode:    0644,
-				ModTime: time.Unix(int64(md.Mtime), 0),
-			}
-
-			if md.IsDir {
-				hdr.Typeflag = tar.TypeDir
-				hdr.Mode = 0755
-				hdr.Name += "/"
-			} else {
-				hdr.Typeflag = tar.TypeReg
-				hdr.Size = int64(md.Size)
-			}
-
-			if err := tw.WriteHeader(hdr); err != nil {
-				p.logger.Error("", zap.Error(err), zap.String("fn", fn))
-				return err
-			}
-
-			// if file, write file contents into the tar archive
-			if !md.IsDir {
-
-				revaPath := p.getRevaPath(ctx, md.Path)
-				stream, err := p.getStorageClient().ReadFile(gCtx, &reva_api.PathReq{Path: revaPath})
-				if err != nil {
-					p.logger.Error("", zap.Error(err))
-					return err
-				}
-
-				for {
-					dcRes, err := stream.Recv()
-					if err == io.EOF {
-						return nil
-					}
-					if err != nil {
-						p.logger.Error("", zap.Error(err))
-						return err
-					}
-					if dcRes.Status != reva_api.StatusCode_OK {
-						p.logger.Error("", zap.Int("status", int(dcRes.Status)))
-						return reva_api.NewError(reva_api.StorageNotSupportedErrorCode)
-					}
-
-					dc := dcRes.DataChunk
-
-					if dc != nil {
-						if dc.Length > 0 {
-							if _, err := tw.Write(dc.Data); err != nil {
-								p.logger.Error("", zap.Error(err))
-								return err
-							}
-						}
-					}
-				}
-
-			} else {
-				return nil
-
-			}
-		})
-
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-		}
+	if inWindows {
+		p.writeZip(ctx, w, files)
+	} else {
+		p.writeTar(ctx, w, files)
 	}
-
 }
 
 /*

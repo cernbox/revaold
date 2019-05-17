@@ -298,13 +298,13 @@ func (fs *eosStorage) EmptyRecycle(ctx context.Context, path string) error {
 	return ts.EmptyRecycle(ctx, path)
 }
 
-func (fs *eosStorage) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
+func (fs *eosStorage) ListRecycle(ctx context.Context, path, from, to string) ([]*api.RecycleEntry, error) {
 	_, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	ts, _, _, path := fs.getStorageForPath(ctx, path)
-	return ts.ListRecycle(ctx, path)
+	return ts.ListRecycle(ctx, path, from, to)
 }
 
 func (fs *eosStorage) RestoreRecycleEntry(ctx context.Context, restoreKey string) error {

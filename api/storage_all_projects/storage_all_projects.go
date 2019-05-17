@@ -544,7 +544,7 @@ func (fs *allProjectsStorage) EmptyRecycle(ctx context.Context, path string) err
 	return api.NewError(api.StorageNotSupportedErrorCode)
 }
 
-func (fs *allProjectsStorage) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
+func (fs *allProjectsStorage) ListRecycle(ctx context.Context, path, from, to string) ([]*api.RecycleEntry, error) {
 	return nil, api.NewError(api.StorageNotSupportedErrorCode)
 }
 

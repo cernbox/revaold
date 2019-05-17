@@ -2755,7 +2755,21 @@ func (p *proxy) listTrashbin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, p.ownCloudHomePrefix)
-	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathReq{Path: revaPath})
+
+	from := r.URL.Query().Get("from")
+	to := r.URL.Query().Get("to")
+
+	dateFrom := ""
+	dateTo := ""
+
+	if dateFromTime, err := time.Parse("2006-01-02", from); err == nil {
+		dateFrom = dateFromTime.Format("2006/01/02")
+	}
+	if dateToTime, err := time.Parse("2006-01-02", to); err == nil {
+		dateTo = dateToTime.Format("2006/01/02")
+	}
+
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathLimitReq{Path: revaPath, From: dateFrom, To: dateTo})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -2895,7 +2909,7 @@ func (p *proxy) restoreTrashbin(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) getRecycleEntries(ctx context.Context) ([]*reva_api.RecycleEntry, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathReq{Path: "/"})
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathLimitReq{Path: "/"})
 	if err != nil {
 		return nil, err
 	}

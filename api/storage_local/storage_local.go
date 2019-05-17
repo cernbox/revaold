@@ -189,7 +189,7 @@ func (fs *localStorage) EmptyRecycle(ctx context.Context, path string) error {
 	return api.NewError(api.StorageNotSupportedErrorCode)
 }
 
-func (fs *localStorage) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
+func (fs *localStorage) ListRecycle(ctx context.Context, path, from, to string) ([]*api.RecycleEntry, error) {
 	return nil, api.NewError(api.StorageNotSupportedErrorCode)
 }
 

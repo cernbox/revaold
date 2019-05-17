@@ -462,20 +462,54 @@ func (c *Client) Write(ctx context.Context, username, path string, stream io.Rea
 }
 
 // ListDeletedEntries returns a list of the deleted entries.
-func (c *Client) ListDeletedEntries(ctx context.Context, username string) ([]*DeletedEntry, error) {
+func (c *Client) ListDeletedEntries(ctx context.Context, username, from, to string) ([]*DeletedEntry, error) {
 	unixUser, err := getUnixUser(username)
 	if err != nil {
 		return nil, err
 	}
 
-	// list only current day deletions to not kill the mgm when there are many files.
-	today := time.Now().Format("2006/01/02")
-	cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "recycle", "ls", today, "-m")
-	stdout, _, err := c.execute(cmd)
-	if err != nil {
-		return nil, err
+	//TODO enforce here the maximum time between from and to??
+
+	var dateFrom, dateTo time.Time
+	deleted := []*DeletedEntry{}
+
+	if from == "" || to == "" {
+		dateFrom = time.Now()
+		dateTo = dateFrom
+	} else {
+		dateFrom, err = time.Parse("2006/01/02", from)
+		if err != nil {
+			return nil, err
+		}
+		dateTo, err =  time.Parse("2006/01/02", to)
+		if err != nil {
+			return nil, err
+		}
+
+		maxDate := dateFrom.AddDate(0, 0, 7) // Limit to 7 days to avoid overloading EOS
+		if maxDate.Before(dateTo) {
+			dateTo = maxDate
+		}
 	}
-	return parseRecycleList(stdout)
+
+	for date := dateFrom; !date.After(dateTo); date = date.AddDate(0, 0, 1) {
+		dateStr := date.Format("2006/01/02")
+
+		// list only specific days' deletions to avoid killing the mgm when there are many files.
+		cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "recycle", "ls", dateStr, "-m")
+		stdout, _, err := c.execute(cmd)
+		if err != nil {
+			return nil, err
+		}
+
+		list, err := parseRecycleList(stdout)
+		if err != nil {
+			return nil, err
+		}
+		
+		deleted = append(deleted, list...)
+	}
+	return deleted, nil
 }
 
 // RestoreDeletedEntry restores a deleted entry.

@@ -259,8 +259,8 @@ func (m *mount) EmptyRecycle(ctx context.Context, path string) error {
 	return m.storage.EmptyRecycle(ctx, path)
 }
 
-func (m *mount) ListRecycle(ctx context.Context, p string) ([]*api.RecycleEntry, error) {
-	entries, err := m.storage.ListRecycle(ctx, p)
+func (m *mount) ListRecycle(ctx context.Context, p, from, to string) ([]*api.RecycleEntry, error) {
+	entries, err := m.storage.ListRecycle(ctx, p, from, to)
 	if err != nil {
 		return nil, err
 	}

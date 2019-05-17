@@ -349,12 +349,12 @@ func (fs *eosStorage) EmptyRecycle(ctx context.Context, path string) error {
 	return fs.c.PurgeDeletedEntries(ctx, u.AccountId)
 }
 
-func (fs *eosStorage) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
+func (fs *eosStorage) ListRecycle(ctx context.Context, path, from, to string) ([]*api.RecycleEntry, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	eosDeletedEntries, err := fs.c.ListDeletedEntries(ctx, u.AccountId)
+	eosDeletedEntries, err := fs.c.ListDeletedEntries(ctx, u.AccountId, from, to)
 	if err != nil {
 		return nil, err
 	}

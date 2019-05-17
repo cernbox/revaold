@@ -24,7 +24,7 @@ service Storage {
 	rpc ListRevisions(PathReq) returns (stream RevisionResponse) {}
 	rpc ReadRevision(RevisionReq) returns (stream DataChunkResponse) {}
 	rpc RestoreRevision(RevisionReq) returns (EmptyResponse) {}
-	rpc ListRecycle(PathReq) returns (stream RecycleEntryResponse) {}
+	rpc ListRecycle(PathLimitReq) returns (stream RecycleEntryResponse) {}
 	rpc RestoreRecycleEntry(RecycleEntryReq) returns (EmptyResponse) {}
 	rpc EmptyRecycle(PathReq) returns (EmptyResponse) {}
 	rpc SetACL(ACLReq) returns (EmptyResponse) {}
@@ -218,6 +218,12 @@ message Metadata {
 
 message PathReq {
 	string path = 1;
+}
+
+message PathLimitReq {
+	string path = 1;
+	string from = 2;
+	string to = 3;
 }
 
 message MoveReq {

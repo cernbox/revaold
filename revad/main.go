@@ -16,6 +16,7 @@ import (
 	"github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/auth_manager_impersonate"
 	"github.com/cernbox/revaold/api/auth_manager_ldap"
+	"github.com/cernbox/revaold/api/auth_manager_oauth_ldap"
 	"github.com/cernbox/revaold/api/mount"
 	"github.com/cernbox/revaold/api/project_manager_db"
 	"github.com/cernbox/revaold/api/public_link_manager_owncloud"
@@ -377,6 +378,11 @@ func init() {
 	gc.Add("auth-manager-ldap-filter", "(samaccountname=%s)", "Filter for LDAP queries.")
 	gc.Add("auth-manager-ldap-bind-username", "DN=foo,OU=Users,OU=Organic Units,DC=cern,DC=ch", "Username to bind to LDAP.")
 	gc.Add("auth-manager-ldap-bind-password", "bar", "Password to bind to LDAP.")
+	gc.Add("auth-manager-db-username", "foo", "Username to access the database.")
+	gc.Add("auth-manager-db-password", "bar", "Password to access the database.")
+	gc.Add("auth-manager-db-hostname", "localhost", "Host where to access the database.")
+	gc.Add("auth-manager-db-port", 3306, "Port where to access the database.")
+	gc.Add("auth-manager-db-name", "", "Name of the database.")
 
 	gc.Add("user-manager", "cboxgroupd", "Implementation to use for the user manager")
 	gc.Add("user-manager-cboxgroupd-uri", "http://localhost:2002", "URI of the CERNBox Group Daemon")
@@ -483,6 +489,19 @@ func getAuthManager() api.AuthManager {
 		bindUsername := gc.GetString("auth-manager-ldap-bind-username")
 		bindPassword := gc.GetString("auth-manager-ldap-bind-password")
 		return auth_manager_ldap.New(hostname, port, baseDN, filter, bindUsername, bindPassword)
+	case "oauth+ldap":
+		hostname := gc.GetString("auth-manager-ldap-hostname")
+		port := gc.GetInt("auth-manager-ldap-port")
+		baseDN := gc.GetString("auth-manager-ldap-basedn")
+		filter := gc.GetString("auth-manager-ldap-filter")
+		bindUsername := gc.GetString("auth-manager-ldap-bind-username")
+		bindPassword := gc.GetString("auth-manager-ldap-bind-password")
+		dbUser := gc.GetString("auth-manager-db-username")
+		dbPass := gc.GetString("auth-manager-db-password")
+		dbHost := gc.GetString("auth-manager-db-hostname")
+		dbPort := gc.GetInt("auth-manager-db-port")
+		dbName := gc.GetString("auth-manager-db-name")
+		return auth_manager_oauth_ldap.New(hostname, port, baseDN, filter, bindUsername, bindPassword, dbUser, dbPass, dbHost, dbName, dbPort, logger)
 	default:
 		panic("auth manager driver not found: " + driver)
 	}

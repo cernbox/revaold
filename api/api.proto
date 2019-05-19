@@ -172,6 +172,7 @@ message TxInfo {
 message ForgeUserTokenReq {
 	string client_id = 1;
 	string client_secret = 2;
+	string token = 3;
 }
 
 

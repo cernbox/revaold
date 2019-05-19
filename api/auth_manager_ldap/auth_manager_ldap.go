@@ -3,6 +3,7 @@ package auth_manager_ldap
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 
 	"github.com/cernbox/revaold/api"
@@ -74,4 +75,8 @@ func (am *authManager) Authenticate(ctx context.Context, clientID, clientSecret 
 	//TODO(labkode): add groups support
 
 	return &api.User{AccountId: clientID, Groups: []string{}}, nil
+}
+
+func (am *authManager) AuthenticateToken(ctx context.Context, token string) (*api.User, error) {
+	return nil, errors.New("Tokens not supported")
 }

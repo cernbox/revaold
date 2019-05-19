@@ -19,7 +19,14 @@ type svc struct {
 
 func (s *svc) ForgeUserToken(ctx context.Context, req *api.ForgeUserTokenReq) (*api.TokenResponse, error) {
 	l := ctx_zap.Extract(ctx)
-	user, err := s.am.Authenticate(ctx, req.ClientId, req.ClientSecret)
+
+	var user *api.User
+	var err error
+	if req.Token != "" {
+		user, err = s.am.AuthenticateToken(ctx, req.Token)
+	} else {
+		user, err = s.am.Authenticate(ctx, req.ClientId, req.ClientSecret)
+	}
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err

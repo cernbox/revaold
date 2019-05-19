@@ -8286,8 +8286,31 @@ func (p *proxy) authAux(h http.HandlerFunc, popup bool) http.HandlerFunc {
 
 				token = res.Token
 				p.logger.Info("x-access-token generated from basic auth", zap.String("username", username))
-			}
+			} else {
+				// 4th: check if oAuth token
+				reqToken := r.Header.Get("Authorization")
+				if reqToken != "" && strings.Contains(reqToken, "Bearer") {
+					splitToken := strings.Split(reqToken, "Bearer")
+					reqToken = strings.TrimSpace(splitToken[1])
 
+					req := &reva_api.ForgeUserTokenReq{Token: reqToken}
+					res, err := authClient.ForgeUserToken(ctx, req)
+					if err != nil {
+						p.logger.Warn("error authentication user with oAuth", zap.String("oauthtoken", reqToken), zap.Error(err))
+						w.WriteHeader(http.StatusUnauthorized)
+						return
+					}
+
+					if res.Status != reva_api.StatusCode_OK {
+						p.logger.Warn("grpc auth req failed", zap.String("oauthtoken", reqToken), zap.Int("code", int(res.Status)))
+						w.WriteHeader(http.StatusUnauthorized)
+						return
+					}
+
+					token = res.Token
+					p.logger.Info("x-access-token generated from oAuth")
+				}
+			}
 		}
 
 		if popup && token == "" {

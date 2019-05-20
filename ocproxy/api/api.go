@@ -132,7 +132,7 @@ func (p *proxy) registerRoutes() {
 
 	// public link routes
 	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET", "POST")
-	p.router.HandleFunc("/index.php/s/{token}/download", p.publicLinkAuth(p.tokenAuth(p.downloadArchivePL))).Methods("GET")
+	p.router.HandleFunc("/index.php/s/{token}/download", p.plAuth(p.downloadArchivePL)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_sharing/ajax/publicpreview.php", p.tokenAuth(p.getPublicPreview)).Methods("GET")
 
 	// app routes
@@ -2755,7 +2755,21 @@ func (p *proxy) listTrashbin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, p.ownCloudHomePrefix)
-	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathReq{Path: revaPath})
+
+	from := r.URL.Query().Get("from")
+	to := r.URL.Query().Get("to")
+
+	dateFrom := ""
+	dateTo := ""
+
+	if dateFromTime, err := time.Parse("2006-01-02", from); err == nil {
+		dateFrom = dateFromTime.Format("2006/01/02")
+	}
+	if dateToTime, err := time.Parse("2006-01-02", to); err == nil {
+		dateTo = dateToTime.Format("2006/01/02")
+	}
+
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathLimitReq{Path: revaPath, From: dateFrom, To: dateTo})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -2895,7 +2909,7 @@ func (p *proxy) restoreTrashbin(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) getRecycleEntries(ctx context.Context) ([]*reva_api.RecycleEntry, error) {
 	gCtx := GetContextWithAuth(ctx)
-	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathReq{Path: "/"})
+	stream, err := p.getStorageClient().ListRecycle(gCtx, &reva_api.PathLimitReq{Path: "/"})
 	if err != nil {
 		return nil, err
 	}
@@ -6582,19 +6596,63 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 	return ctx
 }
 
-func (p *proxy) publicLinkAuth(h http.HandlerFunc) http.HandlerFunc {
+func (p *proxy) plAuth(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		token := mux.Vars(r)["token"]
 
-		// try to authenticate the link with empty password
-		client := p.getAuthClient()
-		res, err := client.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: ""})
-		if err == nil && res.Status == reva_api.StatusCode_OK {
-			// inject token in request
-			r.Header.Set("x-access-token", res.Token)
+		var password string
+		if r.Method == "POST" { // password has been set in password form
+			if err := r.ParseForm(); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			password = r.Form.Get("password")
 		}
+
+		client := p.getAuthClient()
+		res, err := client.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: password})
+		if err != nil {
+			// render link not found template
+			p.logger.Error("", zap.Error(err))
+			p.renderTemplateNotFound(w)
+			return
+		}
+
+		if res.Status != reva_api.StatusCode_OK {
+			tpl, err := template.New("public_link_password").Parse(publicLinkTemplatePassword)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				p.logger.Error("", zap.Error(err))
+				return
+			}
+
+			tpl.Execute(w, nil)
+			return
+		}
+
+		res2, err := client.DismantlePublicLinkToken(ctx, &reva_api.TokenReq{Token: res.Token})
+		if err != nil {
+			// render link not found template
+			p.logger.Error("", zap.Error(err))
+			p.renderTemplateNotFound(w)
+			return
+		}
+		if res.Status != reva_api.StatusCode_OK {
+			// render link not found template
+			p.logger.Error("", zap.Error(err))
+			p.renderTemplateNotFound(w)
+			return
+		}
+
+		pl := res2.PublicLink
+		ctx = reva_api.ContextSetPublicLink(ctx, pl)
+		ctx = reva_api.ContextSetPublicLinkToken(ctx, res.Token)
+		r = r.WithContext(ctx)
+		p.logger.Info("authenticated with public link token", zap.String("token", pl.Token))
 		h(w, r)
+		return
 	})
 }
 

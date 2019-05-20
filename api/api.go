@@ -110,7 +110,7 @@ type Storage interface {
 	ListRevisions(ctx context.Context, path string) ([]*Revision, error)
 	DownloadRevision(ctx context.Context, path, revisionKey string) (io.ReadCloser, error)
 	RestoreRevision(ctx context.Context, path, revisionKey string) error
-	ListRecycle(ctx context.Context, path string) ([]*RecycleEntry, error)
+	ListRecycle(ctx context.Context, path, from, to string) ([]*RecycleEntry, error)
 	RestoreRecycleEntry(ctx context.Context, restoreKey string) error
 	EmptyRecycle(ctx context.Context, path string) error
 	GetPathByID(ctx context.Context, id string) (string, error)

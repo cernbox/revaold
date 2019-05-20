@@ -178,10 +178,10 @@ func (s *svc) ListRevisions(req *api.PathReq, stream api.Storage_ListRevisionsSe
 	return nil
 }
 
-func (s *svc) ListRecycle(req *api.PathReq, stream api.Storage_ListRecycleServer) error {
+func (s *svc) ListRecycle(req *api.PathLimitReq, stream api.Storage_ListRecycleServer) error {
 	ctx := stream.Context()
 	l := ctx_zap.Extract(ctx)
-	entries, err := s.vs.ListRecycle(ctx, req.Path)
+	entries, err := s.vs.ListRecycle(ctx, req.Path, req.From, req.To)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return err

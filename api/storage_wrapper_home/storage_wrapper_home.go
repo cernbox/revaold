@@ -238,12 +238,12 @@ func (fs *homeStorage) EmptyRecycle(ctx context.Context, path string) error {
 	return fs.wrappedStorage.EmptyRecycle(ctx, path)
 }
 
-func (fs *homeStorage) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
+func (fs *homeStorage) ListRecycle(ctx context.Context, path, from, to string) ([]*api.RecycleEntry, error) {
 	u, err := getUserFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	entries, err := fs.wrappedStorage.ListRecycle(ctx, path)
+	entries, err := fs.wrappedStorage.ListRecycle(ctx, path, from, to)
 	if err != nil {
 		return nil, err
 	}

@@ -426,7 +426,7 @@ func (v *vfs) EmptyRecycle(ctx context.Context, path string) error {
 	return nil
 }
 
-func (v *vfs) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry, error) {
+func (v *vfs) ListRecycle(ctx context.Context, path, from, to string) ([]*api.RecycleEntry, error) {
 	derefPath, err := v.getDereferencedPath(ctx, path)
 	if err != nil {
 		v.l.Error("", zap.Error(err))
@@ -437,7 +437,7 @@ func (v *vfs) ListRecycle(ctx context.Context, path string) ([]*api.RecycleEntry
 		v.l.Error("", zap.Error(err))
 		return nil, err
 	}
-	entries, err := m.ListRecycle(ctx, derefPath)
+	entries, err := m.ListRecycle(ctx, derefPath, from, to)
 	if err != nil {
 		v.l.Error("", zap.Error(err))
 		return nil, err

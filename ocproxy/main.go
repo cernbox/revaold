@@ -7,6 +7,7 @@ import (
 	"github.com/cernbox/gohub/goconfig"
 	"github.com/cernbox/gohub/gologger"
 	"github.com/cernbox/revaold/ocproxy/api"
+	"github.com/cernbox/revaold/api/canary"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
@@ -50,6 +51,15 @@ func init() {
 	gc.Add("cache-size", 1000000, "cache size for md records")
 	gc.Add("cache-eviction", 86400, "cache eviction time in seconds for md records")
 
+	gc.Add("canary-enabled", false, "sets the server as canary")
+	gc.Add("canary-cookie-ttl",10440, "time to live in seconds for the cookie before it expires, default one and a half days")
+	gc.Add("canary-dbusername", "foo", "db username")
+	gc.Add("canary-dbpassword", "bar", "db password")
+	gc.Add("canary-dbhost", "localhost", "dbhost")
+	gc.Add("canary-dbport", 3306, "dbport")
+	gc.Add("canary-dbname", "cernbox", "dbname")
+	gc.Add("canary-force-clean", false, "forces removal of all existing cookies to use old UI")
+
 	gc.BindFlags()
 	gc.ReadConfig()
 }
@@ -59,6 +69,15 @@ func main() {
 	logger := gologger.New(gc.GetString("log-level"), gc.GetString("app-log"))
 
 	router := mux.NewRouter()
+
+	canaryOpts := &canary.Options{
+		DBUsername: gc.GetString("canary-dbusername"),
+		DBPassword: gc.GetString("canary-dbpassword"),
+		DBHost: gc.GetString("canary-dbhost"),
+		DBPort: gc.GetInt("canary-dbport"),
+		DBName: gc.GetString("canary-dbname"),
+	}
+	cm := canary.New(canaryOpts)
 
 	opts := &api.Options{
 		Router:                router,
@@ -81,6 +100,10 @@ func main() {
 		CacheEviction:         gc.GetInt("cache-eviction"),
 		MailServer:            gc.GetString("apps-mail-server"),
 		MailServerFromAddress: gc.GetString("apps-mail-server-from-address"),
+		IsCanaryEnabled:       gc.GetBool("canary-enabled"),
+		CanaryManager: cm,
+		CanaryForceClean: gc.GetBool("canary-force-clean"),
+		CanaryCookieTTL: gc.GetInt("canary-cookie-ttl"),
 	}
 
 	_, err := api.New(opts)

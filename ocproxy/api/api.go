@@ -36,6 +36,7 @@ import (
 	"time"
 
 	reva_api "github.com/cernbox/revaold/api"
+	"github.com/cernbox/revaold/api/canary"
 
 	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
@@ -51,6 +52,9 @@ import (
 var shareIDRegexp = regexp.MustCompile(`\(id:.+\)$`)
 
 func (p *proxy) registerRoutes() {
+	// route for checking canary status.
+	p.router.HandleFunc("/index.php/apps/canary", p.tokenAuth(p.canary)).Methods("GET")
+
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
 	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
@@ -532,6 +536,89 @@ func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
 	}`, p.drawIOURL, p.drawIOURL)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(payload))
+}
+
+type canaryMsg struct {
+	Username  string `json:"username"`
+	IsAdopter bool   `json:"is_adopter"`
+	Reload    bool   `json:"reload"`
+}
+
+func (p *proxy) upsertCanaryCookie(w http.ResponseWriter) {
+	c := &http.Cookie{
+		Name:   "web-canary",
+		Value:  "true",
+		MaxAge: 3600,
+	}
+	http.SetCookie(w, c)
+}
+
+func (p *proxy) invalidateCanaryCookie(w http.ResponseWriter) {
+	c := &http.Cookie{
+		Name:   "web-canary",
+		Value:  "true",
+		MaxAge: -1,
+	}
+	http.SetCookie(w, c)
+}
+
+func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting user from ctx to get canary status", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if p.canaryForceClean {
+		cm := &canaryMsg{Username: user.AccountId}
+		data, err := json.Marshal(cm)
+		if err != nil {
+			p.logger.Error("ocproxy: api: error writing json when getting canary status", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Write(data)
+		return
+	}
+
+	cm := &canaryMsg{Username: user.AccountId}
+	if p.isAdopter(user.AccountId) {
+		cm.IsAdopter = true
+	}
+
+	// magic check
+	if p.isCanaryEnabled {
+		if cm.IsAdopter {
+			p.upsertCanaryCookie(w)
+		} else {
+			p.invalidateCanaryCookie(w)
+			cm.Reload = true
+		}
+	} else {
+		if cm.IsAdopter {
+			p.upsertCanaryCookie(w)
+			cm.Reload = true
+		} else {
+			p.invalidateCanaryCookie(w)
+		}
+	}
+
+	data, err := json.Marshal(cm)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error writing json when getting canary status", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Write(data)
+}
+
+func (p *proxy) isAdopter(username string) bool {
+	if username == "labradorsvc" {
+		return false
+	}
+	return false
 }
 
 func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {
@@ -1377,7 +1464,7 @@ type NewShareOCSRequest struct {
 
 type Options struct {
 	Logger            *zap.Logger
-	ThumbnailsFolder string
+	ThumbnailsFolder  string
 	TemporaryFolder   string
 	ChunksFolder      string
 	MaxUploadFileSize uint64
@@ -1415,6 +1502,10 @@ type Options struct {
 
 	MailServer            string
 	MailServerFromAddress string
+
+	IsCanaryEnabled bool
+	CanaryManager *canary.Manager
+	CanaryForceClean bool
 }
 
 func (opt *Options) init() {
@@ -1537,8 +1628,8 @@ func New(opt *Options) (http.Handler, error) {
 		ownCloudPersonalProjectsPrefix: opt.OwnCloudPersonalProjectsPrefix,
 		revaPersonalProjectsPrefix:     opt.RevaPersonalProjectsPrefix,
 
-		chunksFolder:    opt.ChunksFolder,
-		temporaryFolder: opt.TemporaryFolder,
+		chunksFolder:     opt.ChunksFolder,
+		temporaryFolder:  opt.TemporaryFolder,
 		thumbnailsFolder: opt.ThumbnailsFolder,
 
 		maxNumFilesForArchive: opt.MaxNumFilesForArchive,
@@ -1559,6 +1650,10 @@ func New(opt *Options) (http.Handler, error) {
 
 		mailServer:            opt.MailServer,
 		mailServerFromAddress: opt.MailServerFromAddress,
+
+		isCanaryEnabled: opt.IsCanaryEnabled,
+		canaryManager: opt.CanaryManager,
+		canaryForceClean: opt.CanaryForceClean,
 	}
 
 	proxy.registerRoutes()
@@ -1567,7 +1662,7 @@ func New(opt *Options) (http.Handler, error) {
 }
 
 type proxy struct {
-	thumbnailsFolder string
+	thumbnailsFolder  string
 	temporaryFolder   string
 	chunksFolder      string
 	maxUploadFileSize int64
@@ -1609,6 +1704,10 @@ type proxy struct {
 
 	mailServer            string
 	mailServerFromAddress string
+
+	isCanaryEnabled bool
+	canaryManager *canary.Manager
+	canaryForceClean bool
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -2457,7 +2556,7 @@ func (p *proxy) writeZip(ctx context.Context, w http.ResponseWriter, files []str
 
 				p.logger.Debug("walking", zap.String("filename", path))
 				hdr := &zip.FileHeader{
-					Name:    strings.TrimPrefix(md.Path, "/"),
+					Name:     strings.TrimPrefix(md.Path, "/"),
 					Modified: time.Unix(int64(md.Mtime), 0),
 				}
 
@@ -2467,8 +2566,8 @@ func (p *proxy) writeZip(ctx context.Context, w http.ResponseWriter, files []str
 					hdr.UncompressedSize64 = uint64(md.Size)
 				}
 
-				 writer, err := zw.CreateHeader(hdr)
-				
+				writer, err := zw.CreateHeader(hdr)
+
 				if err != nil {
 					p.logger.Error("", zap.Error(err), zap.String("fn", fn))
 					return err

@@ -54,6 +54,8 @@ var shareIDRegexp = regexp.MustCompile(`\(id:.+\)$`)
 func (p *proxy) registerRoutes() {
 	// route for checking canary status.
 	p.router.HandleFunc("/index.php/apps/canary", p.tokenAuth(p.canary)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/canary", p.tokenAuth(p.canarySet)).Methods("POST")
+	
 
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
@@ -562,6 +564,42 @@ func (p *proxy) invalidateCanaryCookie(w http.ResponseWriter) {
 	http.SetCookie(w, c)
 }
 
+func (p *proxy) canarySet(w http.ResponseWriter, r *http.Request) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		p.logger.Error("ocproxy: error reading body", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	msg := &canaryMsg{}
+	if err := json.Unmarshal(data, msg); err != nil {
+		p.logger.Error("ocproxy: error unmarshaling canary message", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+
+	ctx := r.Context()
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting user from ctx to set canary status", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := p.canaryManager.SetStatus(user.AccountId, msg.IsAdopter); err != nil {
+		p.logger.Error("ocproxy: api: error setting canary status", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	p.logger.Info("ocproxy: canary status triggered", zap.String("username", user.AccountId), zap.Bool("adopter", msg.IsAdopter))
+
+	w.WriteHeader(http.StatusOK)
+
+}
+
 func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, err := getUserFromContext(ctx)
@@ -615,10 +653,11 @@ func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) isAdopter(username string) bool {
-	if username == "labradorsvc" {
+	if p.canaryManager.IsAdopter(username) {
+		return true
+	} else {
 		return false
 	}
-	return false
 }
 
 func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {

@@ -1,8 +1,8 @@
 package canary
 
 import (
-	"fmt"
 	"database/sql"
+	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -12,12 +12,12 @@ type Manager struct {
 }
 
 type Options struct {
-	DBUsername,DBPassword, DBHost, DBName string
-	DBPort int
+	DBUsername, DBPassword, DBHost, DBName string
+	DBPort                                 int
 }
 
 func New(opts *Options) *Manager {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",opts.DBUsername, opts.DBPassword, opts.DBHost, opts.DBPort,opts.DBName))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", opts.DBUsername, opts.DBPassword, opts.DBHost, opts.DBPort, opts.DBName))
 	if err != nil {
 		panic(err)
 	}
@@ -31,7 +31,8 @@ func (cm *Manager) isAdopter(username string) bool {
 	if err := cm.db.QueryRow(query, username).Scan(&username, &adopter); err != nil {
 		return false
 	}
-	if adopter == "yes" {return true}
+	if adopter == "yes" {
+		return true
+	}
 	return false
 }
-

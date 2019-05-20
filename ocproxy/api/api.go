@@ -548,7 +548,7 @@ func (p *proxy) upsertCanaryCookie(w http.ResponseWriter) {
 	c := &http.Cookie{
 		Name:   "web-canary",
 		Value:  "true",
-		MaxAge: 3600,
+		MaxAge: p.canaryCookieTTL,
 	}
 	http.SetCookie(w, c)
 }
@@ -1503,9 +1503,10 @@ type Options struct {
 	MailServer            string
 	MailServerFromAddress string
 
-	IsCanaryEnabled bool
-	CanaryManager *canary.Manager
+	IsCanaryEnabled  bool
+	CanaryManager    *canary.Manager
 	CanaryForceClean bool
+	CanaryCookieTTL  int
 }
 
 func (opt *Options) init() {
@@ -1651,9 +1652,10 @@ func New(opt *Options) (http.Handler, error) {
 		mailServer:            opt.MailServer,
 		mailServerFromAddress: opt.MailServerFromAddress,
 
-		isCanaryEnabled: opt.IsCanaryEnabled,
-		canaryManager: opt.CanaryManager,
+		isCanaryEnabled:  opt.IsCanaryEnabled,
+		canaryManager:    opt.CanaryManager,
 		canaryForceClean: opt.CanaryForceClean,
+		canaryCookieTTL:  opt.CanaryCookieTTL,
 	}
 
 	proxy.registerRoutes()
@@ -1705,9 +1707,10 @@ type proxy struct {
 	mailServer            string
 	mailServerFromAddress string
 
-	isCanaryEnabled bool
-	canaryManager *canary.Manager
+	isCanaryEnabled  bool
+	canaryManager    *canary.Manager
 	canaryForceClean bool
+	canaryCookieTTL  int
 }
 
 // TODO(labkode): store this global var inside the proxy

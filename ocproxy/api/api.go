@@ -6656,6 +6656,10 @@ func (p *proxy) plAuth(h http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+func (p *proxy) renderTemplateNotFound(w http.ResponseWriter) {
+		w.Write([]byte(publicLinkTemplateNotFound))
+}
+
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

@@ -386,7 +386,7 @@ func listRecycle(c *cli.Context) error {
 		return cli.NewExitError(err, 1)
 	}
 
-	req := &api.PathReq{Path: path}
+	req := &api.PathLimitReq{Path: path}
 	stream, err := client.ListRecycle(util.GetContextWithAllAuths(path), req)
 	if err != nil {
 		return cli.NewExitError(err, 1)

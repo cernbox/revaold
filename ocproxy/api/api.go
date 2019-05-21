@@ -2035,9 +2035,7 @@ type Options struct {
 	CanaryForceClean bool
 	CanaryCookieTTL  int
 	Hostname string
-
 	OnlyOfficeDocumentServer string
-
 	GanttServer string
 }
 
@@ -2189,11 +2187,9 @@ func New(opt *Options) (http.Handler, error) {
 		canaryForceClean: opt.CanaryForceClean,
 		canaryCookieTTL:  opt.CanaryCookieTTL,
 		hostname: opt.Hostname,
-
 		onlyOfficeMutex: &sync.Mutex{},
 		onlyOfficeMap:   map[string]string{},
 		onlyOfficeDocumentServer: opt.OnlyOfficeDocumentServer,
-
 		ganttServer: opt.GanttServer,
 	}
 
@@ -7302,6 +7298,10 @@ func (p *proxy) plAuth(h http.HandlerFunc) http.HandlerFunc {
 		h(w, r)
 		return
 	})
+}
+
+func (p *proxy) renderTemplateNotFound(w http.ResponseWriter) {
+		w.Write([]byte(publicLinkTemplateNotFound))
 }
 
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {

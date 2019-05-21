@@ -1,0 +1,6 @@
+all:
+	go get ./...
+	go build ./...
+	chown -R root:root .
+	cd revad && make rpm
+	cd ocproxy && make rpm

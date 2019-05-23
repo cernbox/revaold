@@ -55,7 +55,6 @@ func (p *proxy) registerRoutes() {
 	// route for checking canary status.
 	p.router.HandleFunc("/index.php/apps/canary", p.tokenAuth(p.canary)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/canary", p.tokenAuth(p.canarySet)).Methods("POST")
-	
 
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
@@ -548,16 +547,17 @@ type canaryMsg struct {
 
 func (p *proxy) upsertCanaryCookie(w http.ResponseWriter) {
 	c := &http.Cookie{
-		Name:   "web-canary",
+		Name:   "web_canary",
 		Value:  "true",
 		MaxAge: p.canaryCookieTTL,
+		Path:   "/",
 	}
 	http.SetCookie(w, c)
 }
 
 func (p *proxy) invalidateCanaryCookie(w http.ResponseWriter) {
 	c := &http.Cookie{
-		Name:   "web-canary",
+		Name:   "web_canary",
 		Value:  "true",
 		MaxAge: -1,
 	}
@@ -579,7 +579,6 @@ func (p *proxy) canarySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	ctx := r.Context()
 	user, err := getUserFromContext(ctx)
 	if err != nil {
@@ -594,7 +593,13 @@ func (p *proxy) canarySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.logger.Info("ocproxy: canary status triggered", zap.String("username", user.AccountId), zap.Bool("adopter", msg.IsAdopter))
+	p.logger.Info("ocproxy: canary status triggered", zap.String("username", user.AccountId), zap.Bool("adopter", msg.IsAdopter), zap.Int("max-age", p.canaryCookieTTL))
+
+	if msg.IsAdopter {
+		p.upsertCanaryCookie(w)
+	} else {
+		p.invalidateCanaryCookie(w)
+	}
 
 	w.WriteHeader(http.StatusOK)
 
@@ -604,7 +609,7 @@ func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, err := getUserFromContext(ctx)
 	if err != nil {
-		p.logger.Error("ocproxy: api: error getting user from ctx to get canary status", zap.Error(err))
+		p.logger.Error("ocproxy: canary: error getting user from ctx to get canary status", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -613,7 +618,7 @@ func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 		cm := &canaryMsg{Username: user.AccountId}
 		data, err := json.Marshal(cm)
 		if err != nil {
-			p.logger.Error("ocproxy: api: error writing json when getting canary status", zap.Error(err))
+			p.logger.Error("ocproxy: canary: error writing json when getting canary status", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -643,9 +648,11 @@ func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	p.logger.Info("ocproxy: canary: getting cookie", zap.Bool("reload", cm.Reload), zap.Bool("adopter", cm.IsAdopter), zap.Int("max-age", p.canaryCookieTTL), zap.String("username", cm.Username))
+
 	data, err := json.Marshal(cm)
 	if err != nil {
-		p.logger.Error("ocproxy: api: error writing json when getting canary status", zap.Error(err))
+		p.logger.Error("ocproxy: canary: error writing json when getting canary status", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -6798,7 +6805,7 @@ func (p *proxy) plAuth(h http.HandlerFunc) http.HandlerFunc {
 }
 
 func (p *proxy) renderTemplateNotFound(w http.ResponseWriter) {
-		w.Write([]byte(publicLinkTemplateNotFound))
+	w.Write([]byte(publicLinkTemplateNotFound))
 }
 
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {

@@ -558,8 +558,10 @@ func (p *proxy) upsertCanaryCookie(w http.ResponseWriter) {
 func (p *proxy) invalidateCanaryCookie(w http.ResponseWriter) {
 	c := &http.Cookie{
 		Name:   "web_canary",
-		Value:  "true",
-		MaxAge: -1,
+		Value:  "",
+		MaxAge: 0,
+		Expires: time.Unix(0,0),
+		Path: "/",
 	}
 	http.SetCookie(w, c)
 }

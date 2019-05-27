@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.48
+Version: 0.0.49
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,9 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue May 27 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.49
+- Fixes for canary mode (set/clean cookie)
+- Revert public links without access token
 * Tue May 21 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.48
 - Support ZIP downloads for archives
 - Support director download of public links

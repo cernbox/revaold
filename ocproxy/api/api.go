@@ -1027,11 +1027,11 @@ func (p *proxy) upsertCanaryCookie(w http.ResponseWriter) {
 
 func (p *proxy) invalidateCanaryCookie(w http.ResponseWriter) {
 	c := &http.Cookie{
-		Name:   "web_canary",
-		Value:  "",
-		MaxAge: 0,
-		Expires: time.Unix(0,0),
-		Path: "/",
+		Name:    "web_canary",
+		Value:   "",
+		MaxAge:  0,
+		Expires: time.Unix(0, 0),
+		Path:    "/",
 	}
 	http.SetCookie(w, c)
 }
@@ -6027,12 +6027,15 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
+			p.logger.Error("Error receiving chunk from REVA", zap.Error(err))
+			// Write wrong chunk to cause error on client
+			io.CopyN(w, nil, 0)
 			return
 		}
 		if dcRes.Status != reva_api.StatusCode_OK {
-			p.writeError(dcRes.Status, w, r)
+			p.logger.Warn("write error from REVA", zap.Int("status", int(dcRes.Status)))
+			// Write wrong chunk to cause error on client
+			io.CopyN(w, nil, 0)
 			return
 		}
 
@@ -6044,7 +6047,8 @@ func (p *proxy) get(w http.ResponseWriter, r *http.Request) {
 				_, err := io.CopyN(w, reader, int64(dc.Length))
 				if err != nil {
 					p.logger.Error("error copying data to w", zap.Error(err))
-					w.WriteHeader(http.StatusInternalServerError)
+					// Write wrong chunk to cause error on client
+					io.CopyN(w, nil, 0)
 					return
 				}
 			}

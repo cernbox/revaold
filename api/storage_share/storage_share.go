@@ -115,6 +115,11 @@ func (fs *shareStorage) GetMetadata(ctx context.Context, p string) (*api.Metadat
 		return nil, err
 	}
 
+	// TODO(labkode): needed for OnlyOffice to work, unique way 
+	// without relying on the path to track a document
+	// using the orignal metadata id as shares will use another
+	// and that will break the onlyoffice sessions id.
+	md.MigId = md.Id
 	md.IsReadOnly = shareMetadata.IsReadOnly
 	md.Path = path.Join("/", share.Id, strings.TrimPrefix(md.Path, shareMetadata.Path))
 	md.Id = share.Id

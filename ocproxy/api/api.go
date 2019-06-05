@@ -32,12 +32,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	reva_api "github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/canary"
-
+	"github.com/cernbox/revaold/ocproxy/api/static"
 	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
 	"github.com/gofrs/uuid"
@@ -172,10 +173,6 @@ func (p *proxy) registerRoutes() {
 	// drawio routes
 	p.router.HandleFunc("/index.php/apps/drawio/ajax/settings", p.drawioSettings).Methods("GET")
 
-	// onlyoffice routes
-	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.getOnlyOfficeSettings).Methods("GET")
-	//p.router.HandleFunc("/index.php/apps/onlyoffice/{path}", p.).Methods("GET")
-
 	// mailer routes
 	p.router.HandleFunc("/index.php/apps/mailer/sendmail", p.tokenAuth(p.sendMail)).Methods("POST")
 
@@ -183,6 +180,597 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/rootviewer/load", p.tokenAuth(p.loadRootFile))
 	p.router.HandleFunc("/index.php/apps/rootviewer/publicload", p.tokenAuth(p.loadPublicRootFile))
 
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.tokenAuth(p.onlyOfficeSettings))
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{path:.*}", p.tokenAuth(p.onlyOfficeConfig))
+	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/track/{path:.*}", p.tokenAuth(p.onlyOfficeTrack)).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/new", p.tokenAuth(p.onlyOfficeNew)).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/config", p.onlyOfficeMainConfig).Methods("GET")
+	
+	// gant routes
+	p.router.HandleFunc("/index.php/apps/gantt/config", p.getGanttConfig).Methods("GET")
+
+
+}
+
+func (p *proxy) getGanttConfig(w http.ResponseWriter, r *http.Request) {
+       settings := fmt.Sprintf(`
+{
+       "viewer-server": "%s",
+       "formats": [{
+               "mime": "application/x-gantt",
+               "type": "project"
+       }]
+}
+`, p.ganttServer)
+
+       w.Write([]byte(settings))
+}
+
+const (
+	trackerStatusNotFound int = iota
+	trackerStatusEditing
+	trackerStatusMustSave
+	trackerStatusCorrupted
+	trackerStatusClosed
+)
+
+// see https://api.onlyoffice.com/editors/callback
+type callbackRequest struct {
+	Actions []struct {
+		Type   int    `json:"type"`
+		Userid string `json:"userid"`
+	} `json:"actions"`
+	ChangesURL   string      `json:"changesurl"`
+	History      interface{} `json:"history"`
+	Key          string      `json:"key"`
+	Status       int         `json:"status"`
+	URL          string      `json:"url"`
+	Users        []string    `json:"users"`
+	ForceSaveURL int         `json:"forcesaveurl"`
+}
+
+/*
+	$entry = [];
+
+	$entry['id'] = $i['fileid'];
+	$entry['parentId'] = $i['parent'];
+	$entry['mtime'] = $i['mtime'] * 1000;
+	// only pick out the needed attributes
+	$entry['name'] = $i->getName();
+	$entry['permissions'] = $i['permissions'];
+	$entry['mimetype'] = $i['mimetype'];
+	$entry['size'] = $i['size'];
+	$entry['type'] = $i['type'];
+	$entry['etag'] = $i['etag'];
+	if (isset($i['tags'])) {
+		$entry['tags'] = $i['tags'];
+	}
+	if (isset($i['displayname_owner'])) {
+		$entry['shareOwner'] = $i['displayname_owner'];
+	}
+	if (isset($i['is_share_mount_point'])) {
+		$entry['isShareMountPoint'] = $i['is_share_mount_point'];
+	}
+	$mountType = null;
+	if ($i->isShared()) {
+		$mountType = 'shared';
+	} elseif ($i->isMounted()) {
+		$mountType = 'external';
+	}
+	if ($mountType !== null) {
+		if ($i->getInternalPath() === '') {
+			$mountType .= '-root';
+		}
+		$entry['mountType'] = $mountType;
+	}
+	if (isset($i['extraData'])) {
+		$entry['extraData'] = $i['extraData'];
+	}
+	return $entry;
+
+*/
+
+type ocFileInfo struct {
+	Size     int    `json:"size"`
+	FileType string `json:"type"`
+	Etag     string `json:"etag"`
+	Id       string `json:"id"`
+	Mtime    int    `json:"mtime"`
+	Mime     string `json:"mime"`
+	Name     string `json:"name"`
+}
+
+func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		err = errors.Wrap(err, "error reading form")
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	dir := r.Form.Get("dir")
+	name := r.Form.Get("name")
+	fn := path.Join(dir, name)
+	revaPath := p.getRevaPath(ctx, fn)
+
+	newFile := "new" + path.Ext(fn)
+	data, err := static.Asset("var/www/html/cernbox/apps/onlyoffice/assets/en/" + newFile)
+	if err != nil {
+		p.logger.Error(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// write to file
+	gCtx := GetContextWithAuth(ctx)
+	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if txInfoRes.Status != reva_api.StatusCode_OK {
+		p.writeError(txInfoRes.Status, w, r)
+		return
+	}
+
+	txInfo := txInfoRes.TxInfo
+
+	stream, err := p.getStorageClient().WriteChunk(gCtx)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// TODO(labkode); adjust buffer size to maximun opening file fize
+	buffer := make([]byte, 1024*1024*3)
+	offset := uint64(0)
+	numChunks := uint64(0)
+
+	reader := bytes.NewReader(data)
+	for {
+		n, err := reader.Read(buffer)
+		if n > 0 {
+			dc := &reva_api.TxChunk{
+				TxId:   txInfo.TxId,
+				Length: uint64(n),
+				Data:   buffer,
+				Offset: offset,
+			}
+			if err := stream.Send(dc); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			numChunks++
+			offset += uint64(n)
+
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writeSummaryRes, err := stream.CloseAndRecv()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+
+	}
+	if writeSummaryRes.Status != reva_api.StatusCode_OK {
+		p.writeError(writeSummaryRes.Status, w, r)
+		return
+	}
+
+	// all the chunks have been sent, we need to close the tx
+	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if emptyRes.Status != reva_api.StatusCode_OK {
+		p.writeError(emptyRes.Status, w, r)
+		return
+	}
+
+	// set fileinfo output
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	info := &ocFileInfo{
+		Id:    md.Id,
+		Size:  int(md.Size),
+		Mtime: int(md.Mtime),
+		Mime:  md.Mime,
+		Etag:  md.Etag,
+		Name:  path.Base(md.Path),
+	}
+
+	if md.IsDir {
+		info.FileType = "dir"
+	} else {
+		info.FileType = "file"
+	}
+
+	encoded, err := json.Marshal(info)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
+}
+
+func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	fn := mux.Vars(r)["path"]
+	revaPath := p.getRevaPath(ctx, fn)
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	req := &callbackRequest{}
+	if err := json.Unmarshal(data, req); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	p.logger.Info(fmt.Sprintf("onlyoffice/config: %+v", req))
+	if req.Status == trackerStatusEditing || req.Status == trackerStatusClosed {
+		payload := struct {
+			Err int `json:"error"`
+		}{
+			Err: 0,
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Write(encoded)
+		return
+	}
+
+	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted {
+		url := req.URL
+		resp, err := http.Get(url)
+		if err != nil {
+			p.logger.Error(err.Error())
+			payload := struct {
+				Err     int    `json:"error"`
+				Message string `json:"message"`
+			}{
+				Err:     1,
+				Message: "error downloading file from url",
+			}
+			encoded, err := json.Marshal(payload)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write(encoded)
+			return
+		}
+
+		// write to file
+		gCtx := GetContextWithAuth(ctx)
+		txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if txInfoRes.Status != reva_api.StatusCode_OK {
+			p.writeError(txInfoRes.Status, w, r)
+			return
+		}
+
+		txInfo := txInfoRes.TxInfo
+
+		stream, err := p.getStorageClient().WriteChunk(gCtx)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// TODO(labkode); adjust buffer size to maximun opening file fize
+		buffer := make([]byte, 1024*1024*3)
+		offset := uint64(0)
+		numChunks := uint64(0)
+
+		reader := resp.Body
+		for {
+			n, err := reader.Read(buffer)
+			if n > 0 {
+				dc := &reva_api.TxChunk{
+					TxId:   txInfo.TxId,
+					Length: uint64(n),
+					Data:   buffer,
+					Offset: offset,
+				}
+				if err := stream.Send(dc); err != nil {
+					p.logger.Error("", zap.Error(err))
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				numChunks++
+				offset += uint64(n)
+
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
+		writeSummaryRes, err := stream.CloseAndRecv()
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if writeSummaryRes.Status != reva_api.StatusCode_OK {
+			p.writeError(writeSummaryRes.Status, w, r)
+			return
+		}
+
+		// all the chunks have been sent, we need to close the tx
+		emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if emptyRes.Status != reva_api.StatusCode_OK {
+			p.writeError(emptyRes.Status, w, r)
+			return
+		}
+
+		payload := struct {
+			Err int `json:"error"`
+		}{
+			Err: 0,
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Write(encoded)
+		return
+	}
+
+	//ONLYOFFICE: {"key":"65020dfd-cd75-42b1-a118-a0886f1669c8","status":2,"url":"https://cbox-wopi-01.cern.ch:9443/cache/files/65020dfd-cd75-42b1-a118-a0886f1669c8_4907/output.pptx/output.pptx?md5=8q6RMPp1L17mQE7OdDPfdQ==&expires=1543412647&disposition=attachment&ooname=output.pptx","changesurl":"https://cbox-wopi-01.cern.ch:9443/cache/files/65020dfd-cd75-42b1-a118-a0886f1669c8_4907/changes.zip/changes.zip?md5=9HDBPxh1BKUpXqRpPR46Uw==&expires=1543412647&disposition=attachment&ooname=output.zip","history":{"serverVersion":"5.2.3","changes":[{"created":"2018-11-28 13:26:51","user":{"id":"gonzalhu","name":"Hugo Gonzalez Labrador,31 1-002,+41227663986, ()"}}]},"users":["gonzalhu"],"actions":[{"type":0,"userid":"gonzalhu"}],"lastsave":"2018-11-28T13:28:00.417Z","notmodified":false}
+
+	w.WriteHeader(http.StatusInternalServerError)
+	return
+}
+
+func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	fn := mux.Vars(r)["path"]
+	revaPath := p.getRevaPath(ctx, fn)
+	//md, err := p.getMetadata(ctx, revaPath)
+	//if err != nil {
+	//	p.logger.Error("", zap.Error(err))
+	//	w.WriteHeader(http.StatusInternalServerError)
+	//	return
+	//}
+
+	gCtx := GetContextWithAuth(ctx)
+	pathReq := &reva_api.PathReq{Path: revaPath}
+	stream, err := p.getStorageClient().ReadFile(gCtx, pathReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	for {
+		dcRes, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if dcRes.Status != reva_api.StatusCode_OK {
+			p.writeError(dcRes.Status, w, r)
+			return
+		}
+
+		dc := dcRes.DataChunk
+
+		if dc != nil {
+			if dc.Length > 0 {
+				w.Write(dc.Data)
+			}
+		}
+	}
+
+}
+
+func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","conv":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","conv":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","conv":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	settings := &onlyOfficeSettings{}
+	json.Unmarshal([]byte(msg), settings)
+	return settings.Formats[ext].Type
+
+}
+
+
+func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	accessToken, _ := reva_api.ContextGetAccessToken(ctx)
+	fn := mux.Vars(r)["path"]
+	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fileType := strings.TrimPrefix(path.Ext(revaPath), ".")
+	title := md.Path
+	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
+	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
+	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.hostname, path.Dir(fn))
+	lang := "en"
+
+	mode := "edit"
+	if md.IsReadOnly {
+		mode = "view"
+	}
+
+	user, _ := reva_api.ContextGetUser(ctx)
+	userId := user.AccountId
+	displayName := user.DisplayName
+
+	// TODO(labkode): maybe base64 is not good enough, check what they expect as doc id in the express router (nodejs)
+	// onlyoffice API server does not like doc ids with colon :
+	//[labkode@labradorbox cernbox]$ curl https://cbox-wopi-01.cern.ch:9443/v5.2.3-64//doc/home:27167144273772544/c/info?t=1542811227805
+	//<!DOCTYPE html>
+	//<html lang="en">
+	//<head>
+	//<meta charset="utf-8">
+	//<title>Error</title>
+	//</head>
+	//<body>
+	//<pre>Cannot GET /doc/home:27167144273772544/c/info</pre>
+	//</body>
+	//</html>
+
+	// poor man approach to get 20 characters unique sessions
+	// request sent to onlyoffice to increase this value.
+	// create uuid key and set it to map
+	// TODO(labkode): onlyOffice to increase key value
+	//key := md.Etag
+	//if len(key) > 20 {
+		//key = key[0:20]
+	//}
+	// remove special chars
+	//key = strings.Replace(key, ":", "", -1)
+	//key = strings.Replace(key, "\"", "", -1)
+
+	// key cannot contain colon (:), use ._. as separator
+	key := md.Id
+	// if migration id set, use it
+	if md.MigId != "" {
+		key = md.MigId
+	}
+	key = strings.Replace(key, ":", "._.", -1)
+	p.onlyOfficeMutex.Lock()
+	p.onlyOfficeMap[md.EosFile] = key
+	p.onlyOfficeMutex.Unlock()
+
+	p.logger.Info(fmt.Sprintf("office-engine onlyoffice track: key=%s for path=%s for md=%+v", key, fn, md))
+	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download", p.hostname) + md.Path + "?x-access-token=" + accessToken
+
+	msg := `{
+  "document": {
+    "fileType": "%s",
+    "key": "%s",
+    "title": "%s",
+    "url": "%s"
+  },
+  "documentType": "%s",
+  "editorConfig": {
+    "callbackUrl": "%s",
+    "customization": {
+      "goback": {
+        "url": "%s"
+      }
+    },
+    "lang": "%s",
+    "mode": "%s",
+    "user": {
+      "id": "%s",
+      "name": "%s"
+    }
+  },
+  "type": "%s"
+} `
+	msg = fmt.Sprintf(msg, fileType, key, title, url, documentType, callbackUrl, goBackUrl, lang, mode, userId, displayName, "desktop")
+	p.logger.Info("onlyoffice/config response=" + msg)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
+
+	/*
+			$params = [
+		            "document" => [
+		                "fileType" => $ext,
+		                "key" => DocumentService::GenerateRevisionId($key),
+		                "title" => $fileName,
+		                "url" => $fileUrl,
+		            ],
+		            "documentType" => $format["type"],
+		            "editorConfig" => [
+		                "callbackUrl" => $callback,
+		                "customization" => [
+		                    "goback" => [
+		                        "url" => $folderLink
+		                    ]
+		                ],
+		                "lang" => str_replace("_", "-", \OC::$server->getL10NFactory("")->get("")->getLanguageCode()),
+		                "mode" => (empty($callback) ? "view" : "edit"),
+		                "user" => [
+		                    "id" => $userId,
+		                    "name" => $this->userSession->getUser()->getDisplayName()
+		                ]
+		            ],
+		            "type" => $type
+		        ];
+	*/
+}
+
+type onlyOfficeFormatInfo struct {
+	Mime string `json:"mime"`
+	Type string `json:"type"`
+	Edit bool   `json:"edit"`
+	Def  bool   `json:"def"`
+}
+type onlyOfficeSettings struct {
+	Formats map[string]*onlyOfficeFormatInfo `json:"formats"`
+	SameTab bool                             `json:"sameTab"`
+}
+
+func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","conv":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","conv":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","conv":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
 }
 
 func (p *proxy) loadPublicRootFile(w http.ResponseWriter, r *http.Request) {
@@ -337,124 +925,6 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 	w.Write(encoded)
 }
 
-func (p *proxy) getOnlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
-	settings := `
-{
-   "formats":{
-      "docx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document",
-         "type":"text",
-         "edit":true,
-         "def":true
-      },
-      "xlsx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-         "type":"spreadsheet",
-         "edit":true,
-         "def":true
-      },
-      "pptx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation",
-         "type":"presentation",
-         "edit":true,
-         "def":true
-      },
-      "ppsx":{
-         "mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow",
-         "type":"presentation",
-         "edit":true,
-         "def":true
-      },
-      "txt":{
-         "mime":"text\/plain",
-         "type":"text",
-         "edit":true,
-         "def":false
-      },
-      "csv":{
-         "mime":"text\/csv",
-         "type":"spreadsheet",
-         "edit":true,
-         "def":false
-      },
-      "odt":{
-         "mime":"application\/vnd.oasis.opendocument.text",
-         "type":"text",
-         "conv":true
-      },
-      "ods":{
-         "mime":"application\/vnd.oasis.opendocument.spreadsheet",
-         "type":"spreadsheet",
-         "conv":true
-      },
-      "odp":{
-         "mime":"application\/vnd.oasis.opendocument.presentation",
-         "type":"presentation",
-         "conv":true
-      },
-      "doc":{
-         "mime":"application\/msword",
-         "type":"text",
-         "conv":true
-      },
-      "xls":{
-         "mime":"application\/vnd.ms-excel",
-         "type":"spreadsheet",
-         "conv":true
-      },
-      "ppt":{
-         "mime":"application\/vnd.ms-powerpoint",
-         "type":"presentation",
-         "conv":true
-      },
-      "pps":{
-         "mime":"application\/vnd.ms-powerpoint",
-         "type":"presentation",
-         "conv":true
-      },
-      "epub":{
-         "mime":"application\/epub+zip",
-         "type":"text",
-         "conv":true
-      },
-      "rtf":{
-         "mime":"text\/rtf",
-         "type":"text",
-         "conv":true
-      },
-      "mht":{
-         "mime":"message\/rfc822",
-         "conv":true
-      },
-      "html":{
-         "mime":"text\/html",
-         "type":"text",
-         "conv":true
-      },
-      "htm":{
-         "mime":"text\/html",
-         "type":"text",
-         "conv":true
-      },
-      "xps":{
-         "mime":"application\/vnd.ms-xpsdocument",
-         "type":"text"
-      },
-      "pdf":{
-         "mime":"application\/pdf",
-         "type":"text"
-      },
-      "djvu":{
-         "mime":"image\/vnd.djvu",
-         "type":"text"
-      }
-   },
-   "sameTab":true
-}
-`
-
-	w.Write([]byte(settings))
-}
 func (p *proxy) isSyncClient(r *http.Request) bool {
 	agent := strings.ToLower(r.UserAgent())
 	if strings.Contains(agent, "mirall") {
@@ -934,6 +1404,7 @@ func (p *proxy) wopiPublicOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(encoded)
+	p.logger.Info(fmt.Sprintf("office-engine microsoft office 365 publicopen: eospath=%s", md.EosFile))
 }
 
 func (p *proxy) wopiOpen(w http.ResponseWriter, r *http.Request) {
@@ -1032,6 +1503,23 @@ func (p *proxy) wopiOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(encoded)
+	p.logger.Info(fmt.Sprintf("office-engine microsoft office 365 open: eospath=%s", md.EosFile))
+}
+
+func (p *proxy) onlyOfficeMainConfig(w http.ResponseWriter, r *http.Request) {
+	payload := struct{
+		DocumentServer string `json:"document_server"`
+	} {
+		DocumentServer: p.onlyOfficeDocumentServer,
+	}
+	j, err := json.Marshal(payload)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(j)
 }
 
 func (p *proxy) getWopiConfig(w http.ResponseWriter, r *http.Request) {
@@ -1555,6 +2043,9 @@ type Options struct {
 	CanaryManager    *canary.Manager
 	CanaryForceClean bool
 	CanaryCookieTTL  int
+	Hostname string
+	OnlyOfficeDocumentServer string
+	GanttServer string
 }
 
 func (opt *Options) init() {
@@ -1704,6 +2195,11 @@ func New(opt *Options) (http.Handler, error) {
 		canaryManager:    opt.CanaryManager,
 		canaryForceClean: opt.CanaryForceClean,
 		canaryCookieTTL:  opt.CanaryCookieTTL,
+		hostname: opt.Hostname,
+		onlyOfficeMutex: &sync.Mutex{},
+		onlyOfficeMap:   map[string]string{},
+		onlyOfficeDocumentServer: opt.OnlyOfficeDocumentServer,
+		ganttServer: opt.GanttServer,
 	}
 
 	proxy.registerRoutes()
@@ -1759,6 +2255,13 @@ type proxy struct {
 	canaryManager    *canary.Manager
 	canaryForceClean bool
 	canaryCookieTTL  int
+	hostname string
+
+	onlyOfficeMutex *sync.Mutex
+	onlyOfficeMap   map[string]string
+	onlyOfficeDocumentServer string
+
+	ganttServer string
 }
 
 // TODO(labkode): store this global var inside the proxy

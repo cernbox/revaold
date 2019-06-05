@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/cernbox/gohub/goconfig"
@@ -15,6 +16,7 @@ import (
 var gc *goconfig.GoConfig
 
 func init() {
+	hostname, _ := os.Hostname()
 	gc = goconfig.New()
 	gc.SetConfigName("ocproxy")
 	gc.AddConfigurationPaths("/etc/ocproxy")
@@ -25,6 +27,7 @@ func init() {
 	gc.Add("tls-cert", "/etc/grid-security/hostcert.pem", "TLS certificate to encrypt connections.")
 	gc.Add("tls-key", "/etc/grid-security/hostkey.pem", "TLS private key to encrypt connections.")
 	gc.Add("tls-enable", false, "Enable TLS for encrypting connections.")
+	gc.Add("hostname", hostname, "Hostname to set in URLs, default is machine hostname")
 
 	gc.Add("data-chunks-folder", "", "folder where to store data chunks before they are commited to REVA.")
 	gc.Add("temporary-folder", "", "folder where to store temporary data. Empty means use the OS temporary folder.")
@@ -47,6 +50,9 @@ func init() {
 
 	gc.Add("apps-mail-server", "cernmx.cern.ch:25", "An IMAP mail server where to send mails")
 	gc.Add("apps-mail-server-from-address", "cernbox-noreply@cern.ch", "The sender of the mail (FROM header)")
+	
+	gc.Add("apps-onlyoffice-document-server", "example.org", "the location of the onlyoffice server")
+	gc.Add("apps-gantt-server", "https://gantt-viewer.web.cern.ch", "the location of the gantt server")
 
 	gc.Add("cache-size", 1000000, "cache size for md records")
 	gc.Add("cache-eviction", 86400, "cache eviction time in seconds for md records")
@@ -104,6 +110,9 @@ func main() {
 		CanaryManager:         cm,
 		CanaryForceClean:      gc.GetBool("canary-force-clean"),
 		CanaryCookieTTL:       gc.GetInt("canary-cookie-ttl"),
+		Hostname:              gc.GetString("hostname"),
+		OnlyOfficeDocumentServer: gc.GetString("apps-onlyoffice-document-server"),
+		GanttServer: gc.GetString("apps-gantt-server"),
 	}
 
 	_, err := api.New(opts)

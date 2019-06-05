@@ -260,6 +260,8 @@ func getCustomMime(ext string) string {
 		return "application/x-drawio"
 	case ".vsd":
 		return "application/vsd"
+	case ".mpp":
+		return "application/x-gantt"
 	default:
 		return ""
 	}

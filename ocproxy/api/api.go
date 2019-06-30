@@ -36,10 +36,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bluele/gcache"
 	reva_api "github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/canary"
 	"github.com/cernbox/revaold/ocproxy/api/static"
-	"github.com/bluele/gcache"
 	"github.com/disintegration/imaging"
 	"github.com/gofrs/uuid"
 	"github.com/gorilla/mux"
@@ -186,15 +186,14 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/new", p.tokenAuth(p.onlyOfficeNew)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/config", p.onlyOfficeMainConfig).Methods("GET")
-	
+
 	// gant routes
 	p.router.HandleFunc("/index.php/apps/gantt/config", p.getGanttConfig).Methods("GET")
-
 
 }
 
 func (p *proxy) getGanttConfig(w http.ResponseWriter, r *http.Request) {
-       settings := fmt.Sprintf(`
+	settings := fmt.Sprintf(`
 {
        "viewer-server": "%s",
        "formats": [{
@@ -204,7 +203,7 @@ func (p *proxy) getGanttConfig(w http.ResponseWriter, r *http.Request) {
 }
 `, p.ganttServer)
 
-       w.Write([]byte(settings))
+	w.Write([]byte(settings))
 }
 
 const (
@@ -630,7 +629,6 @@ func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
 
 }
 
-
 func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	accessToken, _ := reva_api.ContextGetAccessToken(ctx)
@@ -679,7 +677,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	// TODO(labkode): onlyOffice to increase key value
 	//key := md.Etag
 	//if len(key) > 20 {
-		//key = key[0:20]
+	//key = key[0:20]
 	//}
 	// remove special chars
 	//key = strings.Replace(key, ":", "", -1)
@@ -1507,9 +1505,9 @@ func (p *proxy) wopiOpen(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) onlyOfficeMainConfig(w http.ResponseWriter, r *http.Request) {
-	payload := struct{
+	payload := struct {
 		DocumentServer string `json:"document_server"`
-	} {
+	}{
 		DocumentServer: p.onlyOfficeDocumentServer,
 	}
 	j, err := json.Marshal(payload)
@@ -2039,13 +2037,13 @@ type Options struct {
 	MailServer            string
 	MailServerFromAddress string
 
-	IsCanaryEnabled  bool
-	CanaryManager    *canary.Manager
-	CanaryForceClean bool
-	CanaryCookieTTL  int
-	Hostname string
+	IsCanaryEnabled          bool
+	CanaryManager            *canary.Manager
+	CanaryForceClean         bool
+	CanaryCookieTTL          int
+	Hostname                 string
 	OnlyOfficeDocumentServer string
-	GanttServer string
+	GanttServer              string
 }
 
 func (opt *Options) init() {
@@ -2191,15 +2189,15 @@ func New(opt *Options) (http.Handler, error) {
 		mailServer:            opt.MailServer,
 		mailServerFromAddress: opt.MailServerFromAddress,
 
-		isCanaryEnabled:  opt.IsCanaryEnabled,
-		canaryManager:    opt.CanaryManager,
-		canaryForceClean: opt.CanaryForceClean,
-		canaryCookieTTL:  opt.CanaryCookieTTL,
-		hostname: opt.Hostname,
-		onlyOfficeMutex: &sync.Mutex{},
-		onlyOfficeMap:   map[string]string{},
+		isCanaryEnabled:          opt.IsCanaryEnabled,
+		canaryManager:            opt.CanaryManager,
+		canaryForceClean:         opt.CanaryForceClean,
+		canaryCookieTTL:          opt.CanaryCookieTTL,
+		hostname:                 opt.Hostname,
+		onlyOfficeMutex:          &sync.Mutex{},
+		onlyOfficeMap:            map[string]string{},
 		onlyOfficeDocumentServer: opt.OnlyOfficeDocumentServer,
-		ganttServer: opt.GanttServer,
+		ganttServer:              opt.GanttServer,
 	}
 
 	proxy.registerRoutes()
@@ -2255,10 +2253,10 @@ type proxy struct {
 	canaryManager    *canary.Manager
 	canaryForceClean bool
 	canaryCookieTTL  int
-	hostname string
+	hostname         string
 
-	onlyOfficeMutex *sync.Mutex
-	onlyOfficeMap   map[string]string
+	onlyOfficeMutex          *sync.Mutex
+	onlyOfficeMap            map[string]string
 	onlyOfficeDocumentServer string
 
 	ganttServer string

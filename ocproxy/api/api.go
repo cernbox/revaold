@@ -904,7 +904,7 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	to := []string{recipient + "@cern.ch"}
-	err = smtp.SendMail(p.mailServer, nil, p.mailServerFromAddress, to, []byte(mailBody))
+	err = smtp.SendMail(p.mailServer, nil, user.AccountId+"@cern.ch", to, []byte(mailBody))
 	var msg string
 	if err != nil {
 		err = errors.Wrap(err, "error sending mail")

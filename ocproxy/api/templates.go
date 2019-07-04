@@ -11,8 +11,8 @@ var publicLinkTemplate string = `
 		<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
 		<meta name="theme-color" content="#1d2d44">
 
-		<link rel="icon" href="/core/img/favicon.ico">
-		<link rel="apple-touch-icon-precomposed" href="/core/img/favicon-touch.png">
+		<link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
+		<link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
 		<link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
 		<link rel="stylesheet" href="/core/css/styles.css">
 		<link rel="stylesheet" href="/core/css/inputs.css">
@@ -291,8 +291,8 @@ var publicLinkTemplatePassword = `
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
     <meta name="apple-itunes-app" content="app-id=543672169">
     <meta name="theme-color" content="#1d2d44">
-    <link rel="icon" href="/core/img/favicon.ico">
-    <link rel="apple-touch-icon-precomposed" href="/core/img/favicon-touch.png">
+    <link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
     <link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
     <link rel="stylesheet" href="/core/vendor/select2/select2.css">
     <link rel="stylesheet" href="/core/css/styles.css">
@@ -421,8 +421,8 @@ var publicLinkTemplateNotFound string = `
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
     <meta name="apple-itunes-app" content="app-id=543672169">
     <meta name="theme-color" content="#1d2d44">
-    <link rel="icon" href="/core/img/favicon.ico">
-    <link rel="apple-touch-icon-precomposed" href="/core/img/favicon-touch.png">
+    <link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
     <link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
     <link rel="stylesheet" href="/core/vendor/select2/select2.css">
     <link rel="stylesheet" href="/core/css/styles.css">
@@ -538,8 +538,8 @@ var publicLinkTemplateFile = `
 		<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
 		<meta name="theme-color" content="#1d2d44">
 
-		<link rel="icon" href="/core/img/favicon.ico">
-		<link rel="apple-touch-icon-precomposed" href="/core/img/favicon-touch.png">
+		<link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
+		<link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
 		<link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
 		<link rel="stylesheet" href="/core/css/styles.css">
 		<link rel="stylesheet" href="/core/css/inputs.css">
@@ -789,8 +789,8 @@ var publicLinkDropOnly = `
 		<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
 		<meta name="theme-color" content="#1d2d44">
 
-		<link rel="icon" href="/core/img/favicon.ico">
-		<link rel="apple-touch-icon-precomposed" href="/core/img/favicon-touch.png">
+		<link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
+		<link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
 		<link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
 		<link rel="stylesheet" href="/core/css/styles.css">
 		<link rel="stylesheet" href="/core/css/inputs.css">

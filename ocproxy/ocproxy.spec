@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.50
+Version: 0.0.51
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,9 @@ rm -rf %buildroot/
 
 
 %changelog
+* Wed Jul 10 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.51
+- Send share emails as the user
+- Cleanup templates
 * Thu Jun 20 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.50
 - Fail when unable to get chunk for download of file
 - Add gantt support

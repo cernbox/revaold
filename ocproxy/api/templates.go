@@ -735,7 +735,7 @@ var publicLinkTemplateFile = `
       </div>
       <footer>
         <p class="info">
-          <a href="https://cernbox.wen.cern.ch" target="_blank" rel="noreferrer">CERNBox</a> &ndash; The CERN Cloud Storage		
+          <a href="https://cernbox.web.cern.ch" target="_blank" rel="noreferrer">CERNBox</a> &ndash; The CERN Cloud Storage		
         </p>
       </footer>
     </div>

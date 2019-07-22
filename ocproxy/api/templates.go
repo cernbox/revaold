@@ -683,7 +683,7 @@ var publicLinkTemplateFile = `
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
 	<input type="hidden" name="dir" value="/" id="dir">
-	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
+	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download{{ if .ShowAccessToken }}?x-access-token={{ .AccessToken }}{{ end }}" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
 	<input type="hidden" name="filename" value="/" id="filename">
 	<input type="hidden" name="mimetype" value="{{ .Mime }}" id="mimetype">
@@ -705,7 +705,7 @@ var publicLinkTemplateFile = `
 			<div id="logo-claim" style="display:none;"></div>
 					<div class="header-right">
 				<span id="details">
-					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="download" class="button">
+					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download{{ if .ShowAccessToken }}?x-access-token={{ .AccessToken }}{{ end }}" id="download" class="button">
 						<img class="svg" alt="" src="{{ .BaseUrl }}/core/img/actions/download.svg"/>
 						<span id="download-text">Download</span>
 					</a>
@@ -719,7 +719,7 @@ var publicLinkTemplateFile = `
           <!-- Preview frame is filled via JS to support SVG images for modern browsers -->
           <div id="imgframe"></div>
           <div class="directDownload">
-            <a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadFile" class="button">
+            <a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download{{ if .ShowAccessToken }}?x-access-token={{ .AccessToken }}{{ end }}" id="downloadFile" class="button">
             <img class="svg" alt="" src="{{ .BaseUrl }}/core/img/actions/download.svg"/>
             Download {{ .ShareName }}
             <!--Download {{ .ShareName }} (4.7 MB)-->
@@ -727,12 +727,12 @@ var publicLinkTemplateFile = `
           </div>
           <div class="directLink">
             <label for="directLink">Direct link</label>
-            <input id="directLink" type="text" readonly value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download">
+            <input id="directLink" type="text" readonly value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download{{ if .ShowAccessToken }}?x-access-token={{ .AccessToken }}{{ end }}">
           </div>
 
 	  <!--
 	  {{ if (eq .Mime "application/pynb") }}
-	  <a href="https://cern.ch/swanserver/cgi-bin/go?projurl=https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" target="_blank"><img class="svg" alt="" src="{{ .BaseUrl }}/apps/swanviewer/img//badge_swan_white_150.svg"></a>
+	  <a href="https://cern.ch/swanserver/cgi-bin/go?projurl=https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download{{ if .ShowAccessToken }}?x-access-token={{ .AccessToken }}{{ end }}" target="_blank"><img class="svg" alt="" src="{{ .BaseUrl }}/apps/swanviewer/img//badge_swan_white_150.svg"></a>
 	  {{ end }}
 	  -->
         </div>

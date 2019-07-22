@@ -138,7 +138,7 @@ func (p *proxy) registerRoutes() {
 
 	// public link routes
 	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET", "POST")
-	p.router.HandleFunc("/index.php/s/{token}/download", p.publicLinkAuth(p.tokenAuth(p.downloadArchivePL))).Methods("GET")
+	p.router.HandleFunc("/index.php/s/{token}/download", p.plAuth(p.downloadArchivePL)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/files_sharing/ajax/publicpreview.php", p.tokenAuth(p.getPublicPreview)).Methods("GET")
 
 	// app routes
@@ -5453,14 +5453,15 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Token         string
-		AccessToken   string
-		ShareName     string
-		Size          int
-		Mime          string
-		OverwriteHost string
-		BaseUrl       string
-	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl}
+		Token           string
+		AccessToken     string
+		ShareName       string
+		Size            int
+		Mime            string
+		OverwriteHost   string
+		BaseUrl         string
+		ShowAccessToken bool
+	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl, ShowAccessToken: password != ""}
 
 	if data.BaseUrl != "" {
 		data.BaseUrl = "/" + data.BaseUrl
@@ -7271,19 +7272,67 @@ func GetContextWithAuth(ctx context.Context) context.Context {
 	return ctx
 }
 
-func (p *proxy) publicLinkAuth(h http.HandlerFunc) http.HandlerFunc {
+func (p *proxy) plAuth(h http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		token := mux.Vars(r)["token"]
+		authClient := p.getAuthClient()
 
-		// try to authenticate the link with empty password
-		client := p.getAuthClient()
-		res, err := client.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: ""})
-		if err == nil && res.Status == reva_api.StatusCode_OK {
-			// inject token in request
-			r.Header.Set("x-access-token", res.Token)
+		token := r.Header.Get("X-Access-Token")
+		if token == "" {
+			token = r.URL.Query().Get("x-access-token")
 		}
+
+		if token == "" {
+
+			token = mux.Vars(r)["token"]
+
+			var password string
+			if r.Method == "POST" { // password has been set in password form
+				if err := r.ParseForm(); err != nil {
+					p.logger.Error("", zap.Error(err))
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				password = r.Form.Get("password")
+			}
+
+			res, err := authClient.ForgePublicLinkToken(ctx, &reva_api.ForgePublicLinkTokenReq{Token: token, Password: password})
+			if err != nil {
+				// render link not found template
+				p.logger.Error("", zap.Error(err))
+				p.renderTemplateNotFound(w)
+				return
+			}
+
+			if res.Status != reva_api.StatusCode_OK {
+				p.renderTemplatePublicLinkPassword(w)
+				return
+			}
+
+			token = res.Token
+		}
+
+		res2, err := authClient.DismantlePublicLinkToken(ctx, &reva_api.TokenReq{Token: token})
+		if err != nil {
+			// render link not found template
+			p.logger.Error("", zap.Error(err))
+			p.renderTemplateNotFound(w)
+			return
+		}
+		if res2.Status != reva_api.StatusCode_OK {
+			// render link not found template
+			p.logger.Error("", zap.Error(err))
+			p.renderTemplateNotFound(w)
+			return
+		}
+
+		pl := res2.PublicLink
+		ctx = reva_api.ContextSetPublicLink(ctx, pl)
+		ctx = reva_api.ContextSetPublicLinkToken(ctx, token)
+		r = r.WithContext(ctx)
+		p.logger.Info("authenticated with public link token", zap.String("token", pl.Token))
 		h(w, r)
+		return
 	})
 }
 

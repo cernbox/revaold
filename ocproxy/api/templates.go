@@ -11,108 +11,109 @@ var publicLinkTemplate string = `
 		<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
 		<meta name="theme-color" content="#1d2d44">
 
-		<link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
-		<link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
-		<link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
-		<link rel="stylesheet" href="/core/css/styles.css">
-		<link rel="stylesheet" href="/core/css/inputs.css">
-		<link rel="stylesheet" href="/core/css/header.css">
-		<link rel="stylesheet" href="/core/css/icons.css">
-		<link rel="stylesheet" href="/core/css/fonts.css">
-		<link rel="stylesheet" href="/core/css/apps.css">
-		<link rel="stylesheet" href="/core/css/global.css">
-		<link rel="stylesheet" href="/core/css/fixes.css">
-		<link rel="stylesheet" href="/core/css/multiselect.css">
-		<link rel="stylesheet" href="/core/css/mobile.css">
-		<link rel="stylesheet" href="/core/vendor/select2/select2.css">
-		<link rel="stylesheet" href="/core/vendor/jquery-ui/themes/base/jquery-ui.css">
-		<link rel="stylesheet" href="/core/css/jquery-ui-fixes.css">
-		<link rel="stylesheet" href="/core/css/tooltip.css">
-		<link rel="stylesheet" href="/core/css/share.css">
-		<link rel="stylesheet" href="/apps/files_versions/css/versions.css">
-		<link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
-		<link rel="stylesheet" href="/apps/files_sharing/css/public.css">
-		<link rel="stylesheet" href="/apps/files_sharing/css/mobile.css">
-		<link rel="stylesheet" href="/apps/files/css/files.css">
-		<link rel="stylesheet" href="/apps/files/css/upload.css">
-    		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
-    		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
-    		<link rel="stylesheet" href="/apps/gallery/css/slideshow.css">
-    		<link rel="stylesheet" href="/apps/gallery/css/gallerybutton.css">
-    		<link rel="stylesheet" href="/apps/files_pdfviewer/css/style.css">
-    		<link rel="stylesheet" href="/apps/rootviewer/css/style.css">
-    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootPainter.min.css">
-    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootInterface.min.css">
-		<script src="/index.php/core/js/oc.js"></script>
-		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
-		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
-		<script src="/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
-		<script src="/core/vendor/underscore/underscore.js"></script>
-		<script src="/core/vendor/moment/min/moment-with-locales.js"></script>
-		<script src="/core/vendor/handlebars/handlebars.js"></script>
-		<script src="/core/vendor/blueimp-md5/js/md5.js"></script>
-		<script src="/core/vendor/bootstrap/js/tooltip.js"></script>
-		<script src="/core/vendor/backbone/backbone.js"></script>
-		<script src="/core/vendor/davclient.js/lib/client.js"></script>
-		<script src="/core/vendor/clipboard/dist/clipboard.js"></script>
-		<script src="/core/vendor/bowser/src/bowser.js"></script>
-		<script src="/core/js/jquery.ocdialog.js"></script>
-		<script src="/core/js/oc-dialogs.js"></script>
-		<script src="/core/js/js.js"></script>
-		<script src="/core/js/l10n.js"></script>
-		<script src="/core/js/octemplate.js"></script>
-		<script src="/core/js/eventsource.js"></script>
-		<script src="/core/js/config.js"></script>
-		<script src="/core/search/js/search.js"></script>
-		<script src="/core/js/oc-requesttoken.js"></script>
-		<script src="/core/js/apps.js"></script>
-		<script src="/core/js/mimetype.js"></script>
-		<script src="/core/js/mimetypelist.js"></script>
-		<script src="/core/vendor/snapjs/dist/latest/snap.js"></script>
-		<script src="/core/js/oc-backbone.js"></script>
-		<script src="/core/js/backgroundjobs.js"></script>
-		<script src="/core/js/shareconfigmodel.js"></script>
-		<script src="/core/js/sharemodel.js"></script>
-		<script src="/core/js/sharescollection.js"></script>
-		<script src="/core/js/shareitemmodel.js"></script>
-		<script src="/core/js/sharedialogresharerinfoview.js"></script>
-		<script src="/core/js/sharedialoglinklistview.js"></script>
-		<script src="/core/js/sharedialoglinkshareview.js"></script>
-		<script src="/core/js/sharedialogmailview.js"></script>
-		<script src="/core/js/sharedialoglinksocialview.js"></script>
-		<script src="/core/js/sharedialogexpirationview.js"></script>
-		<script src="/core/js/sharedialogshareelistview.js"></script>
-		<script src="/core/js/sharedialogview.js"></script>
-		<script src="/core/js/share.js"></script>
-		<script src="/core/js/files/fileinfo.js"></script>
-		<script src="/core/js/files/client.js"></script>
-		<script src="/apps/files/js/file-upload.js"></script>
-		<script src="/apps/files_sharing/js/public.js"></script>
-		<script src="/apps/files/js/fileactions.js"></script>
-		<script src="/apps/files/js/fileactionsmenu.js"></script>
-		<script src="/apps/files/js/jquery.fileupload.js"></script>
-		<script src="/apps/files/js/filesummary.js"></script>
-		<script src="/apps/files/js/breadcrumb.js"></script>
-		<script src="/apps/files/js/fileinfomodel.js"></script>
-		<script src="/apps/files/js/newfilemenu.js"></script>
-		<script src="/apps/files/js/files.js"></script>
-		<script src="/apps/files/js/filelist.js"></script>
-		<script src="/apps/files/js/keyboardshortcuts.js"></script>
-		<script src="/apps/gallery/js/vendor/bigshot/bigshot-compressed.js"></script>
-		<script src="/apps/gallery/js/galleryutility.js"></script>
-		<script src="/apps/gallery/js/galleryfileaction.js"></script>
-		<script src="/apps/gallery/js/slideshow.js"></script>
-		<script src="/apps/gallery/js/slideshowcontrols.js"></script>
-		<script src="/apps/gallery/js/slideshowzoomablepreview.js"></script>
-		<script src="/apps/gallery/js/gallerybutton.js"></script>
-		<script src="/apps/gallery/js/vendor/dompurify/src/purify.js"></script>
+		<link rel="icon" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon.ico">
+		<link rel="apple-touch-icon-precomposed" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon-touch.png">
+		<link rel="mask-icon" sizes="any" href="{{ .BaseUrl }}/core/img/favicon-mask.svg" color="#1d2d44">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/styles.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/inputs.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/header.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/icons.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fonts.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/apps.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/global.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fixes.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/multiselect.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/mobile.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/select2/select2.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/jquery-ui/themes/base/jquery-ui.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery-ui-fixes.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/tooltip.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/share.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_versions/css/versions.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery.ocdialog.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/public.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/mobile.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/files.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/upload.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/gallery/css/slideshow.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/gallery/css/gallerybutton.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_pdfviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/vendor/JSRootPainter.min.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/vendor/JSRootInterface.min.css">
+		<script src="{{ .BaseUrl }}/index.php/core/js/oc.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery/dist/jquery.min.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/underscore/underscore.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/moment/min/moment-with-locales.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/handlebars/handlebars.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/blueimp-md5/js/md5.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/bootstrap/js/tooltip.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/backbone/backbone.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/es6-promise/dist/es6-promise.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/davclient.js/lib/client.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/clipboard/dist/clipboard.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/bowser/src/bowser.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/jquery.ocdialog.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-dialogs.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/js.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/l10n.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/octemplate.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/eventsource.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/config.js"></script>
+		<script src="{{ .BaseUrl }}/core/search/js/search.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-requesttoken.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/apps.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/mimetype.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/mimetypelist.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/snapjs/dist/latest/snap.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-backbone.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/backgroundjobs.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/shareconfigmodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharemodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharescollection.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/shareitemmodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogresharerinfoview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinklistview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinkshareview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogmailview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinksocialview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogexpirationview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogshareelistview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/share.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/files/fileinfo.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/files/client.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/file-upload.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files_sharing/js/public.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileactions.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileactionsmenu.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/jquery.fileupload.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/filesummary.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/breadcrumb.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileinfomodel.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/newfilemenu.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/files.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/filelist.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/keyboardshortcuts.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/vendor/bigshot/bigshot-compressed.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/galleryutility.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/galleryfileaction.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/slideshow.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/slideshowcontrols.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/slideshowzoomablepreview.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/gallerybutton.js"></script>
+		<script src="{{ .BaseUrl }}/apps/gallery/js/vendor/dompurify/src/purify.js"></script>
 
-		<script src="/apps/rootviewer/js/script.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootCore.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/d3.v3.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootPainter.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootCore.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/d3.v3.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootPainter.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
 		<script>
 		(function ($, OC) {
 
@@ -144,8 +145,8 @@ var publicLinkTemplate string = `
 
 		})(jQuery, OC);
 		</script>
-    		<script src="/apps/wopiviewer/js/script.js"></script>
-		<script src="/apps/files_pdfviewer/js/previewplugin.js"></script>
+    		<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
 	<body id="body-public">
 	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
 	<noscript>
@@ -161,27 +162,27 @@ var publicLinkTemplate string = `
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
 	<input type="hidden" name="dir" value="/" id="dir">
-	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
+	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
 	<input type="hidden" name="filename" value="/" id="filename">
 	<input type="hidden" name="mimetype" value="httpd/unix-directory" id="mimetype">
 	<input type="hidden" name="previewSupported" value="false" id="previewSupported">
-	<input type="hidden" name="mimetypeIcon" value="/core/img/filetypes/folder.svg" id="mimetypeIcon">
+	<input type="hidden" name="mimetypeIcon" value="{{ .BaseUrl }}/core/img/filetypes/folder.svg" id="mimetypeIcon">
 	<input type="hidden" name="filesize" value="28" id="filesize">
 	<input type="hidden" name="maxSizeAnimateGif" value="10" id="maxSizeAnimateGif">
 
 	<header>
 		<div id="header" class="share-folder" data-protected="false"
 			 data-owner-display-name="admin" data-owner="admin" data-name="Test folder">
-			<a href="/index.php" title="" id="owncloud">
+			<a href="{{ .BaseUrl }}/index.php" title="" id="owncloud">
 				<h1 class="logo-icon"></h1>
 			</a>
 
 			<div id="logo-claim" style="display:none;"></div>
 					<div class="header-right">
 				<span id="details">
-					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="download" class="button">
-						<img class="svg" alt="" src="/core/img/actions/download.svg"/>
+					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="download" class="button">
+						<img class="svg" alt="" src="{{ .BaseUrl }}/core/img/actions/download.svg"/>
 						<span id="download-text">Download</span>
 					</a>
 				</span>
@@ -291,76 +292,77 @@ var publicLinkTemplatePassword = `
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
     <meta name="apple-itunes-app" content="app-id=543672169">
     <meta name="theme-color" content="#1d2d44">
-    <link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
-    <link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
-    <link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
-    <link rel="stylesheet" href="/core/vendor/select2/select2.css">
-    <link rel="stylesheet" href="/core/css/styles.css">
-    <link rel="stylesheet" href="/core/css/inputs.css">
-    <link rel="stylesheet" href="/core/css/header.css">
-    <link rel="stylesheet" href="/core/css/icons.css">
-    <link rel="stylesheet" href="/core/css/fonts.css">
-    <link rel="stylesheet" href="/core/css/apps.css">
-    <link rel="stylesheet" href="/core/css/global.css">
-    <link rel="stylesheet" href="/core/css/fixes.css">
-    <link rel="stylesheet" href="/core/css/multiselect.css">
-    <link rel="stylesheet" href="/core/css/mobile.css">
-    <link rel="stylesheet" href="/core/vendor/jquery-ui/themes/base/jquery-ui.css">
-    <link rel="stylesheet" href="/core/css/jquery-ui-fixes.css">
-    <link rel="stylesheet" href="/core/css/tooltip.css">
-    <link rel="stylesheet" href="/core/css/share.css">
-    <link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
-    <link rel="stylesheet" href="/apps/files_versions/css/versions.css">
-    <link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
-    <link rel="stylesheet" href="/apps/files_sharing/css/authenticate.css">
-    <script src="/index.php/core/js/oc.js"></script>
-    <script src="/core/vendor/jquery/dist/jquery.min.js"></script>
-    <script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
-    <script src="/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
-    <script src="/core/vendor/underscore/underscore.js"></script>
-    <script src="/core/vendor/moment/min/moment-with-locales.js"></script>
-    <script src="/core/vendor/handlebars/handlebars.js"></script>
-    <script src="/core/vendor/blueimp-md5/js/md5.js"></script>
-    <script src="/core/vendor/bootstrap/js/tooltip.js"></script>
-    <script src="/core/vendor/backbone/backbone.js"></script>
-    <script src="/core/vendor/davclient.js/lib/client.js"></script>
-    <script src="/core/vendor/clipboard/dist/clipboard.js"></script>
-    <script src="/core/vendor/bowser/src/bowser.js"></script>
-    <script src="/core/js/jquery.ocdialog.js"></script>
-    <script src="/core/js/oc-dialogs.js"></script>
-    <script src="/core/js/js.js"></script>
-    <script src="/core/js/l10n.js"></script>
-    <script src="/core/js/octemplate.js"></script>
-    <script src="/core/js/eventsource.js"></script>
-    <script src="/core/js/config.js"></script>
-    <script src="/core/search/js/search.js"></script>
-    <script src="/core/js/oc-requesttoken.js"></script>
-    <script src="/core/js/apps.js"></script>
-    <script src="/core/js/mimetype.js"></script>
-    <script src="/core/js/mimetypelist.js"></script>
-    <script src="/core/vendor/snapjs/dist/latest/snap.js"></script>
-    <script src="/core/vendor/select2/select2.js"></script>
-    <script src="/core/js/oc-backbone.js"></script>
-    <script src="/core/js/placeholder.js"></script>
-    <script src="/core/js/jquery.avatar.js"></script>
-    <script src="/core/js/backgroundjobs.js"></script>
-    <script src="/core/js/shareconfigmodel.js"></script>
-    <script src="/core/js/sharemodel.js"></script>
-    <script src="/core/js/sharescollection.js"></script>
-    <script src="/core/js/shareitemmodel.js"></script>
-    <script src="/core/js/sharedialogresharerinfoview.js"></script>
-    <script src="/core/js/sharedialoglinklistview.js"></script>
-    <script src="/core/js/sharedialoglinkshareview.js"></script>
-    <script src="/core/js/sharedialogmailview.js"></script>
-    <script src="/core/js/sharedialoglinksocialview.js"></script>
-    <script src="/core/js/sharedialogexpirationview.js"></script>
-    <script src="/core/js/sharedialogshareelistview.js"></script>
-    <script src="/core/js/sharedialogview.js"></script>
-    <script src="/core/js/share.js"></script>
-    <script src="/core/js/files/fileinfo.js"></script>
-    <script src="/core/js/files/client.js"></script>
-    <script src="/apps/files_sharing/js/authenticate.js"></script>
-    <script src="/apps/wopiviewer/js/script.js"></script>
+    <link rel="icon" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon-touch.png">
+    <link rel="mask-icon" sizes="any" href="{{ .BaseUrl }}/core/img/favicon-mask.svg" color="#1d2d44">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/select2/select2.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/styles.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/inputs.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/header.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/icons.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fonts.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/apps.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/global.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fixes.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/multiselect.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/mobile.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/jquery-ui/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery-ui-fixes.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/tooltip.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/share.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_versions/css/versions.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery.ocdialog.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/authenticate.css">
+    <script src="{{ .BaseUrl }}/index.php/core/js/oc.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/jquery/dist/jquery.min.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/underscore/underscore.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/moment/min/moment-with-locales.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/handlebars/handlebars.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/blueimp-md5/js/md5.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/bootstrap/js/tooltip.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/backbone/backbone.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/es6-promise/dist/es6-promise.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/davclient.js/lib/client.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/clipboard/dist/clipboard.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/bowser/src/bowser.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/jquery.ocdialog.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/oc-dialogs.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/js.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/l10n.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/octemplate.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/eventsource.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/config.js"></script>
+    <script src="{{ .BaseUrl }}/core/search/js/search.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/oc-requesttoken.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/apps.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/mimetype.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/mimetypelist.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/snapjs/dist/latest/snap.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/select2/select2.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/oc-backbone.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/placeholder.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/jquery.avatar.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/backgroundjobs.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/shareconfigmodel.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharemodel.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharescollection.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/shareitemmodel.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogresharerinfoview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialoglinklistview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialoglinkshareview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogmailview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialoglinksocialview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogexpirationview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogshareelistview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/share.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/files/fileinfo.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/files/client.js"></script>
+    <script src="{{ .BaseUrl }}/apps/files_sharing/js/authenticate.js"></script>
+    <script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
   </head>
   <body id="body-login">
     <noscript>
@@ -421,73 +423,74 @@ var publicLinkTemplateNotFound string = `
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
     <meta name="apple-itunes-app" content="app-id=543672169">
     <meta name="theme-color" content="#1d2d44">
-    <link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
-    <link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
-    <link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
-    <link rel="stylesheet" href="/core/vendor/select2/select2.css">
-    <link rel="stylesheet" href="/core/css/styles.css">
-    <link rel="stylesheet" href="/core/css/inputs.css">
-    <link rel="stylesheet" href="/core/css/header.css">
-    <link rel="stylesheet" href="/core/css/icons.css">
-    <link rel="stylesheet" href="/core/css/fonts.css">
-    <link rel="stylesheet" href="/core/css/apps.css">
-    <link rel="stylesheet" href="/core/css/global.css">
-    <link rel="stylesheet" href="/core/css/fixes.css">
-    <link rel="stylesheet" href="/core/css/multiselect.css">
-    <link rel="stylesheet" href="/core/css/mobile.css">
-    <link rel="stylesheet" href="/core/vendor/jquery-ui/themes/base/jquery-ui.css">
-    <link rel="stylesheet" href="/core/css/jquery-ui-fixes.css">
-    <link rel="stylesheet" href="/core/css/tooltip.css">
-    <link rel="stylesheet" href="/core/css/share.css">
-    <link rel="stylesheet" href="/apps/files_versions/css/versions.css">
-    <link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
-    <link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
-    <script src="/index.php/core/js/oc.js"></script>
-    <script src="/core/vendor/jquery/dist/jquery.min.js"></script>
-    <script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
-    <script src="/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
-    <script src="/core/vendor/underscore/underscore.js"></script>
-    <script src="/core/vendor/moment/min/moment-with-locales.js"></script>
-    <script src="/core/vendor/handlebars/handlebars.js"></script>
-    <script src="/core/vendor/blueimp-md5/js/md5.js"></script>
-    <script src="/core/vendor/bootstrap/js/tooltip.js"></script>
-    <script src="/core/vendor/backbone/backbone.js"></script>
-    <script src="/core/vendor/davclient.js/lib/client.js"></script>
-    <script src="/core/vendor/clipboard/dist/clipboard.js"></script>
-    <script src="/core/vendor/bowser/src/bowser.js"></script>
-    <script src="/core/js/jquery.ocdialog.js"></script>
-    <script src="/core/js/oc-dialogs.js"></script>
-    <script src="/core/js/js.js"></script>
-    <script src="/core/js/l10n.js"></script>
-    <script src="/core/js/octemplate.js"></script>
-    <script src="/core/js/eventsource.js"></script>
-    <script src="/core/js/config.js"></script>
-    <script src="/core/search/js/search.js"></script>
-    <script src="/core/js/oc-requesttoken.js"></script>
-    <script src="/core/js/apps.js"></script>
-    <script src="/core/js/mimetype.js"></script>
-    <script src="/core/js/mimetypelist.js"></script>
-    <script src="/core/vendor/snapjs/dist/latest/snap.js"></script>
-    <script src="/core/vendor/select2/select2.js"></script>
-    <script src="/core/js/oc-backbone.js"></script>
-    <script src="/core/js/placeholder.js"></script>
-    <script src="/core/js/jquery.avatar.js"></script>
-    <script src="/core/js/backgroundjobs.js"></script>
-    <script src="/core/js/shareconfigmodel.js"></script>
-    <script src="/core/js/sharemodel.js"></script>
-    <script src="/core/js/sharescollection.js"></script>
-    <script src="/core/js/shareitemmodel.js"></script>
-    <script src="/core/js/sharedialogresharerinfoview.js"></script>
-    <script src="/core/js/sharedialoglinklistview.js"></script>
-    <script src="/core/js/sharedialoglinkshareview.js"></script>
-    <script src="/core/js/sharedialogmailview.js"></script>
-    <script src="/core/js/sharedialoglinksocialview.js"></script>
-    <script src="/core/js/sharedialogexpirationview.js"></script>
-    <script src="/core/js/sharedialogshareelistview.js"></script>
-    <script src="/core/js/sharedialogview.js"></script>
-    <script src="/core/js/share.js"></script>
-    <script src="/core/js/files/fileinfo.js"></script>
-    <script src="/core/js/files/client.js"></script>
+    <link rel="icon" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon.ico">
+    <link rel="apple-touch-icon-precomposed" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon-touch.png">
+    <link rel="mask-icon" sizes="any" href="{{ .BaseUrl }}/core/img/favicon-mask.svg" color="#1d2d44">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/select2/select2.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/styles.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/inputs.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/header.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/icons.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fonts.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/apps.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/global.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fixes.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/multiselect.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/mobile.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/jquery-ui/themes/base/jquery-ui.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery-ui-fixes.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/tooltip.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/share.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_versions/css/versions.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery.ocdialog.css">
+    <link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
+    <script src="{{ .BaseUrl }}/index.php/core/js/oc.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/jquery/dist/jquery.min.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/underscore/underscore.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/moment/min/moment-with-locales.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/handlebars/handlebars.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/blueimp-md5/js/md5.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/bootstrap/js/tooltip.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/backbone/backbone.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/es6-promise/dist/es6-promise.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/davclient.js/lib/client.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/clipboard/dist/clipboard.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/bowser/src/bowser.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/jquery.ocdialog.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/oc-dialogs.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/js.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/l10n.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/octemplate.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/eventsource.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/config.js"></script>
+    <script src="{{ .BaseUrl }}/core/search/js/search.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/oc-requesttoken.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/apps.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/mimetype.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/mimetypelist.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/snapjs/dist/latest/snap.js"></script>
+    <script src="{{ .BaseUrl }}/core/vendor/select2/select2.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/oc-backbone.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/placeholder.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/jquery.avatar.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/backgroundjobs.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/shareconfigmodel.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharemodel.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharescollection.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/shareitemmodel.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogresharerinfoview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialoglinklistview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialoglinkshareview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogmailview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialoglinksocialview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogexpirationview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogshareelistview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/sharedialogview.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/share.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/files/fileinfo.js"></script>
+    <script src="{{ .BaseUrl }}/core/js/files/client.js"></script>
   </head>
   <body id="body-login">
     <noscript>
@@ -512,7 +515,7 @@ var publicLinkTemplateNotFound string = `
           <li class="error">
             File not found or expired<br>
             <p class="hint">The specified document has not been found on the server or it has expired.</p>
-            <p class="hint"><a href="/index.php">You can click here to return to CERNBox.</a></p>
+            <p class="hint"><a href="{{ .BaseUrl }}/index.php">You can click here to return to CERNBox.</a></p>
           </li>
         </ul>
         <div class="push"></div>
@@ -538,98 +541,99 @@ var publicLinkTemplateFile = `
 		<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
 		<meta name="theme-color" content="#1d2d44">
 
-		<link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
-		<link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
-		<link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
-		<link rel="stylesheet" href="/core/css/styles.css">
-		<link rel="stylesheet" href="/core/css/inputs.css">
-		<link rel="stylesheet" href="/core/css/header.css">
-		<link rel="stylesheet" href="/core/css/icons.css">
-		<link rel="stylesheet" href="/core/css/fonts.css">
-		<link rel="stylesheet" href="/core/css/apps.css">
-		<link rel="stylesheet" href="/core/css/global.css">
-		<link rel="stylesheet" href="/core/css/fixes.css">
-		<link rel="stylesheet" href="/core/css/multiselect.css">
-		<link rel="stylesheet" href="/core/css/mobile.css">
-		<link rel="stylesheet" href="/core/vendor/select2/select2.css">
-		<link rel="stylesheet" href="/core/vendor/jquery-ui/themes/base/jquery-ui.css">
-		<link rel="stylesheet" href="/core/css/jquery-ui-fixes.css">
-		<link rel="stylesheet" href="/core/css/tooltip.css">
-		<link rel="stylesheet" href="/core/css/share.css">
-		<link rel="stylesheet" href="/apps/files_versions/css/versions.css">
-		<link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
-		<link rel="stylesheet" href="/apps/files_sharing/css/public.css">
-		<link rel="stylesheet" href="/apps/files_sharing/css/mobile.css">
-		<link rel="stylesheet" href="/apps/files/css/files.css">
-		<link rel="stylesheet" href="/apps/files/css/upload.css">
-    		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
-    		<link rel="stylesheet" href="/apps/wopiviewer/css/style.css">
-    		<link rel="stylesheet" href="/apps/files_pdfviewer/css/style.css">
-    		<link rel="stylesheet" href="/apps/rootviewer/css/style.css">
-    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootPainter.min.css">
-    		<link rel="stylesheet" href="/apps/rootviewer/css/vendor/JSRootInterface.min.css">
-		<script src="/index.php/core/js/oc.js"></script>
-		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
-		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
-		<script src="/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
-		<script src="/core/vendor/underscore/underscore.js"></script>
-		<script src="/core/vendor/moment/min/moment-with-locales.js"></script>
-		<script src="/core/vendor/handlebars/handlebars.js"></script>
-		<script src="/core/vendor/blueimp-md5/js/md5.js"></script>
-		<script src="/core/vendor/bootstrap/js/tooltip.js"></script>
-		<script src="/core/vendor/backbone/backbone.js"></script>
-		<script src="/core/vendor/davclient.js/lib/client.js"></script>
-		<script src="/core/vendor/clipboard/dist/clipboard.js"></script>
-		<script src="/core/vendor/bowser/src/bowser.js"></script>
-		<script src="/core/js/jquery.ocdialog.js"></script>
-		<script src="/core/js/oc-dialogs.js"></script>
-		<script src="/core/js/js.js"></script>
-		<script src="/core/js/l10n.js"></script>
-		<script src="/core/js/octemplate.js"></script>
-		<script src="/core/js/eventsource.js"></script>
-		<script src="/core/js/config.js"></script>
-		<script src="/core/search/js/search.js"></script>
-		<script src="/core/js/oc-requesttoken.js"></script>
-		<script src="/core/js/apps.js"></script>
-		<script src="/core/js/mimetype.js"></script>
-		<script src="/core/js/mimetypelist.js"></script>
-		<script src="/core/vendor/snapjs/dist/latest/snap.js"></script>
-		<script src="/core/js/oc-backbone.js"></script>
-		<script src="/core/js/backgroundjobs.js"></script>
-		<script src="/core/js/shareconfigmodel.js"></script>
-		<script src="/core/js/sharemodel.js"></script>
-		<script src="/core/js/sharescollection.js"></script>
-		<script src="/core/js/shareitemmodel.js"></script>
-		<script src="/core/js/sharedialogresharerinfoview.js"></script>
-		<script src="/core/js/sharedialoglinklistview.js"></script>
-		<script src="/core/js/sharedialoglinkshareview.js"></script>
-		<script src="/core/js/sharedialogmailview.js"></script>
-		<script src="/core/js/sharedialoglinksocialview.js"></script>
-		<script src="/core/js/sharedialogexpirationview.js"></script>
-		<script src="/core/js/sharedialogshareelistview.js"></script>
-		<script src="/core/js/sharedialogview.js"></script>
-		<script src="/core/js/share.js"></script>
-		<script src="/core/js/files/fileinfo.js"></script>
-		<script src="/core/js/files/client.js"></script>
-		<script src="/apps/files/js/file-upload.js"></script>
-		<script src="/apps/files_sharing/js/public.js"></script>
-		<script src="/apps/files/js/fileactions.js"></script>
-		<script src="/apps/files/js/fileactionsmenu.js"></script>
-		<script src="/apps/files/js/jquery.fileupload.js"></script>
-		<script src="/apps/files/js/filesummary.js"></script>
-		<script src="/apps/files/js/breadcrumb.js"></script>
-		<script src="/apps/files/js/fileinfomodel.js"></script>
-		<script src="/apps/files/js/newfilemenu.js"></script>
-		<script src="/apps/files/js/files.js"></script>
-		<script src="/apps/files/js/filelist.js"></script>
-		<script src="/apps/files/js/keyboardshortcuts.js"></script>
+		<link rel="icon" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon.ico">
+		<link rel="apple-touch-icon-precomposed" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon-touch.png">
+		<link rel="mask-icon" sizes="any" href="{{ .BaseUrl }}/core/img/favicon-mask.svg" color="#1d2d44">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/styles.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/inputs.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/header.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/icons.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fonts.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/apps.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/global.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fixes.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/multiselect.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/mobile.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/select2/select2.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/jquery-ui/themes/base/jquery-ui.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery-ui-fixes.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/tooltip.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/share.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_versions/css/versions.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery.ocdialog.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/public.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/mobile.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/files.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/upload.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_pdfviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/vendor/JSRootPainter.min.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/vendor/JSRootInterface.min.css">
+		<script src="{{ .BaseUrl }}/index.php/core/js/oc.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery/dist/jquery.min.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/underscore/underscore.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/moment/min/moment-with-locales.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/handlebars/handlebars.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/blueimp-md5/js/md5.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/bootstrap/js/tooltip.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/backbone/backbone.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/es6-promise/dist/es6-promise.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/davclient.js/lib/client.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/clipboard/dist/clipboard.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/bowser/src/bowser.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/jquery.ocdialog.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-dialogs.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/js.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/l10n.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/octemplate.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/eventsource.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/config.js"></script>
+		<script src="{{ .BaseUrl }}/core/search/js/search.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-requesttoken.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/apps.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/mimetype.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/mimetypelist.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/snapjs/dist/latest/snap.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-backbone.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/backgroundjobs.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/shareconfigmodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharemodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharescollection.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/shareitemmodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogresharerinfoview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinklistview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinkshareview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogmailview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinksocialview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogexpirationview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogshareelistview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/share.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/files/fileinfo.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/files/client.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/file-upload.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files_sharing/js/public.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileactions.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileactionsmenu.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/jquery.fileupload.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/filesummary.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/breadcrumb.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileinfomodel.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/newfilemenu.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/files.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/filelist.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/keyboardshortcuts.js"></script>
 
-		<script src="/apps/rootviewer/js/script.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootCore.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/d3.v3.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootPainter.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
-		<script src="/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootCore.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/d3.v3.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootPainter.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
+		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
 		<script>
 		(function ($, OC) {
 			$(document).ready(function () {
@@ -659,10 +663,10 @@ var publicLinkTemplateFile = `
 			});
 		})(jQuery, OC);
 		</script>
-    		<script src="/apps/wopiviewer/js/script.js"></script>
-		<script src="/apps/files_pdfviewer/js/previewplugin.js"></script>
+    		<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
 		{{ if (eq .Mime "application/pynb") }}
-    		<script src="/apps/swanviewer/js/script.js"></script>
+    		<script src="{{ .BaseUrl }}/apps/swanviewer/js/script.js"></script>
 		{{ end }}
 	<body id="body-public">
 	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
@@ -679,12 +683,12 @@ var publicLinkTemplateFile = `
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
 	<input type="hidden" name="dir" value="/" id="dir">
-	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
+	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
 	<input type="hidden" name="filename" value="/" id="filename">
 	<input type="hidden" name="mimetype" value="{{ .Mime }}" id="mimetype">
 	<input type="hidden" name="previewSupported" value="false" id="previewSupported">
-	<input type="hidden" name="mimetypeIcon" value="/core/img/filetypes/folder.svg" id="mimetypeIcon">
+	<input type="hidden" name="mimetypeIcon" value="{{ .BaseUrl }}/core/img/filetypes/folder.svg" id="mimetypeIcon">
 	<input type="hidden" name="filesize" value="28" id="filesize">
 	<input type="hidden" name="maxSizeAnimateGif" value="10" id="maxSizeAnimateGif">
 	<script>
@@ -694,15 +698,15 @@ var publicLinkTemplateFile = `
 	<header>
 		<div id="header" class="share-folder" data-protected="false"
 			 data-owner-display-name="admin" data-owner="admin" data-name="Test folder">
-			<a href="/index.php" title="" id="owncloud">
+			<a href="{{ .BaseUrl }}/index.php" title="" id="owncloud">
 				<h1 class="logo-icon"></h1>
 			</a>
 
 			<div id="logo-claim" style="display:none;"></div>
 					<div class="header-right">
 				<span id="details">
-					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="download" class="button">
-						<img class="svg" alt="" src="/core/img/actions/download.svg"/>
+					<a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="download" class="button">
+						<img class="svg" alt="" src="{{ .BaseUrl }}/core/img/actions/download.svg"/>
 						<span id="download-text">Download</span>
 					</a>
 				</span>
@@ -715,20 +719,20 @@ var publicLinkTemplateFile = `
           <!-- Preview frame is filled via JS to support SVG images for modern browsers -->
           <div id="imgframe"></div>
           <div class="directDownload">
-            <a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadFile" class="button">
-            <img class="svg" alt="" src="/core/img/actions/download.svg"/>
+            <a href="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadFile" class="button">
+            <img class="svg" alt="" src="{{ .BaseUrl }}/core/img/actions/download.svg"/>
             Download {{ .ShareName }}
             <!--Download {{ .ShareName }} (4.7 MB)-->
             </a>
           </div>
           <div class="directLink">
             <label for="directLink">Direct link</label>
-            <input id="directLink" type="text" readonly value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}">
+            <input id="directLink" type="text" readonly value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download">
           </div>
 
 	  <!--
 	  {{ if (eq .Mime "application/pynb") }}
-	  <a href="https://cern.ch/swanserver/cgi-bin/go?projurl=https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download%3Fx-access-token={{ .AccessToken }}" target="_blank"><img class="svg" alt="" src="/apps/swanviewer/img//badge_swan_white_150.svg"></a>
+	  <a href="https://cern.ch/swanserver/cgi-bin/go?projurl=https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" target="_blank"><img class="svg" alt="" src="{{ .BaseUrl }}/apps/swanviewer/img//badge_swan_white_150.svg"></a>
 	  {{ end }}
 	  -->
         </div>
@@ -789,88 +793,89 @@ var publicLinkDropOnly = `
 		<meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0">
 		<meta name="theme-color" content="#1d2d44">
 
-		<link rel="icon" href="/apps/cernbox-theme/core/img/favicon.ico">
-		<link rel="apple-touch-icon-precomposed" href="/apps/cernbox-theme/core/img/favicon-touch.png">
-		<link rel="mask-icon" sizes="any" href="/core/img/favicon-mask.svg" color="#1d2d44">
-		<link rel="stylesheet" href="/core/css/styles.css">
-		<link rel="stylesheet" href="/core/css/inputs.css">
-		<link rel="stylesheet" href="/core/css/header.css">
-		<link rel="stylesheet" href="/core/css/icons.css">
-		<link rel="stylesheet" href="/core/css/fonts.css">
-		<link rel="stylesheet" href="/core/css/apps.css">
-		<link rel="stylesheet" href="/core/css/global.css">
-		<link rel="stylesheet" href="/core/css/fixes.css">
-		<link rel="stylesheet" href="/core/css/multiselect.css">
-		<link rel="stylesheet" href="/core/css/mobile.css">
-		<link rel="stylesheet" href="/core/vendor/select2/select2.css">
-		<link rel="stylesheet" href="/core/vendor/jquery-ui/themes/base/jquery-ui.css">
-		<link rel="stylesheet" href="/core/css/jquery-ui-fixes.css">
-		<link rel="stylesheet" href="/core/css/tooltip.css">
-		<link rel="stylesheet" href="/core/css/share.css">
-		<link rel="stylesheet" href="/apps/files_versions/css/versions.css">
-		<link rel="stylesheet" href="/core/css/jquery.ocdialog.css">
-		<link rel="stylesheet" href="/apps/files_sharing/css/public.css">
-		<link rel="stylesheet" href="/apps/files_sharing/css/upload.css">
-		<link rel="stylesheet" href="/apps/files_sharing/css/mobile.css">
-		<link rel="stylesheet" href="/apps/files/css/files.css">
-		<link rel="stylesheet" href="/apps/files/css/upload.css">
-    		<link rel="stylesheet" href="/apps/cernbox-theme/core/css/styles.css">
-		<script src="/index.php/core/js/oc.js"></script>
-		<script src="/core/vendor/jquery/dist/jquery.min.js"></script>
-		<script src="/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
-		<script src="/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
-		<script src="/core/vendor/underscore/underscore.js"></script>
-		<script src="/core/vendor/moment/min/moment-with-locales.js"></script>
-		<script src="/core/vendor/handlebars/handlebars.js"></script>
-		<script src="/core/vendor/blueimp-md5/js/md5.js"></script>
-		<script src="/core/vendor/bootstrap/js/tooltip.js"></script>
-		<script src="/core/vendor/backbone/backbone.js"></script>
-		<script src="/core/vendor/davclient.js/lib/client.js"></script>
-		<script src="/core/vendor/clipboard/dist/clipboard.js"></script>
-		<script src="/core/vendor/bowser/src/bowser.js"></script>
-		<script src="/core/js/jquery.ocdialog.js"></script>
-		<script src="/core/js/oc-dialogs.js"></script>
-		<script src="/core/js/js.js"></script>
-		<script src="/core/js/l10n.js"></script>
-		<script src="/core/js/octemplate.js"></script>
-		<script src="/core/js/eventsource.js"></script>
-		<script src="/core/js/config.js"></script>
-		<script src="/core/search/js/search.js"></script>
-		<script src="/core/js/oc-requesttoken.js"></script>
-		<script src="/core/js/apps.js"></script>
-		<script src="/core/js/mimetype.js"></script>
-		<script src="/core/js/mimetypelist.js"></script>
-		<script src="/core/vendor/snapjs/dist/latest/snap.js"></script>
-		<script src="/core/js/oc-backbone.js"></script>
-		<script src="/core/js/backgroundjobs.js"></script>
-		<script src="/core/js/shareconfigmodel.js"></script>
-		<script src="/core/js/sharemodel.js"></script>
-		<script src="/core/js/sharescollection.js"></script>
-		<script src="/core/js/shareitemmodel.js"></script>
-		<script src="/core/js/sharedialogresharerinfoview.js"></script>
-		<script src="/core/js/sharedialoglinklistview.js"></script>
-		<script src="/core/js/sharedialoglinkshareview.js"></script>
-		<script src="/core/js/sharedialogmailview.js"></script>
-		<script src="/core/js/sharedialoglinksocialview.js"></script>
-		<script src="/core/js/sharedialogexpirationview.js"></script>
-		<script src="/core/js/sharedialogshareelistview.js"></script>
-		<script src="/core/js/sharedialogview.js"></script>
-		<script src="/core/js/share.js"></script>
-		<script src="/core/js/files/fileinfo.js"></script>
-		<script src="/core/js/files/client.js"></script>
-		<script src="/apps/files/js/file-upload.js"></script>
-		<script src="/apps/files_sharing/js/public.js"></script>
-		<script src="/apps/files_sharing/js/PublicUploadView.js"></script>
-		<script src="/apps/files/js/fileactions.js"></script>
-		<script src="/apps/files/js/fileactionsmenu.js"></script>
-		<script src="/apps/files/js/jquery.fileupload.js"></script>
-		<script src="/apps/files/js/filesummary.js"></script>
-		<script src="/apps/files/js/breadcrumb.js"></script>
-		<script src="/apps/files/js/fileinfomodel.js"></script>
-		<script src="/apps/files/js/newfilemenu.js"></script>
-		<script src="/apps/files/js/files.js"></script>
-		<script src="/apps/files/js/filelist.js"></script>
-		<script src="/apps/files/js/keyboardshortcuts.js"></script>
+		<link rel="icon" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon.ico">
+		<link rel="apple-touch-icon-precomposed" href="{{ .BaseUrl }}/apps/cernbox-theme/core/img/favicon-touch.png">
+		<link rel="mask-icon" sizes="any" href="{{ .BaseUrl }}/core/img/favicon-mask.svg" color="#1d2d44">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/styles.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/inputs.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/header.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/icons.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fonts.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/apps.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/global.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/fixes.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/multiselect.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/mobile.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/select2/select2.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/vendor/jquery-ui/themes/base/jquery-ui.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery-ui-fixes.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/tooltip.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/share.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_versions/css/versions.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery.ocdialog.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/public.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/upload.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/mobile.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/files.css">
+		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/upload.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
+		<script src="{{ .BaseUrl }}/index.php/core/js/oc.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery/dist/jquery.min.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/jquery-ui/ui/jquery-ui.custom.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/underscore/underscore.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/moment/min/moment-with-locales.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/handlebars/handlebars.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/blueimp-md5/js/md5.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/bootstrap/js/tooltip.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/backbone/backbone.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/es6-promise/dist/es6-promise.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/davclient.js/lib/client.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/clipboard/dist/clipboard.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/bowser/src/bowser.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/jquery.ocdialog.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-dialogs.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/js.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/l10n.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/octemplate.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/eventsource.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/config.js"></script>
+		<script src="{{ .BaseUrl }}/core/search/js/search.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-requesttoken.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/apps.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/mimetype.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/mimetypelist.js"></script>
+		<script src="{{ .BaseUrl }}/core/vendor/snapjs/dist/latest/snap.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/oc-backbone.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/backgroundjobs.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/shareconfigmodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharemodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharescollection.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/shareitemmodel.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogresharerinfoview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinklistview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinkshareview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogmailview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialoglinksocialview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogexpirationview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogshareelistview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/sharedialogview.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/share.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/files/fileinfo.js"></script>
+		<script src="{{ .BaseUrl }}/core/js/files/client.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/file-upload.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files_sharing/js/public.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files_sharing/js/PublicUploadView.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileactions.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileactionsmenu.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/jquery.fileupload.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/filesummary.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/breadcrumb.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/fileinfomodel.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/newfilemenu.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/files.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/filelist.js"></script>
+		<script src="{{ .BaseUrl }}/apps/files/js/keyboardshortcuts.js"></script>
 		<script>
 		(function ($, OC) {
 
@@ -917,12 +922,12 @@ var publicLinkDropOnly = `
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
 	<input type="hidden" name="dir" value="/" id="dir">
-	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download?x-access-token={{ .AccessToken }}" id="downloadURL">
+	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
 	<input type="hidden" name="filename" value="/" id="filename">
 	<input type="hidden" name="mimetype" value="httpd/unix-directory" id="mimetype">
 	<input type="hidden" name="previewSupported" value="false" id="previewSupported">
-	<input type="hidden" name="mimetypeIcon" value="/core/img/filetypes/folder.svg" id="mimetypeIcon">
+	<input type="hidden" name="mimetypeIcon" value="{{ .BaseUrl }}/core/img/filetypes/folder.svg" id="mimetypeIcon">
 	<input type="hidden" name="filesize" value="28" id="filesize">
 	<input type="hidden" name="maxSizeAnimateGif" value="10" id="maxSizeAnimateGif">
 
@@ -936,7 +941,7 @@ var publicLinkDropOnly = `
 	<header>
 		<div id="header" class="share-folder" data-protected="false"
 			 data-owner-display-name="admin" data-owner="admin" data-name="Test folder">
-			<a href="/index.php" title="" id="owncloud">
+			<a href="{{ .BaseUrl }}/index.php" title="" id="owncloud">
 				<h1 class="logo-icon"></h1>
 			</a>
 

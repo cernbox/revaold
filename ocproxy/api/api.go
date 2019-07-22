@@ -2047,6 +2047,8 @@ type Options struct {
 	Hostname                 string
 	OnlyOfficeDocumentServer string
 	GanttServer              string
+
+	BaseUrl string
 }
 
 func (opt *Options) init() {
@@ -2201,6 +2203,8 @@ func New(opt *Options) (http.Handler, error) {
 		onlyOfficeMap:            map[string]string{},
 		onlyOfficeDocumentServer: opt.OnlyOfficeDocumentServer,
 		ganttServer:              opt.GanttServer,
+
+		baseUrl: opt.BaseUrl,
 	}
 
 	proxy.registerRoutes()
@@ -2263,6 +2267,8 @@ type proxy struct {
 	onlyOfficeDocumentServer string
 
 	ganttServer string
+
+	baseUrl string
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -5373,19 +5379,12 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// render link not found template
 		p.logger.Error("", zap.Error(err))
-		w.Write([]byte(publicLinkTemplateNotFound))
+		p.renderTemplateNotFound(w)
 		return
 	}
 
 	if res.Status != reva_api.StatusCode_OK {
-		tpl, err := template.New("public_link_password").Parse(publicLinkTemplatePassword)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			p.logger.Error("", zap.Error(err))
-			return
-		}
-
-		tpl.Execute(w, nil)
+		p.renderTemplatePublicLinkPassword(w)
 		return
 	}
 
@@ -5393,13 +5392,13 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// render link not found template
 		p.logger.Error("", zap.Error(err))
-		w.Write([]byte(publicLinkTemplateNotFound))
+		p.renderTemplateNotFound(w)
 		return
 	}
 	if res.Status != reva_api.StatusCode_OK {
 		// render link not found template
 		p.logger.Error("", zap.Error(err))
-		w.Write([]byte(publicLinkTemplateNotFound))
+		p.renderTemplateNotFound(w)
 		return
 	}
 
@@ -5412,7 +5411,7 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("error getting metadata for public link", zap.Error(err))
-		w.Write([]byte(publicLinkTemplateNotFound))
+		p.renderTemplateNotFound(w)
 		return
 	}
 
@@ -5424,7 +5423,12 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 			AccessToken   string
 			Note          string
 			OverwriteHost string
-		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost}
+			BaseUrl       string
+		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl}
+
+		if data.BaseUrl != "" {
+			data.BaseUrl = "/" + data.BaseUrl
+		}
 
 		if pl.DropOnly {
 			tpl, err := template.New("public_link_drop_only").Parse(publicLinkDropOnly)
@@ -5455,7 +5459,12 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 		Size          int
 		Mime          string
 		OverwriteHost string
-	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost}
+		BaseUrl       string
+	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl}
+
+	if data.BaseUrl != "" {
+		data.BaseUrl = "/" + data.BaseUrl
+	}
 
 	tpl, err := template.New("public_link_file").Parse(publicLinkTemplateFile)
 	if err != nil {
@@ -6228,6 +6237,10 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 		davPrefix := fmt.Sprintf("remote.php/dav/files/%s", username)
 		index := strings.Index(destinationURL.Path, davPrefix)
 		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
+	}
+
+	if p.baseUrl != "" {
+		destinationPath = path.Join("/", p.baseUrl, destinationPath)
 	}
 
 	gCtx := GetContextWithAuth(ctx)
@@ -7095,9 +7108,9 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 
 		// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
 		if val := ctx.Value("user-dav-uri"); val != nil {
-			ref = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+			ref = path.Join(p.baseUrl, "/remote.php/dav/files", user.AccountId, md.Path)
 		} else {
-			ref = path.Join("/remote.php/webdav", md.Path)
+			ref = path.Join(p.baseUrl, "/remote.php/webdav", md.Path)
 		}
 
 		if md.IsDir {
@@ -7110,6 +7123,10 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 		response.Href = path.Join("/public.php/webdav", md.Path)
 		if md.IsDir {
 			response.Href = path.Join("/public.php/webdav", md.Path) + "/"
+		}
+
+		if p.baseUrl != "" {
+			response.Href = path.Join("/", p.baseUrl, response.Href)
 		}
 	}
 
@@ -7268,10 +7285,6 @@ func (p *proxy) publicLinkAuth(h http.HandlerFunc) http.HandlerFunc {
 		}
 		h(w, r)
 	})
-}
-
-func (p *proxy) renderTemplateNotFound(w http.ResponseWriter) {
-	w.Write([]byte(publicLinkTemplateNotFound))
 }
 
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
@@ -7489,6 +7502,7 @@ func (p *proxy) getOCPath(ctx context.Context, md *reva_api.Metadata) string {
 			}
 		}
 	}
+
 	p.logger.Debug(fmt.Sprintf("owncloud path conversion: reva(%s) =>oc(%s)", revaPath, ocPath))
 	return ocPath
 }
@@ -7551,4 +7565,34 @@ func (p *proxy) getCachedMetadata(ctx context.Context, path string) (*reva_api.M
 
 func (p *proxy) searchFile(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("[]"))
+}
+
+func (p *proxy) renderTemplateNotFound(w http.ResponseWriter) {
+	p.renderTemplate(w, "public_link_not_found", publicLinkTemplateNotFound)
+}
+
+func (p *proxy) renderTemplatePublicLinkPassword(w http.ResponseWriter) {
+	p.renderTemplate(w, "public_link_password", publicLinkTemplatePassword)
+}
+
+func (p *proxy) renderTemplate(w http.ResponseWriter, templateName, templateStr string) {
+
+	data := struct {
+		Note          string
+		OverwriteHost string
+		BaseUrl       string
+	}{Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl}
+
+	if data.BaseUrl != "" {
+		data.BaseUrl = "/" + data.BaseUrl
+	}
+
+	tpl, err := template.New(templateName).Parse(templateStr)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		p.logger.Error("", zap.Error(err))
+		return
+	}
+
+	tpl.Execute(w, data)
 }

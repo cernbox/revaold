@@ -66,6 +66,8 @@ func init() {
 	gc.Add("canary-dbname", "cernbox", "dbname")
 	gc.Add("canary-force-clean", false, "forces removal of all existing cookies to use old UI")
 
+	gc.Add("base-url", "", "Base url that should be appended to all links (in case cernbox in not in root path)")
+
 	gc.BindFlags()
 	gc.ReadConfig()
 }
@@ -113,6 +115,7 @@ func main() {
 		Hostname:              gc.GetString("hostname"),
 		OnlyOfficeDocumentServer: gc.GetString("apps-onlyoffice-document-server"),
 		GanttServer: gc.GetString("apps-gantt-server"),
+		BaseUrl:               gc.GetString("base-url"),
 	}
 
 	_, err := api.New(opts)

@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.51
+Version: 0.0.52
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,11 @@ rm -rf %buildroot/
 
 
 %changelog
+* Wed Jul 25 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.52
+- Mock search endpoint to avoid going to OC
+- Fix CERNBox webpage url in download templates
+- BaseURL to allow deployment in ScienceBox
+- Publick links without access except when password share
 * Wed Jul 10 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.51
 - Send share emails as the user
 - Cleanup templates

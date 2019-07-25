@@ -190,6 +190,9 @@ func (p *proxy) registerRoutes() {
 	// gant routes
 	p.router.HandleFunc("/index.php/apps/gantt/config", p.getGanttConfig).Methods("GET")
 
+	// search route (mockup)
+	p.router.HandleFunc("/index.php/core/search", p.searchFile).Methods("GET")
+
 }
 
 func (p *proxy) getGanttConfig(w http.ResponseWriter, r *http.Request) {
@@ -7544,4 +7547,8 @@ func (p *proxy) getCachedMetadata(ctx context.Context, path string) (*reva_api.M
 	p.shareCache.SetWithExpire(path, md, p.cacheEviction)
 	p.logger.Debug("ocproxy: api: getCachedMetadata: md retrieved and stored  in cache", zap.String("path", path))
 	return md, nil
+}
+
+func (p *proxy) searchFile(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("[]"))
 }

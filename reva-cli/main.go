@@ -12,7 +12,7 @@ func main() {
 	app := cli.NewApp()
 	app.Authors = []cli.Author{
 		cli.Author{
-			Name:  "Hugo GonzÃÂÃÂÃÂÃÂ¡lez Labrador",
+			Name:  "Hugo Gonzalez Labrador",
 			Email: "contact@hugo.labkode.com",
 		},
 	}

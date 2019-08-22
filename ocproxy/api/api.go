@@ -2431,7 +2431,7 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, filename)
-	md, err := p.getMetadata(ctx, revaPath)
+	_, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -2446,7 +2446,6 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+path.Base(revaPath)+"\"")
-	w.Header().Set("Content-Length", strconv.FormatUint(md.Size, 10))
 	w.WriteHeader(http.StatusOK)
 	var reader io.Reader
 	for {
@@ -2460,7 +2459,9 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if dcRes.Status != reva_api.StatusCode_OK {
-			p.writeError(dcRes.Status, w, r)
+			p.logger.Error("error receiving chunk from REVA", zap.Error(err))
+			// Write wrong chunk to cause error on client
+			io.CopyN(w, nil, 0)
 			return
 		}
 
@@ -2471,8 +2472,9 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 				reader = bytes.NewReader(dc.Data)
 				_, err := io.CopyN(w, reader, int64(dc.Length))
 				if err != nil {
-					p.logger.Error("", zap.Error(err))
-					w.WriteHeader(http.StatusInternalServerError)
+					p.logger.Error("error copying data to w", zap.Error(err))
+					// Write wrong chunk to cause error on client
+					io.CopyN(w, nil, 0)
 					return
 				}
 			}

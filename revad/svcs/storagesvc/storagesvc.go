@@ -1,7 +1,6 @@
 package storagesvc
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -86,35 +85,37 @@ func (s *svc) ReadRevision(req *api.RevisionReq, stream api.Storage_ReadRevision
 	ctx := stream.Context()
 	l := ctx_zap.Extract(ctx)
 	readCloser, err := s.vs.DownloadRevision(ctx, req.Path, req.RevKey)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return err
+	}
 	defer func() {
 		l.Debug("closing fd when reading version for path: " + req.Path)
 		if err := readCloser.Close(); err != nil {
 			l.Error("error closing fd", zap.Error(err))
 		}
 	}()
-	if err != nil {
-		l.Error("", zap.Error(err))
-		return err
-	}
-
-	bufferedReader := bufio.NewReaderSize(readCloser, 1024*1024*3)
 
 	// send data chunks of maximum 1 MiB
 	buffer := make([]byte, 1024*1024*3)
 	for {
-		n, err := bufferedReader.Read(buffer)
+		n, err := readCloser.Read(buffer)
+
+		if n > 0 {
+			dc := &api.DataChunk{Data: buffer[:n], Length: uint64(n)}
+			dcRes := &api.DataChunkResponse{DataChunk: dc}
+			if err := stream.Send(dcRes); err != nil {
+				l.Error("", zap.Error(err))
+				return nil
+			}
+		}
+
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			l.Error("", zap.Error(err))
+			l.Error("error when reading from readcloser", zap.Error(err))
 			return err
-		}
-		dc := &api.DataChunk{Data: buffer, Length: uint64(n)}
-		dcRes := &api.DataChunkResponse{DataChunk: dc}
-		if err := stream.Send(dcRes); err != nil {
-			l.Error("", zap.Error(err))
-			return nil
 		}
 	}
 	return nil

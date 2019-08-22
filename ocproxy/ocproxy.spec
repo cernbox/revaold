@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.52
+Version: 0.0.53
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Thu Aug 22 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.53
+- Fix download of file versions
 * Wed Jul 25 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.52
 - Mock search endpoint to avoid going to OC
 - Fix CERNBox webpage url in download templates

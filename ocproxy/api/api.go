@@ -215,6 +215,8 @@ const (
 	trackerStatusMustSave
 	trackerStatusCorrupted
 	trackerStatusClosed
+	trackerStatusEditingMustSave = iota + 1
+	trackerStatusForceSavingError
 )
 
 // see https://api.onlyoffice.com/editors/callback
@@ -453,7 +455,7 @@ func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted {
+	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusForceSavingError {
 		url := req.URL
 		resp, err := http.Get(url)
 		if err != nil {

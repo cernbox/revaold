@@ -182,7 +182,9 @@ func (p *proxy) registerRoutes() {
 
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.tokenAuth(p.onlyOfficeSettings))
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{path:.*}", p.tokenAuth(p.onlyOfficeConfig))
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/configpublic", p.tokenAuth(p.onlyOfficePublicLinkConfig)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/track/{path:.*}", p.tokenAuth(p.onlyOfficeTrack)).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/trackpublic/{token:.*}", p.tokenAuth(p.onlyOfficePublickLinkTrack)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/new", p.tokenAuth(p.onlyOfficeNew)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/config", p.onlyOfficeMainConfig).Methods("GET")
@@ -423,8 +425,44 @@ func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
+	p.onlyOfficeTrackInternal(w, r, false)
+}
+
+func (p *proxy) onlyOfficePublickLinkTrack(w http.ResponseWriter, r *http.Request) {
+	p.onlyOfficeTrackInternal(w, r, true)
+}
+
+func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, public bool) {
 	ctx := r.Context()
-	fn := mux.Vars(r)["path"]
+
+	var fn string
+
+	if public {
+
+		token := mux.Vars(r)["token"]
+		fn = r.URL.Query().Get("filename")
+
+		pl, ok := reva_api.ContextGetPublicLink(ctx)
+		if !ok {
+			p.logger.Warn("ocproxy: api: cannot get public link from ctx")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if pl.Token != token {
+			p.logger.Warn("ocproxy: api: pl ctx does not match requested token", zap.String("req_token", token), zap.String("ctx_token", pl.Token))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if pl.ReadOnly {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else {
+		fn = mux.Vars(r)["path"]
+	}
+
 	revaPath := p.getRevaPath(ctx, fn)
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -438,7 +476,7 @@ func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.logger.Info(fmt.Sprintf("onlyoffice/config: %+v", req))
+	p.logger.Info(fmt.Sprintf("onlyoffice/track: %+v", req))
 	if req.Status == trackerStatusEditing || req.Status == trackerStatusClosed {
 		payload := struct {
 			Err int `json:"error"`
@@ -699,7 +737,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	p.onlyOfficeMap[md.EosFile] = key
 	p.onlyOfficeMutex.Unlock()
 
-	p.logger.Info(fmt.Sprintf("office-engine onlyoffice track: key=%s for path=%s for md=%+v", key, fn, md))
+	p.logger.Info(fmt.Sprintf("office-engine onlyoffice config: key=%s for path=%s for md=%+v", key, fn, md))
 	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download", p.hostname) + md.Path + "?x-access-token=" + accessToken
 
 	msg := `{
@@ -757,6 +795,101 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 		            "type" => $type
 		        ];
 	*/
+}
+
+func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	fn := r.Form.Get("filename")
+	token := r.Form.Get("token")
+	folderURL := r.Form.Get("folderurl")
+	accessToken := r.Header.Get("X-Access-Token")
+
+	pl, ok := reva_api.ContextGetPublicLink(ctx)
+	if !ok {
+		p.logger.Warn("ocproxy: api: cannot get public link from ctx")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if pl.Token != token {
+		p.logger.Warn("ocproxy: api: pl ctx does not match requested token", zap.String("req_token", token), zap.String("ctx_token", pl.Token))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting md for pl", zap.String("reva_path", revaPath), zap.String("token", pl.Token), zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fileType := strings.TrimPrefix(path.Ext(md.EosFile), ".")
+	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
+	callbackURL := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/trackpublic/%s?filename=%s&x-access-token=%s", p.hostname, token, fn, accessToken)
+	lang := "en"
+
+	mode := "view"
+	if !pl.ReadOnly {
+		mode = "edit"
+	}
+
+	// key cannot contain colon (:), use ._. as separator
+	// key := pl.Path
+	// if migration id set, use it
+	// if md.MigId != "" {
+	// 	key = md.MigId
+	// }
+
+	paths := strings.Split(pl.Path, ":")
+	etags := strings.Split(md.Etag, ":")
+	key := fmt.Sprintf("%s:%s", paths[0], etags[0])
+	key = strings.Replace(key, "\"", "", -1)
+
+	key = strings.Replace(key, ":", "._.", -1)
+	p.onlyOfficeMutex.Lock()
+	p.onlyOfficeMap[md.EosFile] = key
+	p.onlyOfficeMutex.Unlock()
+
+	p.logger.Info(fmt.Sprintf("office-engine onlyoffice config: key=%s for path=%s for md=%+v", key, fn, md))
+	url := fmt.Sprintf("https://%s/index.php/s/%s/download?x-access-token=%s&path=%s&files=%s", p.hostname, token, accessToken, path.Dir(fn), path.Base(fn))
+
+	msg := `{
+  "document": {
+    "fileType": "%s",
+    "key": "%s",
+    "title": "%s",
+    "url": "%s"
+  },
+  "documentType": "%s",
+  "editorConfig": {
+    "callbackUrl": "%s",
+    "customization": {
+      "goback": {
+        "url": "%s"
+      }
+    },
+    "lang": "%s",
+    "mode": "%s",
+    "user": {
+      "id": "%s",
+      "name": "%s"
+    }
+  },
+  "type": "%s"
+} `
+	msg = fmt.Sprintf(msg, fileType, key, pl.Name, url, documentType, callbackURL, folderURL, lang, mode, pl.OwnerId, "", "desktop")
+	p.logger.Info("onlyoffice/config response=" + msg)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
 }
 
 type onlyOfficeFormatInfo struct {

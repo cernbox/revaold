@@ -39,6 +39,7 @@ import (
 	"github.com/bluele/gcache"
 	reva_api "github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/canary"
+	"github.com/cernbox/revaold/api/office_engine"
 	"github.com/cernbox/revaold/ocproxy/api/static"
 	"github.com/disintegration/imaging"
 	"github.com/gofrs/uuid"
@@ -194,6 +195,10 @@ func (p *proxy) registerRoutes() {
 
 	// search route (mockup)
 	p.router.HandleFunc("/index.php/core/search", p.searchFile).Methods("GET")
+
+	// configure the correct office engine
+	p.router.HandleFunc("/index.php/apps/office", p.tokenAuth(p.getOfficeEngine)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/office", p.tokenAuth(p.setOfficeEngine)).Methods("POST")
 
 }
 
@@ -880,13 +885,13 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
     "lang": "%s",
     "mode": "%s",
     "user": {
-      "id": "%s",
-      "name": "%s"
+      "id": "",
+      "name": ""
     }
   },
   "type": "%s"
 } `
-	msg = fmt.Sprintf(msg, fileType, key, pl.Name, url, documentType, callbackURL, folderURL, lang, mode, pl.OwnerId, "", "desktop")
+	msg = fmt.Sprintf(msg, fileType, key, pl.Name, url, documentType, callbackURL, folderURL, lang, mode, "desktop")
 	p.logger.Info("onlyoffice/config response=" + msg)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(msg))
@@ -907,6 +912,65 @@ func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
 	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(msg))
+}
+
+func (p *proxy) getOfficeEngine(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: error getting user from ctx to get office engine", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	office, err := p.officeEngineManager.GetOfficeEngine(user.AccountId)
+
+	if err != nil {
+		p.logger.Error("ocproxy: error getting office engine", zap.Error(err))
+		//TODO should we also return a default value here?
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	msg := fmt.Sprintf("{\"engine\":\"%s\"}", office)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
+}
+
+func (p *proxy) setOfficeEngine(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: error getting user from ctx to get office engine", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		p.logger.Error("Error parsing form", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	engine := r.Form.Get("engine")
+
+	if engine == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = p.officeEngineManager.SetOfficeEngine(user.AccountId, engine)
+
+	if err != nil {
+		p.logger.Error("ocproxy: error setting office engine", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	p.logger.Info(fmt.Sprintf("ocproxy: set %s as office engine for %s", engine, user.AccountId))
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (p *proxy) loadPublicRootFile(w http.ResponseWriter, r *http.Request) {
@@ -2179,6 +2243,7 @@ type Options struct {
 	CanaryManager            *canary.Manager
 	CanaryForceClean         bool
 	CanaryCookieTTL          int
+	OfficeEngineManager      *office_engine.Manager
 	Hostname                 string
 	OnlyOfficeDocumentServer string
 	GanttServer              string
@@ -2333,6 +2398,7 @@ func New(opt *Options) (http.Handler, error) {
 		canaryManager:            opt.CanaryManager,
 		canaryForceClean:         opt.CanaryForceClean,
 		canaryCookieTTL:          opt.CanaryCookieTTL,
+		officeEngineManager:      opt.OfficeEngineManager,
 		hostname:                 opt.Hostname,
 		onlyOfficeMutex:          &sync.Mutex{},
 		onlyOfficeMap:            map[string]string{},
@@ -2391,11 +2457,12 @@ type proxy struct {
 	mailServer            string
 	mailServerFromAddress string
 
-	isCanaryEnabled  bool
-	canaryManager    *canary.Manager
-	canaryForceClean bool
-	canaryCookieTTL  int
-	hostname         string
+	isCanaryEnabled     bool
+	canaryManager       *canary.Manager
+	canaryForceClean    bool
+	canaryCookieTTL     int
+	officeEngineManager *office_engine.Manager
+	hostname            string
 
 	onlyOfficeMutex          *sync.Mutex
 	onlyOfficeMap            map[string]string
@@ -5552,6 +5619,8 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	officeEngine, _ := p.officeEngineManager.GetOfficeEngine(pl.OwnerId)
+
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 
 	if pl.ItemType == reva_api.PublicLink_FOLDER {
@@ -5561,7 +5630,8 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 			Note          string
 			OverwriteHost string
 			BaseUrl       string
-		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl}
+			OfficeEngine  string
+		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl, OfficeEngine: officeEngine}
 
 		if data.BaseUrl != "" {
 			data.BaseUrl = "/" + data.BaseUrl
@@ -5598,7 +5668,8 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 		OverwriteHost   string
 		BaseUrl         string
 		ShowAccessToken bool
-	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl, ShowAccessToken: password != ""}
+		OfficeEngine    string
+	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl, ShowAccessToken: password != "", OfficeEngine: officeEngine}
 
 	if data.BaseUrl != "" {
 		data.BaseUrl = "/" + data.BaseUrl

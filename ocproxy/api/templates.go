@@ -165,6 +165,7 @@ var publicLinkTemplate string = `
 
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
+	<input type="hidden" id="officeEngine" name="officeEngine" value="{{ .OfficeEngine }}">
 	<input type="hidden" name="dir" value="/" id="dir">
 	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
@@ -695,6 +696,7 @@ var publicLinkTemplateFile = `
 
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
+	<input type="hidden" id="officeEngine" name="officeEngine" value="{{ .OfficeEngine }}">
 	<input type="hidden" name="dir" value="/" id="dir">
 	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download{{ if .ShowAccessToken }}?x-access-token={{ .AccessToken }}{{ end }}" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
@@ -934,6 +936,7 @@ var publicLinkDropOnly = `
 
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
+	<input type="hidden" id="officeEngine" name="officeEngine" value="{{ .OfficeEngine }}">
 	<input type="hidden" name="dir" value="/" id="dir">
 	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">

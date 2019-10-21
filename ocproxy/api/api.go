@@ -693,7 +693,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	title := md.Path
 	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
 	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
-	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.hostname, path.Dir(fn))
+	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.overwriteHost, path.Dir(fn))
 	lang := "en"
 
 	mode := "edit"

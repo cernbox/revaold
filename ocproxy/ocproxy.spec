@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.53
+Version: 0.0.54
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,11 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon Oct 21 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.54
+- OnlyOffice for Public links
+- Persist the Office engine choice in the DB
+- Fix get back url for OnlyOffice (now uses Overwrite Host)
+- Open odt/s/p files with onlyoffice
 * Thu Aug 22 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.53
 - Fix download of file versions
 * Wed Jul 25 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.52

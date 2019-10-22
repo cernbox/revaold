@@ -37,6 +37,8 @@ var publicLinkTemplate string = `
 		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/upload.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/main.css">
+			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/editor.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/gallery/css/slideshow.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/gallery/css/gallerybutton.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_pdfviewer/css/style.css">
@@ -145,7 +147,9 @@ var publicLinkTemplate string = `
 
 		})(jQuery, OC);
 		</script>
-    		<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
+		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>
 		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
 	<body id="body-public">
 	<data key="cernboxauthtoken" x-access-token="{{ .AccessToken }}" />
@@ -161,6 +165,7 @@ var publicLinkTemplate string = `
 
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
+	<input type="hidden" id="officeEngine" name="officeEngine" value="{{ .OfficeEngine }}">
 	<input type="hidden" name="dir" value="/" id="dir">
 	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
@@ -314,6 +319,9 @@ var publicLinkTemplatePassword = `
     <link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_versions/css/versions.css">
     <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery.ocdialog.css">
     <link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/authenticate.css">
+	<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+	<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/main.css">
+	<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/editor.css">
     <script src="{{ .BaseUrl }}/index.php/core/js/oc.js"></script>
     <script src="{{ .BaseUrl }}/core/vendor/jquery/dist/jquery.min.js"></script>
     <script src="{{ .BaseUrl }}/core/vendor/jquery-migrate/jquery-migrate.min.js"></script>
@@ -363,6 +371,8 @@ var publicLinkTemplatePassword = `
     <script src="{{ .BaseUrl }}/core/js/files/client.js"></script>
     <script src="{{ .BaseUrl }}/apps/files_sharing/js/authenticate.js"></script>
     <script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+	<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
+	<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>
   </head>
   <body id="body-login">
     <noscript>
@@ -567,6 +577,8 @@ var publicLinkTemplateFile = `
 		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/upload.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/main.css">
+			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/editor.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_pdfviewer/css/style.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/style.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/rootviewer/css/vendor/JSRootPainter.min.css">
@@ -663,8 +675,10 @@ var publicLinkTemplateFile = `
 			});
 		})(jQuery, OC);
 		</script>
-    		<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+    	<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
 		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
+		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
+		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>
 		{{ if (eq .Mime "application/pynb") }}
     		<script src="{{ .BaseUrl }}/apps/swanviewer/js/script.js"></script>
 		{{ end }}
@@ -682,6 +696,7 @@ var publicLinkTemplateFile = `
 
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
+	<input type="hidden" id="officeEngine" name="officeEngine" value="{{ .OfficeEngine }}">
 	<input type="hidden" name="dir" value="/" id="dir">
 	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download{{ if .ShowAccessToken }}?x-access-token={{ .AccessToken }}{{ end }}" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">
@@ -921,6 +936,7 @@ var publicLinkDropOnly = `
 
 	<input type="hidden" id="filesApp" name="filesApp" value="1">
 	<input type="hidden" id="isPublic" name="isPublic" value="1">
+	<input type="hidden" id="officeEngine" name="officeEngine" value="{{ .OfficeEngine }}">
 	<input type="hidden" name="dir" value="/" id="dir">
 	<input type="hidden" name="downloadURL" value="https://{{ .OverwriteHost }}/index.php/s/{{ .Token }}/download" id="downloadURL">
 	<input type="hidden" name="sharingToken" value="{{ .Token }}" id="sharingToken">

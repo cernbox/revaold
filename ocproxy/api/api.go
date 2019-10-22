@@ -39,6 +39,7 @@ import (
 	"github.com/bluele/gcache"
 	reva_api "github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/canary"
+	"github.com/cernbox/revaold/api/office_engine"
 	"github.com/cernbox/revaold/ocproxy/api/static"
 	"github.com/disintegration/imaging"
 	"github.com/gofrs/uuid"
@@ -182,7 +183,9 @@ func (p *proxy) registerRoutes() {
 
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/settings", p.tokenAuth(p.onlyOfficeSettings))
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/config/{path:.*}", p.tokenAuth(p.onlyOfficeConfig))
+	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/configpublic", p.tokenAuth(p.onlyOfficePublicLinkConfig)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/track/{path:.*}", p.tokenAuth(p.onlyOfficeTrack)).Methods("POST")
+	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/trackpublic/{token:.*}", p.tokenAuth(p.onlyOfficePublickLinkTrack)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/storage/download/{path:.*}", p.tokenAuth(p.onlyOfficeDownload)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/new", p.tokenAuth(p.onlyOfficeNew)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/config", p.onlyOfficeMainConfig).Methods("GET")
@@ -192,6 +195,10 @@ func (p *proxy) registerRoutes() {
 
 	// search route (mockup)
 	p.router.HandleFunc("/index.php/core/search", p.searchFile).Methods("GET")
+
+	// configure the correct office engine
+	p.router.HandleFunc("/index.php/apps/office", p.tokenAuth(p.getOfficeEngine)).Methods("GET")
+	p.router.HandleFunc("/index.php/apps/office", p.tokenAuth(p.setOfficeEngine)).Methods("POST")
 
 }
 
@@ -215,6 +222,8 @@ const (
 	trackerStatusMustSave
 	trackerStatusCorrupted
 	trackerStatusClosed
+	trackerStatusEditingMustSave = iota + 1
+	trackerStatusForceSavingError
 )
 
 // see https://api.onlyoffice.com/editors/callback
@@ -421,8 +430,44 @@ func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
+	p.onlyOfficeTrackInternal(w, r, false)
+}
+
+func (p *proxy) onlyOfficePublickLinkTrack(w http.ResponseWriter, r *http.Request) {
+	p.onlyOfficeTrackInternal(w, r, true)
+}
+
+func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, public bool) {
 	ctx := r.Context()
-	fn := mux.Vars(r)["path"]
+
+	var fn string
+
+	if public {
+
+		token := mux.Vars(r)["token"]
+		fn = r.URL.Query().Get("filename")
+
+		pl, ok := reva_api.ContextGetPublicLink(ctx)
+		if !ok {
+			p.logger.Warn("ocproxy: api: cannot get public link from ctx")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if pl.Token != token {
+			p.logger.Warn("ocproxy: api: pl ctx does not match requested token", zap.String("req_token", token), zap.String("ctx_token", pl.Token))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if pl.ReadOnly {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	} else {
+		fn = mux.Vars(r)["path"]
+	}
+
 	revaPath := p.getRevaPath(ctx, fn)
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -436,7 +481,7 @@ func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.logger.Info(fmt.Sprintf("onlyoffice/config: %+v", req))
+	p.logger.Info(fmt.Sprintf("onlyoffice/track: %+v", req))
 	if req.Status == trackerStatusEditing || req.Status == trackerStatusClosed {
 		payload := struct {
 			Err int `json:"error"`
@@ -453,7 +498,7 @@ func (p *proxy) onlyOfficeTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted {
+	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusForceSavingError {
 		url := req.URL
 		resp, err := http.Get(url)
 		if err != nil {
@@ -625,7 +670,7 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
-	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","conv":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","conv":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","conv":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
 	settings := &onlyOfficeSettings{}
 	json.Unmarshal([]byte(msg), settings)
 	return settings.Formats[ext].Type
@@ -648,7 +693,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	title := md.Path
 	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
 	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
-	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.hostname, path.Dir(fn))
+	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.overwriteHost, path.Dir(fn))
 	lang := "en"
 
 	mode := "edit"
@@ -697,7 +742,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	p.onlyOfficeMap[md.EosFile] = key
 	p.onlyOfficeMutex.Unlock()
 
-	p.logger.Info(fmt.Sprintf("office-engine onlyoffice track: key=%s for path=%s for md=%+v", key, fn, md))
+	p.logger.Info(fmt.Sprintf("office-engine onlyoffice config: key=%s for path=%s for md=%+v", key, fn, md))
 	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download", p.hostname) + md.Path + "?x-access-token=" + accessToken
 
 	msg := `{
@@ -757,6 +802,101 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	*/
 }
 
+func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	err := r.ParseForm()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	fn := r.Form.Get("filename")
+	token := r.Form.Get("token")
+	folderURL := r.Form.Get("folderurl")
+	accessToken := r.Header.Get("X-Access-Token")
+
+	pl, ok := reva_api.ContextGetPublicLink(ctx)
+	if !ok {
+		p.logger.Warn("ocproxy: api: cannot get public link from ctx")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if pl.Token != token {
+		p.logger.Warn("ocproxy: api: pl ctx does not match requested token", zap.String("req_token", token), zap.String("ctx_token", pl.Token))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("ocproxy: api: error getting md for pl", zap.String("reva_path", revaPath), zap.String("token", pl.Token), zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fileType := strings.TrimPrefix(path.Ext(md.EosFile), ".")
+	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
+	callbackURL := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/trackpublic/%s?filename=%s&x-access-token=%s", p.hostname, token, fn, accessToken)
+	lang := "en"
+
+	mode := "view"
+	if !pl.ReadOnly {
+		mode = "edit"
+	}
+
+	// key cannot contain colon (:), use ._. as separator
+	// key := pl.Path
+	// if migration id set, use it
+	// if md.MigId != "" {
+	// 	key = md.MigId
+	// }
+
+	paths := strings.Split(pl.Path, ":")
+	etags := strings.Split(md.Etag, ":")
+	key := fmt.Sprintf("%s:%s", paths[0], etags[0])
+	key = strings.Replace(key, "\"", "", -1)
+
+	key = strings.Replace(key, ":", "._.", -1)
+	p.onlyOfficeMutex.Lock()
+	p.onlyOfficeMap[md.EosFile] = key
+	p.onlyOfficeMutex.Unlock()
+
+	p.logger.Info(fmt.Sprintf("office-engine onlyoffice config: key=%s for path=%s for md=%+v", key, fn, md))
+	url := fmt.Sprintf("https://%s/index.php/s/%s/download?x-access-token=%s&path=%s&files=%s", p.hostname, token, accessToken, path.Dir(fn), path.Base(fn))
+
+	msg := `{
+  "document": {
+    "fileType": "%s",
+    "key": "%s",
+    "title": "%s",
+    "url": "%s"
+  },
+  "documentType": "%s",
+  "editorConfig": {
+    "callbackUrl": "%s",
+    "customization": {
+      "goback": {
+        "url": "%s"
+      }
+    },
+    "lang": "%s",
+    "mode": "%s",
+    "user": {
+      "id": "",
+      "name": ""
+    }
+  },
+  "type": "%s"
+} `
+	msg = fmt.Sprintf(msg, fileType, key, pl.Name, url, documentType, callbackURL, folderURL, lang, mode, "desktop")
+	p.logger.Info("onlyoffice/config response=" + msg)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
+}
+
 type onlyOfficeFormatInfo struct {
 	Mime string `json:"mime"`
 	Type string `json:"type"`
@@ -769,9 +909,68 @@ type onlyOfficeSettings struct {
 }
 
 func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
-	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","conv":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","conv":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","conv":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(msg))
+}
+
+func (p *proxy) getOfficeEngine(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: error getting user from ctx to get office engine", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	office, err := p.officeEngineManager.GetOfficeEngine(user.AccountId)
+
+	if err != nil {
+		p.logger.Error("ocproxy: error getting office engine", zap.Error(err))
+		//TODO should we also return a default value here?
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	msg := fmt.Sprintf("{\"engine\":\"%s\"}", office)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(msg))
+}
+
+func (p *proxy) setOfficeEngine(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+	user, err := getUserFromContext(ctx)
+	if err != nil {
+		p.logger.Error("ocproxy: error getting user from ctx to get office engine", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		p.logger.Error("Error parsing form", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	engine := r.Form.Get("engine")
+
+	if engine == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = p.officeEngineManager.SetOfficeEngine(user.AccountId, engine)
+
+	if err != nil {
+		p.logger.Error("ocproxy: error setting office engine", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	p.logger.Info(fmt.Sprintf("ocproxy: set %s as office engine for %s", engine, user.AccountId))
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (p *proxy) loadPublicRootFile(w http.ResponseWriter, r *http.Request) {
@@ -2044,6 +2243,7 @@ type Options struct {
 	CanaryManager            *canary.Manager
 	CanaryForceClean         bool
 	CanaryCookieTTL          int
+	OfficeEngineManager      *office_engine.Manager
 	Hostname                 string
 	OnlyOfficeDocumentServer string
 	GanttServer              string
@@ -2198,6 +2398,7 @@ func New(opt *Options) (http.Handler, error) {
 		canaryManager:            opt.CanaryManager,
 		canaryForceClean:         opt.CanaryForceClean,
 		canaryCookieTTL:          opt.CanaryCookieTTL,
+		officeEngineManager:      opt.OfficeEngineManager,
 		hostname:                 opt.Hostname,
 		onlyOfficeMutex:          &sync.Mutex{},
 		onlyOfficeMap:            map[string]string{},
@@ -2256,11 +2457,12 @@ type proxy struct {
 	mailServer            string
 	mailServerFromAddress string
 
-	isCanaryEnabled  bool
-	canaryManager    *canary.Manager
-	canaryForceClean bool
-	canaryCookieTTL  int
-	hostname         string
+	isCanaryEnabled     bool
+	canaryManager       *canary.Manager
+	canaryForceClean    bool
+	canaryCookieTTL     int
+	officeEngineManager *office_engine.Manager
+	hostname            string
 
 	onlyOfficeMutex          *sync.Mutex
 	onlyOfficeMap            map[string]string
@@ -5417,6 +5619,8 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	officeEngine, _ := p.officeEngineManager.GetOfficeEngine(pl.OwnerId)
+
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 
 	if pl.ItemType == reva_api.PublicLink_FOLDER {
@@ -5426,7 +5630,8 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 			Note          string
 			OverwriteHost string
 			BaseUrl       string
-		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl}
+			OfficeEngine  string
+		}{AccessToken: res.Token, Token: token, Note: "The CERN Cloud Storage", OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl, OfficeEngine: officeEngine}
 
 		if data.BaseUrl != "" {
 			data.BaseUrl = "/" + data.BaseUrl
@@ -5463,7 +5668,8 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 		OverwriteHost   string
 		BaseUrl         string
 		ShowAccessToken bool
-	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl, ShowAccessToken: password != ""}
+		OfficeEngine    string
+	}{AccessToken: res.Token, Token: token, ShareName: pl.Name, Size: int(md.Size), Mime: md.Mime, OverwriteHost: p.overwriteHost, BaseUrl: p.baseUrl, ShowAccessToken: password != "", OfficeEngine: officeEngine}
 
 	if data.BaseUrl != "" {
 		data.BaseUrl = "/" + data.BaseUrl

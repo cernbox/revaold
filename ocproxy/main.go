@@ -8,6 +8,7 @@ import (
 	"github.com/cernbox/gohub/goconfig"
 	"github.com/cernbox/gohub/gologger"
 	"github.com/cernbox/revaold/api/canary"
+	"github.com/cernbox/revaold/api/office_engine"
 	"github.com/cernbox/revaold/ocproxy/api"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -50,7 +51,7 @@ func init() {
 
 	gc.Add("apps-mail-server", "cernmx.cern.ch:25", "An IMAP mail server where to send mails")
 	gc.Add("apps-mail-server-from-address", "cernbox-noreply@cern.ch", "The sender of the mail (FROM header)")
-	
+
 	gc.Add("apps-onlyoffice-document-server", "example.org", "the location of the onlyoffice server")
 	gc.Add("apps-gantt-server", "https://gantt-viewer.web.cern.ch", "the location of the gantt server")
 
@@ -59,12 +60,13 @@ func init() {
 
 	gc.Add("canary-enabled", false, "sets the server as canary")
 	gc.Add("canary-cookie-ttl", 10440, "time to live in seconds for the cookie before it expires, default one and a half days")
-	gc.Add("canary-dbusername", "foo", "db username")
-	gc.Add("canary-dbpassword", "bar", "db password")
-	gc.Add("canary-dbhost", "localhost", "dbhost")
-	gc.Add("canary-dbport", 3306, "dbport")
-	gc.Add("canary-dbname", "cernbox", "dbname")
 	gc.Add("canary-force-clean", false, "forces removal of all existing cookies to use old UI")
+
+	gc.Add("dbusername", "foo", "db username")
+	gc.Add("dbpassword", "bar", "db password")
+	gc.Add("dbhost", "localhost", "dbhost")
+	gc.Add("dbport", 3306, "dbport")
+	gc.Add("dbname", "cernbox", "dbname")
 
 	gc.Add("base-url", "", "Base url that should be appended to all links (in case cernbox in not in root path)")
 
@@ -79,43 +81,53 @@ func main() {
 	router := mux.NewRouter()
 
 	canaryOpts := &canary.Options{
-		DBUsername: gc.GetString("canary-dbusername"),
-		DBPassword: gc.GetString("canary-dbpassword"),
-		DBHost:     gc.GetString("canary-dbhost"),
-		DBPort:     gc.GetInt("canary-dbport"),
-		DBName:     gc.GetString("canary-dbname"),
+		DBUsername: gc.GetString("dbusername"),
+		DBPassword: gc.GetString("dbpassword"),
+		DBHost:     gc.GetString("dbhost"),
+		DBPort:     gc.GetInt("dbport"),
+		DBName:     gc.GetString("dbname"),
 	}
 	cm := canary.New(canaryOpts)
 
+	officeOpts := &office_engine.Options{
+		DBUsername: gc.GetString("dbusername"),
+		DBPassword: gc.GetString("dbpassword"),
+		DBHost:     gc.GetString("dbhost"),
+		DBPort:     gc.GetInt("dbport"),
+		DBName:     gc.GetString("dbname"),
+	}
+	oem := office_engine.New(officeOpts)
+
 	opts := &api.Options{
-		Router:                router,
-		ThumbnailsFolder:      gc.GetString("thumbnails-folder"),
-		TemporaryFolder:       gc.GetString("temporary-folder"),
-		ChunksFolder:          gc.GetString("data-chunks-folder"),
-		REVAHost:              gc.GetString("reva-tcp-address"),
-		MaxUploadFileSize:     uint64(gc.GetInt("max-upload-file-size")),
-		Logger:                logger,
-		CBOXGroupDaemonURI:    gc.GetString("cboxgroupd-http-address"),
-		CBOXGroupDaemonSecret: gc.GetString("cboxgroupd-shared-secret"),
-		MaxNumFilesForArchive: gc.GetInt("archive-max-num-files"),
-		MaxSizeForArchive:     gc.GetInt("archive-max-size"),
-		MaxViewerFileFize:     gc.GetInt("viewer-max-file-size"),
-		OverwriteHost:         gc.GetString("overwrite-host"),
-		WopiServer:            gc.GetString("wopi-server"),
-		WopiSecret:            gc.GetString("wopi-secret"),
-		DrawIOURL:             gc.GetString("apps-drawio-url"),
-		CacheSize:             gc.GetInt("cache-size"),
-		CacheEviction:         gc.GetInt("cache-eviction"),
-		MailServer:            gc.GetString("apps-mail-server"),
-		MailServerFromAddress: gc.GetString("apps-mail-server-from-address"),
-		IsCanaryEnabled:       gc.GetBool("canary-enabled"),
-		CanaryManager:         cm,
-		CanaryForceClean:      gc.GetBool("canary-force-clean"),
-		CanaryCookieTTL:       gc.GetInt("canary-cookie-ttl"),
-		Hostname:              gc.GetString("hostname"),
+		Router:                   router,
+		ThumbnailsFolder:         gc.GetString("thumbnails-folder"),
+		TemporaryFolder:          gc.GetString("temporary-folder"),
+		ChunksFolder:             gc.GetString("data-chunks-folder"),
+		REVAHost:                 gc.GetString("reva-tcp-address"),
+		MaxUploadFileSize:        uint64(gc.GetInt("max-upload-file-size")),
+		Logger:                   logger,
+		CBOXGroupDaemonURI:       gc.GetString("cboxgroupd-http-address"),
+		CBOXGroupDaemonSecret:    gc.GetString("cboxgroupd-shared-secret"),
+		MaxNumFilesForArchive:    gc.GetInt("archive-max-num-files"),
+		MaxSizeForArchive:        gc.GetInt("archive-max-size"),
+		MaxViewerFileFize:        gc.GetInt("viewer-max-file-size"),
+		OverwriteHost:            gc.GetString("overwrite-host"),
+		WopiServer:               gc.GetString("wopi-server"),
+		WopiSecret:               gc.GetString("wopi-secret"),
+		DrawIOURL:                gc.GetString("apps-drawio-url"),
+		CacheSize:                gc.GetInt("cache-size"),
+		CacheEviction:            gc.GetInt("cache-eviction"),
+		MailServer:               gc.GetString("apps-mail-server"),
+		MailServerFromAddress:    gc.GetString("apps-mail-server-from-address"),
+		IsCanaryEnabled:          gc.GetBool("canary-enabled"),
+		CanaryManager:            cm,
+		CanaryForceClean:         gc.GetBool("canary-force-clean"),
+		CanaryCookieTTL:          gc.GetInt("canary-cookie-ttl"),
+		OfficeEngineManager:      oem,
+		Hostname:                 gc.GetString("hostname"),
 		OnlyOfficeDocumentServer: gc.GetString("apps-onlyoffice-document-server"),
-		GanttServer: gc.GetString("apps-gantt-server"),
-		BaseUrl:               gc.GetString("base-url"),
+		GanttServer:              gc.GetString("apps-gantt-server"),
+		BaseUrl:                  gc.GetString("base-url"),
 	}
 
 	_, err := api.New(opts)

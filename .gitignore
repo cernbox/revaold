@@ -1,0 +1,5 @@
+*rpm
+revad/revad*
+ocproxy/ocproxy*
+revad/rpmbuild/
+ocproxy/rpmbuild/

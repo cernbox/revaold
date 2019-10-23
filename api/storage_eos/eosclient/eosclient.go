@@ -518,7 +518,17 @@ func (c *Client) RestoreDeletedEntry(ctx context.Context, username, key string) 
 	if err != nil {
 		return err
 	}
+	// We don't know if the key points to a directory or to a file
+	// if the deleted entry is a file recycle restore <key> will work, for a directory we need to prefix the key
+	// with pxid:<key>. As in this function we don't have the information, we try first for a file, in case it fails,
+	// we try with directory.
 	cmd := exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "recycle", "restore", key)
+	_, _, err = c.execute(cmd)
+	if err == nil {
+		return nil
+	}
+
+	cmd = exec.CommandContext(ctx, "/usr/bin/eos", "-r", unixUser.Uid, unixUser.Gid, "recycle", "restore", fmt.Sprintf("pxid:%s", key))
 	_, _, err = c.execute(cmd)
 	return err
 }

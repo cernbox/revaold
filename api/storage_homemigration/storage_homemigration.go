@@ -208,7 +208,7 @@ func (fs *eosStorage) createHome(ctx context.Context, username, mountID string) 
 			fs.logger.Warn("api: storage_homemigration: createHome: script disabled to create homes on oldhome")
 			return errors.New("homedir creation disabled on oldhome")
 		}
-	} else if strings.HasPrefix(mountID, "/eoshome-") {
+	} else if strings.HasPrefix(mountID, "/eoshome-") || strings.HasPrefix(mountID, "eoshome-") {
 		if fs.newScriptEnabled {
 			instance := "root://" + mountID + ".cern.ch"
 			_, stdErr, exitStatus := fs.executeScript(ctx, fs.newScript, username, instance)

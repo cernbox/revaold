@@ -891,7 +891,7 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
   },
   "type": "%s"
 } `
-	msg = fmt.Sprintf(msg, fileType, key, pl.Name, url, documentType, callbackURL, folderURL, lang, mode, "desktop")
+	msg = fmt.Sprintf(msg, fileType, key, strings.Replace(fn, "//", "", -1), url, documentType, callbackURL, folderURL, lang, mode, "desktop")
 	p.logger.Info("onlyoffice/config response=" + msg)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(msg))

@@ -1360,18 +1360,7 @@ func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {
 		Email       string `json:"email"`
 	}{ID: user.AccountId, DisplayName: user.AccountId, Email: user.AccountId + "@cern.ch"}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100, Message: "OK"}
-	payload := &OCSPayload{Meta: meta, Data: userData}
-	res := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(res)
-	if err != nil {
-		p.logger.Error("ocproxy: api: error in json marshal", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write(encoded)
+	p.writeOCSResponse(w, r, "ok", 100, userData, nil, "OK")
 }
 
 func (p *proxy) swanPublicLoad(w http.ResponseWriter, r *http.Request) {
@@ -4203,21 +4192,11 @@ func (p *proxy) search(w http.ResponseWriter, r *http.Request) {
 	exact := &OCSShareeExact{Users: exactUserEntries, Groups: exactGroupEntries, Remotes: []*OCSShareeEntry{}}
 	data := &OCSShareeData{Exact: exact, Users: inexactUserEntries, Groups: inexactGroupEntries, Remotes: []*OCSShareeEntry{}}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100, Message: "OK"}
-	payload := &OCSPayload{Meta: meta, Data: data}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Expires", "0")
-	w.Header().Set("Pragma", "no-cache")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
+	extraHeaders := make(map[string]string)
+	extraHeaders["Cache-Control"] = "no-cache, no-store, must-revalidate"
+	extraHeaders["Expires"] = "0"
+	extraHeaders["Pragma"] = "no-cache"
+	p.writeOCSResponse(w, r, "ok", 100, data, extraHeaders, "OK")
 
 }
 
@@ -4249,11 +4228,11 @@ func (p *proxy) createPublicLinkShare(ctx context.Context, newShare *NewShareOCS
 		return
 	}
 
-	p.writeOCSResponse(w, r, ocsShare)
+	p.writeOCSResponse(w, r, "ok", 200, ocsShare, nil, "")
 
 }
 
-func (p *proxy) writeOCSResponse(w http.ResponseWriter, r *http.Request, data interface{}) {
+func (p *proxy) writeOCSResponse(w http.ResponseWriter, r *http.Request, status string, statusCode int, data interface{}, extraHeaders map[string]string, message string) {
 
 	format := r.URL.Query().Get("format")
 
@@ -4262,7 +4241,7 @@ func (p *proxy) writeOCSResponse(w http.ResponseWriter, r *http.Request, data in
 		useXML = false
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
+	meta := &ResponseMeta{Status: status, StatusCode: statusCode, Message: message}
 	payload := &OCSPayload{Meta: meta, Data: data}
 
 	var encoded []byte
@@ -4282,6 +4261,9 @@ func (p *proxy) writeOCSResponse(w http.ResponseWriter, r *http.Request, data in
 		w.Header().Set("Content-Type", "application/xml")
 	} else {
 		w.Header().Set("Content-Type", "application/json")
+	}
+	for header, value := range extraHeaders {
+		w.Header().Set(header, value)
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(encoded)
@@ -4324,7 +4306,7 @@ func (p *proxy) createFolderShare(ctx context.Context, newShare *NewShareOCSRequ
 		return
 	}
 
-	p.writeOCSResponse(w, r, ocsShare)
+	p.writeOCSResponse(w, r, "ok", 200, ocsShare, nil, "")
 
 }
 
@@ -4470,18 +4452,7 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) getRemoteShares(w http.ResponseWriter, r *http.Request) {
 	shares := []*OCSShare{}
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-	payload := &OCSPayload{Meta: meta, Data: shares}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
+	p.writeOCSResponse(w, r, "ok", 100, shares, nil, "")
 
 }
 
@@ -4539,22 +4510,11 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 		ocsShares = append(ocsShares, folderShares...)
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-	payload := &OCSPayload{Meta: meta, Data: ocsShares}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Expires", "0")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
+	extraHeaders := make(map[string]string)
+	extraHeaders["Cache-Control"] = "no-cache, no-store, must-revalidate"
+	extraHeaders["Expires"] = "0"
+	extraHeaders["Pragma"] = "no-cache"
+	p.writeOCSResponse(w, r, "ok", 100, ocsShares, extraHeaders, "")
 }
 
 func (p *proxy) getPublicLinkShares(ctx context.Context, onlyForPath string) ([]*OCSShare, error) {
@@ -4885,79 +4845,7 @@ func (p *proxy) getReceivedShares(w http.ResponseWriter, r *http.Request, path s
 
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 200}
-	payload := &OCSPayload{Meta: meta, Data: ocsShares}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
-	/*
-		shares := []*OCSShare{}
-		if path == "" {
-			shares = []*OCSShare{
-				&OCSShare{
-					ID:               "244",
-					Path:             "/A new Vespa.pdf",
-					Permissions:      PermissionRead,
-					MimeType:         "application/pdf",
-					ShareType:        ShareTypeUser,
-					DisplayNameOwner: "Labrador",
-					UIDOwner:         "labradorsvc",
-					ItemSource:       "home:1234",
-					FileSource:       "home:1234",
-					FileTarget:       "/A new Vespa.pdf",
-					State:            ShareStateAccepted,
-					ItemType:         ItemTypeFile,
-				},
-				&OCSShare{
-					ID:               "245",
-					Path:             "/Red trail",
-					Permissions:      PermissionRead,
-					MimeType:         "application/json",
-					ShareType:        ShareTypeGroup,
-					DisplayNameOwner: "cernbox-admins",
-					UIDOwner:         "lmascett",
-					ItemSource:       "home:1235",
-					FileSource:       "home:1235",
-					FileTarget:       "/Red trail",
-					State:            ShareStatePending,
-					ItemType:         ItemTypeFolder,
-				},
-				&OCSShare{
-					ID:               "246",
-					Path:             "/Bad stuff",
-					Permissions:      PermissionRead,
-					MimeType:         "httpd/unix-directory",
-					ShareType:        ShareTypeGroup,
-					DisplayNameOwner: "cernbox-admins",
-					UIDOwner:         "lmascett",
-					ItemSource:       "home:1236",
-					FileSource:       "home:1236",
-					FileTarget:       "/Bad stuff",
-					State:            ShareStateAccepted,
-					ItemType:         ItemTypeFolder,
-				},
-			}
-		}
-		meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-		payload := &OCSPayload{Meta: meta, Data: shares}
-		ocsRes := &OCSResponse{OCS: payload}
-		encoded, err := json.Marshal(ocsRes)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(encoded)
-	*/
+	p.writeOCSResponse(w, r, "ok", 200, ocsShares, nil, "")
 }
 
 func (p *proxy) getPublicLink(ctx context.Context, id string) (*reva_api.PublicLink, error) {
@@ -5038,44 +4926,21 @@ func (p *proxy) getShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	extraHeaders := make(map[string]string)
+	extraHeaders["Cache-Control"] = "no-cache, no-store, must-revalidate"
+	extraHeaders["Expires"] = "0"
+	extraHeaders["Pragma"] = "no-cache"
+
 	if found {
 		ocsShares := []*OCSShare{ocsShare}
-		meta := &ResponseMeta{Status: "ok", StatusCode: 200}
-		payload := &OCSPayload{Meta: meta, Data: ocsShares}
-		ocsRes := &OCSResponse{OCS: payload}
-		encoded, err := json.Marshal(ocsRes)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Expires", "0")
-		w.Header().Set("Pragma", "no-cache")
-		w.WriteHeader(http.StatusOK)
-		w.Write(encoded)
+		p.writeOCSResponse(w, r, "ok", 200, ocsShares, extraHeaders, "")
 		return
 
 	}
 
 	if found2 {
 		ocsShares := []*OCSShare{ocsShare2}
-		meta := &ResponseMeta{Status: "ok", StatusCode: 200}
-		payload := &OCSPayload{Meta: meta, Data: ocsShares}
-		ocsRes := &OCSResponse{OCS: payload}
-		encoded, err := json.Marshal(ocsRes)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-		w.Header().Set("Expires", "0")
-		w.Header().Set("Pragma", "no-cache")
-		w.WriteHeader(http.StatusOK)
-		w.Write(encoded)
+		p.writeOCSResponse(w, r, "ok", 200, ocsShares, extraHeaders, "")
 		return
 
 	}
@@ -5110,19 +4975,7 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 			p.writeError(res.Status, w, r)
 			return
 		}
-
-		meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-		payload := &OCSPayload{Meta: meta}
-		ocsRes := &OCSResponse{OCS: payload}
-		encoded, err := json.Marshal(ocsRes)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(encoded)
+		p.writeOCSResponse(w, r, "ok", 100, nil, nil, "")
 		return
 	}
 
@@ -5145,34 +4998,12 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-		payload := &OCSPayload{Meta: meta}
-		ocsRes := &OCSResponse{OCS: payload}
-		encoded, err := json.Marshal(ocsRes)
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		w.Write(encoded)
+		p.writeOCSResponse(w, r, "ok", 100, nil, nil, "")
 		return
 	}
 
 	p.logger.Warn("share not found: " + shareID)
-	meta := &ResponseMeta{Status: "failure", StatusCode: 404}
-	payload := &OCSPayload{Meta: meta}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
+	p.writeOCSResponse(w, r, "failure", 404, nil, nil, "")
 }
 
 func (p *proxy) isPublicLinkShare(ctx context.Context, shareID string) (bool, error) {
@@ -5223,18 +5054,7 @@ func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.Response
 		return
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-	payload := &OCSPayload{Meta: meta, Data: ocsShare}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
+	p.writeOCSResponse(w, r, "ok", 100, ocsShare, nil, "")
 }
 
 // TODO(labkode): check for updateReadOnly
@@ -5272,19 +5092,7 @@ func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSReque
 		return
 	}
 
-	meta := &ResponseMeta{Status: "ok", StatusCode: 100}
-	payload := &OCSPayload{Meta: meta, Data: ocsShare}
-	ocsRes := &OCSResponse{OCS: payload}
-	encoded, err := json.Marshal(ocsRes)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(encoded)
-
+	p.writeOCSResponse(w, r, "ok", 100, ocsShare, nil, "")
 }
 func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

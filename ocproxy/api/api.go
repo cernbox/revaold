@@ -63,6 +63,7 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
 
 	// user prefixed webdav routes
+	p.router.HandleFunc("/remote.php/dav/files/", p.tokenAuth(p.propfind)).Methods("PROPFIND")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
@@ -5316,7 +5317,7 @@ type ResponseMeta struct {
 type OCSPayload struct {
 	XMLName xml.Name      `xml:"ocs" json:"-"`
 	Meta    *ResponseMeta `json:"meta" xml:"meta"`
-	Data    interface{}   `json:"data" xml:"data"`
+	Data    interface{}   `json:"data" xml:"data>element"`
 }
 
 type OCSResponse struct {
@@ -6821,6 +6822,9 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 		ctx = context.WithValue(ctx, "user-dav-uri", true)
 	}
 
+	clientMapping := r.Header.Get("CBOXCLIENTMAPPING")
+	ctx = context.WithValue(ctx, "client-mapping", clientMapping)
+
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, path)
 	gReq := &reva_api.PathReq{Path: revaPath}
@@ -7137,11 +7141,15 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 	if user, ok := reva_api.ContextGetUser(ctx); ok {
 		var ref string
 
+		//for now client-mapping is only used for the mobile client
+		mapping := ctx.Value("client-mapping")
+		mappingPrefix, _ := mapping.(string)
+
 		// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
 		if val := ctx.Value("user-dav-uri"); val != nil {
-			ref = path.Join(p.baseUrl, "/remote.php/dav/files", user.AccountId, md.Path)
+			ref = path.Join(p.baseUrl, mappingPrefix, "/remote.php/dav/files", user.AccountId, md.Path)
 		} else {
-			ref = path.Join(p.baseUrl, "/remote.php/webdav", md.Path)
+			ref = path.Join(p.baseUrl, mappingPrefix, "/remote.php/webdav", md.Path)
 		}
 
 		if md.IsDir {
@@ -7410,7 +7418,13 @@ func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 
 		if token == "" {
 			p.logger.Warn("auth token not provided", zap.String("X-Access-Token", token))
+
+			bToReturn := []byte("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\"><s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception><s:message>No public access to this resource., No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured, No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured</s:message></d:error>")
+			w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+			w.Header().Set("Content-Length", strconv.Itoa(len(bToReturn)))
+			w.Header().Set("www-authenticate", "Basic realm=\"ownCloud\"")
 			w.WriteHeader(http.StatusUnauthorized)
+			w.Write(bToReturn)
 			return
 		}
 

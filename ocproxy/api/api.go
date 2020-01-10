@@ -1977,7 +1977,7 @@ func (p *proxy) getFav(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mds := p.favsToMD(ctx, favs)
-	xmlFavs, err := p.favMDToXML(ctx, mds)
+	xmlFavs, err := p.favMDToXML(ctx, &propfindXML{Allprop: new(struct{})}, mds)
 	if err != nil {
 		p.logger.Error("error converting fav map to xml", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -2004,12 +2004,11 @@ func (p *proxy) favsToMD(ctx context.Context, tags []*reva_api.Tag) []*reva_api.
 	return mds
 }
 
-func (p *proxy) favMDToXML(ctx context.Context, mds []*reva_api.Metadata) ([]byte, error) {
+func (p *proxy) favMDToXML(ctx context.Context, pf *propfindXML, mds []*reva_api.Metadata) ([]byte, error) {
 	responses := []*responseXML{}
 
 	for _, md := range mds {
-		favProp := p.getFavXMLProp()
-		res, err := p.mdToPropResponse(ctx, md, favProp)
+		res, err := p.mdToPropResponse(ctx, pf, md, "1")
 		if err != nil {
 			p.logger.Error("error converting tag md to xml", zap.Error(err))
 			continue
@@ -6813,9 +6812,17 @@ func (p *proxy) putChunked(w http.ResponseWriter, r *http.Request) {
 	return
 
 }
+
 func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	path := mux.Vars(r)["path"]
+
+	pf, status, err := readPropfind(r.Body)
+	if err != nil {
+		p.logger.Error("error reading propfind request", zap.Error(err))
+		w.WriteHeader(status)
+		return
+	}
 
 	// request comes from remote.php/dav/files/gonzalhu/...
 	if mux.Vars(r)["username"] != "" {
@@ -6880,7 +6887,7 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	mdsInXML, err := p.mdsToXML(ctx, mds)
+	mdsInXML, err := p.mdsToXML(ctx, &pf, mds)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -7022,10 +7029,10 @@ func getChunkBLOBInfo(path string) (*chunkBLOBInfo, error) {
 	}, nil
 }
 
-func (p *proxy) mdsToXML(ctx context.Context, mds []*reva_api.Metadata) (string, error) {
+func (p *proxy) mdsToXML(ctx context.Context, pf *propfindXML, mds []*reva_api.Metadata) (string, error) {
 	responses := []*responseXML{}
 	for _, md := range mds {
-		res, err := p.mdToPropResponse(ctx, md)
+		res, err := p.mdToPropResponse(ctx, pf, md, "0")
 		if err != nil {
 			return "", err
 		}
@@ -7042,66 +7049,37 @@ func (p *proxy) mdsToXML(ctx context.Context, mds []*reva_api.Metadata) (string,
 	return msg, nil
 }
 
-func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, props ...propertyXML) (*responseXML, error) {
-	propList := []propertyXML{}
+func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_api.Metadata, favourite string) (*responseXML, error) {
 
-	getETag := propertyXML{
-		xml.Name{Space: "", Local: "d:getetag"},
-		"", []byte(md.Etag)}
-
-	// See https://github.com/owncloud/core/issues/8322
-	perm := ""
-	if !md.IsReadOnly {
-		perm = "WCKDNV"
-
-	}
-	if md.IsShareable {
-		perm += "R"
-	}
-	ocPermissions := propertyXML{xml.Name{Space: "", Local: "oc:permissions"},
-		"", []byte(perm)}
-
-	/*
-		quotaUsedBytes := propertyXML{
-			xml.Name{Space: "", Local: "d:quota-used-bytes"}, "", []byte("0")}
-
-		quotaAvailableBytes := propertyXML{
-			xml.Name{Space: "", Local: "d:quota-available-bytes"}, "",
-			[]byte("1000000000")}
-	*/
-
-	getContentLegnth := propertyXML{
-		xml.Name{Space: "", Local: "d:getcontentlength"},
-		"", []byte(fmt.Sprintf("%d", md.Size))}
-
-	var getContentType propertyXML
-	if md.IsDir {
-		getContentType = propertyXML{
-			xml.Name{Space: "", Local: "d:getcontenttype"},
-			"", []byte("httpd/unix-directory")}
-
-	} else {
-		getContentType = propertyXML{
-			xml.Name{Space: "", Local: "d:getcontenttype"},
-			"", []byte(md.Mime)}
-
+	var ref string
+	// TODO(labkode): harden check for user
+	if user, ok := reva_api.ContextGetUser(ctx); ok {
+		// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
+		if val := ctx.Value("user-dav-uri"); val != nil {
+			ref = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+		} else {
+			ref = path.Join("/remote.php/webdav", md.Path)
+		}
+	} else { // public link access
+		ref = path.Join("/public.php/webdav", md.Path)
 	}
 
-	// Finder needs the the getLastModified property to work.
-	t := time.Unix(int64(md.Mtime), 0).UTC()
-	lasModifiedString := t.Format(time.RFC1123)
-	getLastModified := propertyXML{
-		xml.Name{Space: "", Local: "d:getlastmodified"},
-		"", []byte(lasModifiedString)}
+	//for now client-mapping is only used for the mobile client
+	mapping := ctx.Value("client-mapping")
+	mappingPrefix, _ := mapping.(string)
 
-	getResourceType := propertyXML{
-		xml.Name{Space: "", Local: "d:resourcetype"},
-		"", []byte("")}
+	ref = path.Join("/", p.baseUrl, mappingPrefix, ref)
 
 	if md.IsDir {
-		getResourceType.InnerXML = []byte("<d:collection/>")
-		getContentType.InnerXML = []byte("httpd/unix-directory")
-		ocPermissions.InnerXML = []byte(perm)
+		ref += "/"
+	}
+
+	// url encode ref
+	encoded := &url.URL{Path: ref}
+
+	response := responseXML{
+		Href:     encoded.String(),
+		Propstat: []propstatXML{},
 	}
 
 	// the fileID must be xml-escaped as there are cases like public links
@@ -7110,73 +7088,273 @@ func (p *proxy) mdToPropResponse(ctx context.Context, md *reva_api.Metadata, pro
 	var fileIDEscaped bytes.Buffer
 	err := xml.EscapeText(&fileIDEscaped, []byte(md.Id))
 	if err != nil {
-		p.logger.Error("error xml escaping oc:fileid", zap.Error(err))
+		p.logger.Error("error xml escaping fileid", zap.Error(err))
 		return nil, err
+	}
+	fileId := string(fileIDEscaped.Bytes())
+
+	perm := ""
+	if !md.IsReadOnly {
+		perm = "WCKDNV"
 
 	}
-	ocID := propertyXML{xml.Name{Space: "", Local: "oc:fileid"}, "",
-		fileIDEscaped.Bytes()}
-
-	ocDownloadURL := propertyXML{xml.Name{Space: "", Local: "oc:downloadURL"},
-		"", []byte("")}
-
-	ocDC := propertyXML{xml.Name{Space: "", Local: "oc:dDC"},
-		"", []byte("")}
-
-	propList = append(propList, getResourceType, getContentLegnth, getContentType, getLastModified, // general WebDAV properties
-		getETag /*quotaAvailableBytes, quotaUsedBytes,*/, ocID, ocDownloadURL, ocDC, ocPermissions) // properties needed by ownCloud
-	propList = append(propList, props...)
-
-	// PropStat, only HTTP/1.1 200 is sent.
-	propStatList := []propstatXML{}
-
-	propStat := propstatXML{}
-	propStat.Prop = propList
-	propStat.Status = "HTTP/1.1 200 OK"
-	propStatList = append(propStatList, propStat)
-
-	response := responseXML{}
-
-	// TODO(labkode): harden check for user
-	if user, ok := reva_api.ContextGetUser(ctx); ok {
-		var ref string
-
-		//for now client-mapping is only used for the mobile client
-		mapping := ctx.Value("client-mapping")
-		mappingPrefix, _ := mapping.(string)
-
-		// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
-		if val := ctx.Value("user-dav-uri"); val != nil {
-			ref = path.Join(p.baseUrl, mappingPrefix, "/remote.php/dav/files", user.AccountId, md.Path)
-		} else {
-			ref = path.Join(p.baseUrl, mappingPrefix, "/remote.php/webdav", md.Path)
-		}
-
-		if md.IsDir {
-			ref += "/"
-		}
-
-		response.Href = ref
-
-	} else { // public link access
-		response.Href = path.Join("/public.php/webdav", md.Path)
-		if md.IsDir {
-			response.Href = path.Join("/public.php/webdav", md.Path) + "/"
-		}
-
-		if p.baseUrl != "" {
-			response.Href = path.Join("/", p.baseUrl, response.Href)
-		}
+	if md.IsShareable {
+		perm += "R"
 	}
 
-	// url encode response.Href
-	encoded := &url.URL{Path: response.Href}
-	response.Href = encoded.String()
 
-	response.Propstat = propStatList
+	// when allprops has been requested
+	if pf.Allprop != nil {
+		// return all known properties
+		response.Propstat = append(response.Propstat, propstatXML{
+			Status: "HTTP/1.1 200 OK",
+			Prop:   []*propertyXML{},
+		})
+
+		response.Propstat[0].Prop = append(response.Propstat[0].Prop,
+			p.newProp("oc:id", fileId),
+			p.newProp("oc:fileid", fileId),
+		)
+
+		if md.Etag != "" {
+			response.Propstat[0].Prop = append(response.Propstat[0].Prop, p.newProp("d:getetag", md.Etag))
+		}
+
+		response.Propstat[0].Prop = append(response.Propstat[0].Prop, p.newProp("oc:permissions", perm))
+
+		// always return size
+		size := fmt.Sprintf("%d", md.Size)
+		if md.IsDir {
+			response.Propstat[0].Prop = append(response.Propstat[0].Prop,
+				p.newProp("d:resourcetype", "<d:collection/>"),
+				// p.newProp("d:getcontenttype", "httpd/unix-directory"),
+				p.newProp("oc:size", size),
+			)
+		} else if md.Mime != "" {
+			response.Propstat[0].Prop = append(response.Propstat[0].Prop,
+				p.newProp("d:getcontenttype", md.Mime),
+				p.newProp("d:getcontentlength", size),
+			)
+		}
+		// Finder needs the the getLastModified property to work.
+		t := time.Unix(int64(md.Mtime), 0).UTC()
+		lastModifiedString := t.Format(time.RFC1123)
+		response.Propstat[0].Prop = append(response.Propstat[0].Prop, p.newProp("d:getlastmodified", lastModifiedString))
+
+		// Diogo: we don't have checksum in revaold?
+		// if md.Checksum != nil {
+		// 	// TODO(jfd): the actual value is an abomination like this:
+		// 	// <oc:checksums>
+		// 	//   <oc:checksum>SHA1:9bd253a09d58be107bcb4169ebf338c8df34d086 MD5:d90bcc6bf847403d22a4abba64e79994 ADLER32:fca23ff5</oc:checksum>
+		// 	// </oc:checksums>
+		// 	// yep, correct, space delimited key value pairs inside an oc:checksum tag inside an oc:checksums tag
+		// 	value := fmt.Sprintf("<oc:checksum>%s:%s</oc:checksum>", md.Checksum.Type, md.Checksum.Sum)
+		// 	response.Propstat[0].Prop = append(response.Propstat[0].Prop, p.newProp("oc:checksums", value))
+		// }
+
+		// dirty workaround
+		response.Propstat[0].Prop = append(response.Propstat[0].Prop, p.newProp("oc:favorite", favourite))
+	} else {
+		// otherwise return only the requested properties
+		propstatOK := propstatXML{
+			Status: "HTTP/1.1 200 OK",
+			Prop:   []*propertyXML{},
+		}
+		propstatNotFound := propstatXML{
+			Status: "HTTP/1.1 404 Not Found",
+			Prop:   []*propertyXML{},
+		}
+		size := fmt.Sprintf("%d", md.Size)
+		for i := range pf.Prop {
+			switch pf.Prop[i].Space {
+			case "http://owncloud.org/ns":
+				switch pf.Prop[i].Local {
+				// TODO(jfd): maybe phoenix and the other clients can just use this id as an opaque string?
+				// I tested the desktop client and phoenix to annotate which properties are requestted, see below cases
+				case "fileid": // phoenix only
+					if md.Id != "" {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("oc:fileid", fileId))
+					} else {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("oc:fileid", ""))
+					}
+				case "id": // desktop client only
+					if md.Id != "" {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("oc:id", fileId))
+					} else {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("oc:id", ""))
+					}
+				case "permissions": // both
+					if perm != "" {
+						// TODO(jfd): properly build permissions string
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("oc:permissions", perm))
+					} else {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("oc:permissions", ""))
+					}
+				case "size": // phoenix only
+					// TODO we cannot find out if md.Size is set or not because ints in go default to 0
+					// oc:size is also available on folders
+					propstatOK.Prop = append(propstatOK.Prop, p.newProp("oc:size", size))
+				case "favorite": // phoenix only
+					// can be 0 or 1
+					// TODO: read favorite via separate call? that would be expensive? I hope it is in the md
+					propstatOK.Prop = append(propstatOK.Prop, p.newProp("oc:favorite", favourite))
+				case "checksums": // desktop
+					// if md.Checksum != nil {
+					// 	// TODO(jfd): the actual value is an abomination like this:
+					// 	// <oc:checksums>
+					// 	//   <oc:checksum>SHA1:9bd253a09d58be107bcb4169ebf338c8df34d086 MD5:d90bcc6bf847403d22a4abba64e79994 ADLER32:fca23ff5</oc:checksum>
+					// 	// </oc:checksums>
+					// 	// yep, correct, space delimited key value pairs inside an oc:checksum tag inside an oc:checksums tag
+					// 	value := fmt.Sprintf("<oc:checksum>%s:%s</oc:checksum>", md.Checksum.Type, md.Checksum.Sum)
+					// 	propstatOK.Prop = append(propstatOK.Prop, p.newProp("oc:checksums", value))
+					// } else {
+					propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("oc:checksums", ""))
+					// }
+				case "privatelink": // phoenix only
+					// <oc:privatelink>https://phoenix.owncloud.com/f/9</oc:privatelink>
+					fallthrough
+				case "downloadUrl": // desktop
+					fallthrough
+				case "dDC": // desktop
+					fallthrough
+				case "data-fingerprint": // desktop
+					// used by admins to indicate a backup has been restored,
+					// can only occur on the root node
+					// server implementation in https://github.com/owncloud/core/pull/24054
+					// see https://doc.owncloud.com/server/admin_manual/configuration/server/occ_command.html#maintenance-commands
+					// TODO(jfd): double check the client behavior with reva on backup restore
+					fallthrough
+				case "share-types": // desktop
+					// <oc:share-types>
+					//   <oc:share-type>1</oc:share-type>
+					// </oc:share-types>
+					fallthrough
+				default:
+					propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("oc:"+pf.Prop[i].Local, ""))
+				}
+			case "DAV:":
+				switch pf.Prop[i].Local {
+				case "getetag": // both
+					if md.Etag != "" {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getetag", md.Etag))
+					} else {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:getetag", ""))
+					}
+				case "getcontentlength": // both
+					// see everts stance on this https://stackoverflow.com/a/31621912, he points to http://tools.ietf.org/html/rfc4918#section-15.3
+					// > Purpose: Contains the Content-Length header returned by a GET without accept headers.
+					// which only would make sense when eg. rendering a plain HTML filelisting when GETing a collection,
+					// which is not the case ... so we don't return it on collections. owncloud has oc:size for that
+					// TODO we cannot find out if md.Size is set or not because ints in go default to 0
+					if md.IsDir {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:getcontentlength", ""))
+					} else {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getcontentlength", size))
+					}
+				case "resourcetype": // both
+					if md.IsDir {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:resourcetype", "<d:collection/>"))
+					} else {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:resourcetype", ""))
+						// redirectref is another option
+					}
+				case "getcontenttype": // phoenix
+					/*if md.IsDir {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getcontenttype", "httpd/unix-directory"))
+					} else*/ if !md.IsDir && md.Mime != "" {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getcontenttype", md.Mime))
+					} else {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:getcontenttype", ""))
+					}
+				case "getlastmodified": // both
+					// TODO we cannot find out if md.Mtime is set or not because ints in go default to 0
+					t := time.Unix(int64(md.Mtime), 0).UTC()
+					lastModifiedString := t.Format(time.RFC1123)
+					propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getlastmodified", lastModifiedString))
+				default:
+					propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:"+pf.Prop[i].Local, ""))
+				}
+			default:
+				// TODO (jfd) lookup shortname for unknown namespaces?
+				propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp(pf.Prop[i].Space+":"+pf.Prop[i].Local, ""))
+			}
+		}
+		response.Propstat = append(response.Propstat, propstatOK, propstatNotFound)
+	}
 
 	return &response, nil
+}
 
+func (p *proxy) newProp(key, val string) *propertyXML {
+	return &propertyXML{
+		XMLName:  xml.Name{Space: "", Local: key},
+		Lang:     "",
+		InnerXML: []byte(val),
+	}
+}
+
+
+// http://www.webdav.org/specs/rfc4918.html#ELEMENT_prop (for propfind)
+type propfindProps []xml.Name
+
+// Next returns the next token, if any, in the XML stream of d.
+// RFC 4918 requires to ignore comments, processing instructions
+// and directives.
+// http://www.webdav.org/specs/rfc4918.html#property_values
+// http://www.webdav.org/specs/rfc4918.html#xml-extensibility
+func next(d *xml.Decoder) (xml.Token, error) {
+	for {
+		t, err := d.Token()
+		if err != nil {
+			return t, err
+		}
+		switch t.(type) {
+		case xml.Comment, xml.Directive, xml.ProcInst:
+			continue
+		default:
+			return t, nil
+		}
+	}
+}
+
+// UnmarshalXML appends the property names enclosed within start to pn.
+//
+// It returns an error if start does not contain any properties or if
+// properties contain values. Character data between properties is ignored.
+func (pn *propfindProps) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	for {
+		t, err := next(d)
+		if err != nil {
+			return err
+		}
+		switch e := t.(type) {
+		case xml.EndElement:
+			// jfd: I think <d:prop></d:prop> is perfectly valid ... treat it as allprop
+			/*
+				if len(*pn) == 0 {
+					return fmt.Errorf("%s must not be empty", start.Name.Local)
+				}
+			*/
+			return nil
+		case xml.StartElement:
+			t, err = next(d)
+			if err != nil {
+				return err
+			}
+			if _, ok := t.(xml.EndElement); !ok {
+				return fmt.Errorf("unexpected token %T", t)
+			}
+			*pn = append(*pn, e.Name)
+		}
+	}
+}
+
+type propfindXML struct {
+	XMLName  xml.Name      `xml:"DAV: propfind"`
+	Allprop  *struct{}     `xml:"DAV: allprop"`
+	Propname *struct{}     `xml:"DAV: propname"`
+	Prop     propfindProps `xml:"DAV: prop"`
+	Include  propfindProps `xml:"DAV: include"`
 }
 
 type responseXML struct {
@@ -7188,17 +7366,17 @@ type responseXML struct {
 	ResponseDescription string        `xml:"d:responsedescription,omitempty"`
 }
 
-// http://www.ocwebdav.org/specs/rfc4918.html#ELEMENT_propstat
+// http://www.webdav.org/specs/rfc4918.html#ELEMENT_propstat
 type propstatXML struct {
 	// Prop requires DAV: to be the default namespace in the enclosing
 	// XML. This is due to the standard encoding/xml package currently
 	// not honoring namespace declarations inside a xmltag with a
 	// parent element for anonymous slice elements.
 	// Use of multistatusWriter takes care of this.
-	Prop                []propertyXML `xml:"d:prop>_ignored_"`
-	Status              string        `xml:"d:status"`
-	Error               *errorXML     `xml:"d:error"`
-	ResponseDescription string        `xml:"d:responsedescription,omitempty"`
+	Prop                []*propertyXML `xml:"d:prop>_ignored_"`
+	Status              string         `xml:"d:status"`
+	Error               *errorXML      `xml:"d:error"`
+	ResponseDescription string         `xml:"d:responsedescription,omitempty"`
 }
 
 // Property represents a single DAV resource property as defined in RFC 4918.
@@ -7225,6 +7403,50 @@ type propertyXML struct {
 type errorXML struct {
 	XMLName  xml.Name `xml:"d:error"`
 	InnerXML []byte   `xml:",innerxml"`
+}
+
+var errInvalidPropfind = errors.New("webdav: invalid propfind")
+
+type countingReader struct {
+	n int
+	r io.Reader
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	c.n += n
+	return n, err
+}
+
+// from https://github.com/golang/net/blob/e514e69ffb8bc3c76a71ae40de0118d794855992/webdav/xml.go#L178-L205
+func readPropfind(r io.Reader) (pf propfindXML, status int, err error) {
+	c := countingReader{r: r}
+	if err = xml.NewDecoder(&c).Decode(&pf); err != nil {
+		if err == io.EOF {
+			if c.n == 0 {
+				// An empty body means to propfind allprop.
+				// http://www.webdav.org/specs/rfc4918.html#METHOD_PROPFIND
+				return propfindXML{Allprop: new(struct{})}, 0, nil
+			}
+			err = errInvalidPropfind
+		}
+		return propfindXML{}, http.StatusBadRequest, err
+	}
+
+	if pf.Allprop == nil && pf.Include != nil {
+		return propfindXML{}, http.StatusBadRequest, errInvalidPropfind
+	}
+	if pf.Allprop != nil && (pf.Prop != nil || pf.Propname != nil) {
+		return propfindXML{}, http.StatusBadRequest, errInvalidPropfind
+	}
+	if pf.Prop != nil && pf.Propname != nil {
+		return propfindXML{}, http.StatusBadRequest, errInvalidPropfind
+	}
+	if pf.Propname == nil && pf.Allprop == nil && pf.Prop == nil {
+		// jfd: I think <d:prop></d:prop> is perfectly valid ... treat it as allprop
+		return propfindXML{Allprop: new(struct{})}, 0, nil
+	}
+	return pf, 0, nil
 }
 
 // exifOrientation parses the  EXIF data in r and returns the stored

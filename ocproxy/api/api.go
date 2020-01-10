@@ -6887,6 +6887,27 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	for i := range pf.Prop {
+		if pf.Prop[i].Space == "DAV:" && (pf.Prop[i].Local == "quota-used-bytes" || pf.Prop[i].Local == "quota-available-bytes") {
+			res, err := p.getStorageClient().GetQuota(gCtx, &reva_api.QuotaReq{Path: "/home"})
+			if err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		
+			if res.Status != reva_api.StatusCode_OK {
+				p.writeError(res.Status, w, r)
+				p.logger.Error("wrong grpc status", zap.Int("status", int(res.Status)))
+				return
+			}
+
+			ctx = context.WithValue(ctx, "quota-used-bytes", strconv.FormatInt(res.GetUsedBytes(), 10))
+			ctx = context.WithValue(ctx, "quota-available-bytes", strconv.FormatInt(res.GetTotalBytes(), 10))
+			break
+		}
+	}
+
 	mdsInXML, err := p.mdsToXML(ctx, &pf, mds)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -7271,6 +7292,20 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 					t := time.Unix(int64(md.Mtime), 0).UTC()
 					lastModifiedString := t.Format(time.RFC1123)
 					propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getlastmodified", lastModifiedString))
+				case "quota-used-bytes":
+					quota, _ := ctx.Value("quota-used-bytes").(string)
+					if quota != "" {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:quota-used-bytes", quota))
+					} else {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:quota-used-bytes", ""))
+					}
+				case "quota-available-bytes":
+					quota, _ := ctx.Value("quota-available-bytes").(string)
+					if quota != "" {
+						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:quota-available-bytes", quota))
+					} else {
+						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:quota-available-bytes", ""))
+					}
 				default:
 					propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:"+pf.Prop[i].Local, ""))
 				}

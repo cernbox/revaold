@@ -4514,7 +4514,7 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	extraHeaders["Cache-Control"] = "no-cache, no-store, must-revalidate"
 	extraHeaders["Expires"] = "0"
 	extraHeaders["Pragma"] = "no-cache"
-	p.writeOCSResponse(w, r, "ok", 100, ocsShares, extraHeaders, "")
+	p.writeOCSResponse(w, r, "ok", 200, ocsShares, extraHeaders, "")
 }
 
 func (p *proxy) getPublicLinkShares(ctx context.Context, onlyForPath string) ([]*OCSShare, error) {

@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.54
+Version: 0.0.55
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,11 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon Jan 10 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.55
+- Replies both in json and xml
+- Dynamic webdav replies (only reply to what is requested)
+- Improve compatibility of new webdav endpoint (to allow mobile client to connect)
+- Quota on webdav requests
 * Mon Oct 21 2019 Diogo Castro <diogo.castro@cern.ch> 0.0.54
 - OnlyOffice for Public links
 - Persist the Office engine choice in the DB

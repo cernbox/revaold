@@ -4437,6 +4437,12 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 	md := res.Metadata
 	newShare.Name = path.Base(md.Path)
 
+	if !md.IsDir && newShare.ShareType != ShareTypePublicLink {
+		w.WriteHeader(http.StatusForbidden)
+		p.writeOCSResponse(w, r, "failure", 403, nil, nil, "Files can only be shared via Public Link")
+		return
+	}
+
 	if newShare.ShareType == ShareTypePublicLink {
 		p.createPublicLinkShare(ctx, newShare, readOnly, dropOnly, expiration, w, r)
 		return

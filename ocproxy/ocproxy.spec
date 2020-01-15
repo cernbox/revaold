@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.55
+Version: 0.0.56
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Wed Jan 15 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.56
+- Forbid sharing files with users/groups
 * Mon Jan 10 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.55
 - Replies both in json and xml
 - Dynamic webdav replies (only reply to what is requested)

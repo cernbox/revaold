@@ -63,18 +63,18 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
 
 	// user prefixed webdav routes
-	p.router.HandleFunc("/remote.php/dav/files/", p.tokenAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.get)).Methods("GET")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.options)).Methods("OPTIONS")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.lock)).Methods("LOCK")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.unlock)).Methods("UNLOCK")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.head)).Methods("HEAD")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.mkcol)).Methods("MKCOL")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.propfind)).Methods("PROPFIND")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
+	p.router.HandleFunc("/remote.php/dav/files/", p.tokenAuthPopup(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.get)).Methods("GET")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.put)).Methods("PUT")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.options)).Methods("OPTIONS")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.lock)).Methods("LOCK")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.unlock)).Methods("UNLOCK")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.head)).Methods("HEAD")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.mkcol)).Methods("MKCOL")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.proppatch)).Methods("PROPPATCH")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.delete)).Methods("DELETE")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.move)).Methods("MOVE")
 
 	// user-relative routes
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
@@ -7637,7 +7637,16 @@ func (p *proxy) plAuth(h http.HandlerFunc) http.HandlerFunc {
 	})
 }
 
+func (p *proxy) tokenAuthPopup(h http.HandlerFunc) http.HandlerFunc {
+	return p.authAux(h, true)
+}
+
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
+	return p.authAux(h, false)
+}
+
+
+func (p *proxy) authAux(h http.HandlerFunc, popup bool) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		normalizedPath := mux.Vars(r)["path"]
@@ -7679,7 +7688,7 @@ func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 
 		}
 
-		if token == "" {
+		if popup && token == "" {
 			p.logger.Warn("auth token not provided", zap.String("X-Access-Token", token))
 
 			bToReturn := []byte("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\"><s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception><s:message>No public access to this resource., No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured, No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured</s:message></d:error>")

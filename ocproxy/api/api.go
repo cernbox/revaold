@@ -76,6 +76,12 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
+	// new chunking routes
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.mkcolNG)).Methods("MKCOL")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.moveNG)).Methods("MOVE")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.propfindNG)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/{chunknumber}", p.tokenAuth(p.putNG)).Methods("PUT")
+
 	// user-relative routes
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
@@ -2238,6 +2244,8 @@ type Options struct {
 	GanttServer              string
 
 	BaseUrl string
+
+	NGChunkPath string
 }
 
 func (opt *Options) init() {
@@ -2330,6 +2338,10 @@ func New(opt *Options) (http.Handler, error) {
 		return nil, err
 	}
 
+	if err := os.MkdirAll(opt.NGChunkPath, 0755); err != nil {
+		return nil, err
+	}
+
 	tr := &http.Transport{
 		//	DisableKeepAlives:   opts.DisableKeepAlives,
 		//IdleConnTimeout:     time.Duration(opts.IdleConnTimeout) * time.Second,
@@ -2395,6 +2407,8 @@ func New(opt *Options) (http.Handler, error) {
 		ganttServer:              opt.GanttServer,
 
 		baseUrl: opt.BaseUrl,
+
+		ngChunkPath: opt.NGChunkPath,
 	}
 
 	proxy.registerRoutes()
@@ -2460,6 +2474,8 @@ type proxy struct {
 	ganttServer string
 
 	baseUrl string
+
+	ngChunkPath string
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -6229,9 +6245,201 @@ func (p *proxy) mkcol(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
+	// How do we assembly the chunks?
+	// https://github.com/owncloud/core/blob/2de709ee929ff8ffd480019c82e09929134ad41d/apps/dav/lib/Upload/ChunkingPlugin.php#L96
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (p *proxy) infoToMD(info os.FileInfo, uploadid string) *reva_api.Metadata {
+	/*
+				type Metadata struct {
+					Id          string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+					Path        string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+					Size        uint64 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+					Mtime       uint64 `protobuf:"varint,4,opt,name=mtime,proto3" json:"mtime,omitempty"`
+					IsDir       bool   `protobuf:"varint,5,opt,name=is_dir,json=isDir,proto3" json:"is_dir,omitempty"`
+					Etag        string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
+					Checksum    string `protobuf:"bytes,7,opt,name=checksum,proto3" json:"checksum,omitempty"`
+					DerefPath   string `protobuf:"bytes,8,opt,name=deref_path,json=derefPath,proto3" json:"deref_path,omitempty"`
+					IsReadOnly  bool   `protobuf:"varint,9,opt,name=is_read_only,json=isReadOnly,proto3" json:"is_read_only,omitempty"`
+					IsShareable bool   `protobuf:"varint,10,opt,name=is_shareable,json=isShareable,proto3" json:"is_shareable,omitempty"`
+					Mime        string `protobuf:"bytes,11,opt,name=mime,proto3" json:"mime,omitempty"`
+					Sys         []byte `protobuf:"bytes,12,opt,name=sys,proto3" json:"sys,omitempty"`
+					TreeCount   uint64 `protobuf:"varint,13,opt,name=tree_count,json=treeCount,proto3" json:"tree_count,omitempty"`
+					// EOS filesytem extended metadata records
+					EosFile     string `protobuf:"bytes,14,opt,name=eos_file,json=eosFile,proto3" json:"eos_file,omitempty"`
+					EosInstance string `protobuf:"bytes,15,opt,name=eos_instance,json=eosInstance,proto3" json:"eos_instance,omitempty"`
+					// Share extended metadata records
+					ShareTarget string `protobuf:"bytes,16,opt,name=share_target,json=shareTarget,proto3" json:"share_target,omitempty"`
+					// Migration extended metadata records
+					MigId                string   `protobuf:"bytes,17,opt,name=mig_id,json=migId,proto3" json:"mig_id,omitempty"`
+					MigPath              string   `protobuf:"bytes,18,opt,name=mig_path,json=migPath,proto3" json:"mig_path,omitempty"`
+					XXX_NoUnkeyedLiteral struct{} `json:"-"`
+					XXX_unrecognized     []byte   `json:"-"`
+					XXX_sizecache        int32    `json:"-"`
+				}
+		type FileInfo interface {
+			Name() string       // base name of the file
+			Size() int64        // length in bytes for regular files; system-dependent for others
+			Mode() FileMode     // file mode bits
+			ModTime() time.Time // modification time
+			IsDir() bool        // abbreviation for Mode().IsDir()
+			Sys() interface{}   // underlying data source (can return nil)
+		}
+
+	*/
+	id := fmt.Sprintf("%s-%s", uploadid, info.Name())
+	md := &reva_api.Metadata{}
+	md.Id = id
+	md.Path = path.Join("/", uploadid, info.Name())
+	md.Size = uint64(info.Size())
+	md.IsDir = info.IsDir()
+	md.Etag = id // what else?
+	md.Mime = reva_api.DetectMimeType(md.IsDir, info.Name())
+
+	return md
+}
+
+func (p *proxy) propfindNG(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	username := mux.Vars(r)["username"]
+	uploadid := mux.Vars(r)["uploadid"]
+
+	pf, status, err := readPropfind(r.Body)
+	if err != nil {
+		p.logger.Error("error reading propfind request", zap.Error(err))
+		w.WriteHeader(status)
+		return
+	}
+
+	var children bool
+	depth := r.Header.Get("Depth")
+	if depth == "1" {
+		children = true
+	}
+
+	var mds []*reva_api.Metadata
+
+	uploadFolder := path.Join(p.ngChunkPath, username, uploadid)
+	fd, err := os.Open(uploadFolder)
+	if err != nil {
+		p.logger.Error("error opening ng upload folder: "+uploadFolder, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer fd.Close()
+
+	info, err := fd.Stat()
+
+	md := p.infoToMD(info, uploadid)
+	mds = append(mds, md)
+
+	if children && md.IsDir {
+		infos, err := fd.Readdir(-1)
+		if err != nil {
+			p.logger.Error("error listing ng chunks inside: "+uploadFolder, zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		for _, i := range infos {
+			md := p.infoToMD(i, uploadid)
+			mds = append(mds, md)
+		}
+	}
+
+	mdsInXML, err := p.mdsToXML(ctx, &pf, mds)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("DAV", "1, 3, extended-mkcol")
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.WriteHeader(207)
+	w.Write([]byte(mdsInXML))
+	w.WriteHeader(207)
+}
+
+func (p *proxy) mkcolNG(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	username := mux.Vars(r)["username"]
+	uploadid := mux.Vars(r)["uploadid"]
+
+	uploadPath := path.Join(p.ngChunkPath, username, uploadid)
+	// TODO(labkode):  validate that username matches loggedin user
+	if err := os.MkdirAll(uploadPath, 0755); err != nil {
+		p.logger.Error("error ng mkcol path: "+uploadPath, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (p *proxy) putNG(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	username := mux.Vars(r)["username"]
+	uploadid := mux.Vars(r)["uploadid"]
+	chunknumber := mux.Vars(r)["chunknumber"]
+
+	if r.Body == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	readCloser := http.MaxBytesReader(w, r.Body, p.maxUploadFileSize)
+
+	chunk := path.Join(p.ngChunkPath, username, uploadid, chunknumber)
+
+	fd, err := os.Create(chunk) // create or truncate
+	if err != nil {
+		p.logger.Error("error opening chunk file: "+chunk, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer fd.Close()
+
+	// copy http body to file
+	if _, err := io.Copy(fd, readCloser); err != nil {
+		p.logger.Error("error copying http body to chunk file: "+chunk, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	info, err := fd.Stat()
+	if err != nil {
+		p.logger.Error("error stating chunk file: "+chunk, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fd.Close()
+
+	//w.Header().Add("Content-Type", md.Mime)
+	//w.Header().Set("ETag", modifiedMd.Etag)
+	//w.Header().Set("OC-FileId", modifiedMd.Id)
+	//w.Header().Set("OC-ETag", modifiedMd.Etag)
+	lastModifiedString := info.ModTime().Format(time.RFC1123)
+	w.Header().Set("Last-Modified", lastModifiedString)
+	//w.Header().Set("X-OC-MTime", "accepted")
+
+	w.WriteHeader(http.StatusCreated)
+	return
+
+}
+
 func (p *proxy) proppatch(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
+
 func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	oldPath := mux.Vars(r)["path"]
@@ -6901,7 +7109,7 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-		
+
 			if res.Status != reva_api.StatusCode_OK {
 				p.writeError(res.Status, w, r)
 				p.logger.Error("wrong grpc status", zap.Int("status", int(res.Status)))
@@ -7081,11 +7289,16 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 	var ref string
 	// TODO(labkode): harden check for user
 	if user, ok := reva_api.ContextGetUser(ctx); ok {
-		// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
-		if val := ctx.Value("user-dav-uri"); val != nil {
-			ref = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+		// check for ng chunking
+		if val := ctx.Value("upload-dav-uri"); val != nil {
+			ref = path.Join("/remote.php/dav/uploads", user.AccountId, md.Path)
 		} else {
-			ref = path.Join("/remote.php/webdav", md.Path)
+			// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
+			if val := ctx.Value("user-dav-uri"); val != nil {
+				ref = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+			} else {
+				ref = path.Join("/remote.php/webdav", md.Path)
+			}
 		}
 	} else { // public link access
 		ref = path.Join("/public.php/webdav", md.Path)
@@ -7128,7 +7341,6 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 	if md.IsShareable {
 		perm += "R"
 	}
-
 
 	// when allprops has been requested
 	if pf.Allprop != nil {
@@ -7288,7 +7500,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 				case "getcontenttype": // phoenix
 					/*if md.IsDir {
 						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getcontenttype", "httpd/unix-directory"))
-					} else*/ if !md.IsDir && md.Mime != "" {
+					} else*/if !md.IsDir && md.Mime != "" {
 						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getcontenttype", md.Mime))
 					} else {
 						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:getcontenttype", ""))
@@ -7333,7 +7545,6 @@ func (p *proxy) newProp(key, val string) *propertyXML {
 		InnerXML: []byte(val),
 	}
 }
-
 
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_prop (for propfind)
 type propfindProps []xml.Name

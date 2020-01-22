@@ -59,6 +59,7 @@ type MountOptions struct {
 
 // Mount contains the information about a mount.
 // Similar to "struct mntent" in /usr/include/mntent.h.
+
 // See also getent(8).
 // A Mount exposes two mount points, one path based and another namespace based.
 // A path-based mount point can be '/home', a namespaced mount-point can be 'home:1234'

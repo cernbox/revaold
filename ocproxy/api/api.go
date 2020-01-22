@@ -6249,8 +6249,287 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 	// How do we assembly the chunks?
 	// https://github.com/owncloud/core/blob/2de709ee929ff8ffd480019c82e09929134ad41d/apps/dav/lib/Upload/ChunkingPlugin.php#L96
 	ctx := r.Context()
+	uploadid := mux.Vars(r)["uploadid"]
 	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+
+	destination := r.Header.Get("Destination")
+	overwrite := r.Header.Get("Overwrite")
+
+	if destination == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	destinationURL, err := gourl.ParseRequestURI(destination)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	overwrite = strings.ToUpper(overwrite)
+	if overwrite == "" {
+		overwrite = "T"
+	}
+
+	if overwrite != "T" && overwrite != "F" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	username := mux.Vars(r)["username"]
+	davPrefix := fmt.Sprintf("remote.php/dav/uploads/%s", username)
+	index := strings.Index(destinationURL.Path, davPrefix)
+	destinationPath := path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
+
+	if p.baseUrl != "" {
+		destinationPath = path.Join("/", p.baseUrl, destinationPath)
+	}
+
+	// we are moving from
+	// remote.php/dav/uploads/<username>/<upload-id>/
+	// to
+	// remote.php/dav/files/<username>/Documents/myfile.txt
+	// so we need to assemble all the chunks inside the the ng chunk folder in order
+	// and when we have the final file we send it to reva as a standard file upload.
+	// Then we remove the temporary chunk folder having the <upload-id>.
+
+	uploadPath := path.Join(p.ngChunkPath, username, uploadid)
+	fd, err := os.Open(uploadPath)
+	if err != nil {
+		if err != nil {
+			p.logger.Error("error opening ng chunk uploadid folder:"+uploadPath, zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+	}
+
+	names, err := fd.Readdirnames(-1)
+	if err != nil {
+		p.logger.Error("error reading chunks from:"+uploadPath, zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	names = p.getSortedChunkSlice(names)
+	p.logger.Info(fmt.Sprintf("chunks: %+v", names))
+
+	assembledFilename := path.Join(uploadPath, "assembled")
+	p.logger.Info("", zap.String("assembledfilename", assembledFilename))
+
+	assembledFile, err := os.OpenFile(assembledFilename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
+	if err != nil {
+		p.logger.Error("error opening assembled file", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	for i, n := range names {
+		p.logger.Info("processing chunk", zap.String("name", n), zap.Int("int", i))
+		chunkFilename := path.Join(uploadPath, n)
+		p.logger.Info(fmt.Sprintf("processing chunk %d", i), zap.String("chunk", chunkFilename))
+
+		chunk, err := os.Open(chunkFilename)
+		defer chunk.Close()
+		if err != nil {
+			p.logger.Error("error opening chunk file", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		//n, err := io.CopyN(assembledFile, chunk, int64(chunkInfo.ClientLength))
+		_, err = io.Copy(assembledFile, chunk)
+		if err != nil && err != io.EOF {
+			p.logger.Error("error copying chunk file", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		/*
+			if n != int64(chunkInfo.ClientLength) {
+				return nil, fmt.Errorf("chunk size in disk is different from chunk size sent from client. Read: %d Sent: %d", n, chunkInfo.ClientLength)
+			}
+		*/
+		chunk.Close()
+	}
+	defer assembledFile.Close()
+
+	fd, err = os.Open(assembledFilename)
+	if err != nil {
+		p.logger.Error("error opening assembled file after it has been filled with chunks", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	revaPath := p.getRevaPath(ctx, destinationPath)
+	gReq := &reva_api.PathReq{Path: revaPath}
+	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if mdRes.Status != reva_api.StatusCode_OK {
+		if mdRes.Status != reva_api.StatusCode_STORAGE_NOT_FOUND {
+			p.writeError(mdRes.Status, w, r)
+			return
+		}
+	}
+
+	md := mdRes.Metadata
+	if md != nil && md.IsDir {
+		p.logger.Warn("file already exists and is a folder", zap.String("path", md.Path))
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	// if If-Match header contains an Etag we need to check it against the ETag from the server
+	// so see if they match or not. If they do not match, StatusPreconditionFailed is returned
+	if md != nil {
+		md.Path = p.getOCPath(ctx, md)
+		clientETag := r.Header.Get("If-Match")
+		serverETag := md.Etag
+		if clientETag != "" {
+			if err := p.handleIfMatchHeader(clientETag, serverETag, w, r); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusPreconditionRequired)
+				return
+			}
+		}
+	}
+
+	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if txInfoRes.Status != reva_api.StatusCode_OK {
+		p.writeError(txInfoRes.Status, w, r)
+		return
+	}
+
+	txInfo := txInfoRes.TxInfo
+
+	stream, err := p.getStorageClient().WriteChunk(gCtx)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	buffer := make([]byte, 1024*1024*3)
+	offset := uint64(0)
+	numChunks := uint64(0)
+
+	readCloser := http.MaxBytesReader(w, assembledFile, p.maxUploadFileSize)
+	defer readCloser.Close()
+
+	for {
+		n, err := readCloser.Read(buffer)
+		if n > 0 {
+			dc := &reva_api.TxChunk{
+				TxId:   txInfo.TxId,
+				Length: uint64(n),
+				Data:   buffer,
+				Offset: offset,
+			}
+			if err := stream.Send(dc); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			numChunks++
+			offset += uint64(n)
+
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writeSummaryRes, err := stream.CloseAndRecv()
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if writeSummaryRes.Status != reva_api.StatusCode_OK {
+		p.writeError(writeSummaryRes.Status, w, r)
+		return
+	}
+
+	// all the chunks have been sent, we need to close the tx
+	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if emptyRes.Status != reva_api.StatusCode_OK {
+		p.writeError(emptyRes.Status, w, r)
+		return
+	}
+
+	modifiedMdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if modifiedMdRes.Status != reva_api.StatusCode_OK {
+		p.writeError(modifiedMdRes.Status, w, r)
+		return
+	}
+	modifiedMd := modifiedMdRes.Metadata
+
+	w.Header().Add("Content-Type", modifiedMd.Mime)
+	w.Header().Set("ETag", modifiedMd.Etag)
+	w.Header().Set("OC-FileId", modifiedMd.Id)
+	w.Header().Set("OC-ETag", modifiedMd.Etag)
+	t := time.Unix(int64(modifiedMd.Mtime), 0)
+	lastModifiedString := t.Format(time.RFC1123)
+	w.Header().Set("Last-Modified", lastModifiedString)
+	w.Header().Set("X-OC-MTime", "accepted")
+
+	// if object did not exist, http code is 201, else 204.
+	if md == nil {
+		w.WriteHeader(http.StatusCreated)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+	return
+
 	w.WriteHeader(http.StatusCreated)
+	assembledFile.Close()
+	// TODO: remove uploadid directory
+}
+
+func (p *proxy) getSortedChunkSlice(names []string) []string {
+	// sort names numerically by chunk
+	sort.Slice(names, func(i, j int) bool {
+		previous := names[i]
+		next := names[j]
+
+		previousOffset, err := strconv.ParseInt(strings.Split(previous, "-")[0], 10, 64)
+		if err != nil {
+			panic("chunk name cannot be casted to int: " + previous)
+		}
+		nextOffset, err := strconv.ParseInt(strings.Split(next, "-")[0], 10, 64)
+		if err != nil {
+			panic("chunk name cannot be casted to int: " + next)
+		}
+		return previousOffset < nextOffset
+	})
+	return names
 }
 
 func (p *proxy) infoToMD(info os.FileInfo, uploadid string) *reva_api.Metadata {
@@ -6367,6 +6646,16 @@ func (p *proxy) propfindNG(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) mkcolNG(w http.ResponseWriter, r *http.Request) {
+	/*
+		First, the client generates a transfer id and creates a directory for uploading the chunks
+		MKCOL /remote.php/dav/uploads/<user-id>/<transfer-id>
+		The MKCOL SHOULD have a OC-Total-Length header which is the final size of the file
+		The server should reply with 201 Created.
+	*/
+
+	// TODO(labkode): store the header in a special file inside the
+	// dav/uploads/hugo/uploadid/file-length.txt
+	// so we can read it when assembling the final file.
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, "upload-dav-uri", true)
 	username := mux.Vars(r)["username"]

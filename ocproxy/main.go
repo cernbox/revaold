@@ -70,6 +70,8 @@ func init() {
 
 	gc.Add("base-url", "", "Base url that should be appended to all links (in case cernbox in not in root path)")
 
+	gc.Add("ng-chunk-path", "/var/ng-chunk", "where to store NG dav chunks")
+
 	gc.BindFlags()
 	gc.ReadConfig()
 }
@@ -128,6 +130,7 @@ func main() {
 		OnlyOfficeDocumentServer: gc.GetString("apps-onlyoffice-document-server"),
 		GanttServer:              gc.GetString("apps-gantt-server"),
 		BaseUrl:                  gc.GetString("base-url"),
+		NGChunkPath:              gc.GetString("ng-chunk-path"),
 	}
 
 	_, err := api.New(opts)

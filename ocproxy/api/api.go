@@ -76,6 +76,12 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.delete)).Methods("DELETE")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
+	// new chunking routes
+	//p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/.file}", p.tokenAuth(p.moveNG)).Methods("MOVE")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/{chunkoffset}", p.tokenAuth(p.putOrMoveNG)).Methods("PUT", "MOVE")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.mkcolNG)).Methods("MKCOL")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.propfindNG)).Methods("PROPFIND")
+
 	// user-relative routes
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.put)).Methods("PUT")
@@ -112,6 +118,11 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/gallery/config", p.getGalleryConfig).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/gallery/preview/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/gallery/preview.public/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
+
+	// other thumbnail routes for example used by the Android mobile client.
+	// index.php/apps/files/api/v1/thumbnail/448/448/bmw/IMG_20190921_095922.jpg
+	// we can reuse the get requests for previews
+	p.router.HandleFunc("/index.php/apps/files/api/v1/thumbnail/{w}/{h}/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
 
 	// requests targeting a file/folder
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
@@ -2238,6 +2249,8 @@ type Options struct {
 	GanttServer              string
 
 	BaseUrl string
+
+	NGChunkPath string
 }
 
 func (opt *Options) init() {
@@ -2330,6 +2343,10 @@ func New(opt *Options) (http.Handler, error) {
 		return nil, err
 	}
 
+	if err := os.MkdirAll(opt.NGChunkPath, 0755); err != nil {
+		return nil, err
+	}
+
 	tr := &http.Transport{
 		//	DisableKeepAlives:   opts.DisableKeepAlives,
 		//IdleConnTimeout:     time.Duration(opts.IdleConnTimeout) * time.Second,
@@ -2395,6 +2412,8 @@ func New(opt *Options) (http.Handler, error) {
 		ganttServer:              opt.GanttServer,
 
 		baseUrl: opt.BaseUrl,
+
+		ngChunkPath: opt.NGChunkPath,
 	}
 
 	proxy.registerRoutes()
@@ -2460,6 +2479,8 @@ type proxy struct {
 	ganttServer string
 
 	baseUrl string
+
+	ngChunkPath string
 }
 
 // TODO(labkode): store this global var inside the proxy
@@ -5596,6 +5617,13 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	widthString := r.URL.Query().Get("width")
 	heightString := r.URL.Query().Get("height")
 
+	if widthString == "" {
+		widthString = mux.Vars(r)["w"]
+	}
+	if heightString == "" {
+		heightString = mux.Vars(r)["h"]
+	}
+
 	width, err := strconv.ParseInt(widthString, 10, 64)
 	if err != nil {
 		p.logger.Warn("", zap.String("x", widthString))
@@ -6229,9 +6257,526 @@ func (p *proxy) mkcol(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
+	// How do we assembly the chunks?
+	// https://github.com/owncloud/core/blob/2de709ee929ff8ffd480019c82e09929134ad41d/apps/dav/lib/Upload/ChunkingPlugin.php#L96
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	uploadid := mux.Vars(r)["uploadid"]
+
+	destination := r.Header.Get("Destination")
+	overwrite := r.Header.Get("Overwrite")
+
+	if destination == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	destinationURL, err := gourl.ParseRequestURI(destination)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	overwrite = strings.ToUpper(overwrite)
+	if overwrite == "" {
+		overwrite = "T"
+	}
+
+	if overwrite != "T" && overwrite != "F" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	username := mux.Vars(r)["username"]
+	davPrefix := fmt.Sprintf("remote.php/dav/uploads/%s", username)
+	index := strings.Index(destinationURL.Path, davPrefix)
+	destinationPath := path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
+
+	if p.baseUrl != "" {
+		destinationPath = path.Join("/", p.baseUrl, destinationPath)
+	}
+
+	// we are moving from
+	// remote.php/dav/uploads/<username>/<upload-id>/
+	// to
+	// remote.php/dav/files/<username>/Documents/myfile.txt
+	// so we need to assemble all the chunks inside the the ng chunk folder in order
+	// and when we have the final file we send it to reva as a standard file upload.
+	// Then we remove the temporary chunk folder having the <upload-id>.
+
+	uploadPath := path.Join(p.ngChunkPath, username, uploadid)
+	fd, err := os.Open(uploadPath)
+	if err != nil {
+		if err != nil {
+			p.logger.Error("error opening ng chunk uploadid folder:"+uploadPath, zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+	}
+
+	names, err := fd.Readdirnames(-1)
+	if err != nil {
+		p.logger.Error("error reading chunks from:"+uploadPath, zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	names = p.getSortedChunkSlice(names)
+	p.logger.Info(fmt.Sprintf("chunks: %+v", names))
+
+	assembledFilename := path.Join(uploadPath, "assembled")
+	p.logger.Info("", zap.String("assembledfilename", assembledFilename))
+
+	assembledFile, err := os.OpenFile(assembledFilename, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0600)
+	if err != nil {
+		p.logger.Error("error opening assembled file", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	for i, n := range names {
+		p.logger.Info("processing chunk", zap.String("name", n), zap.Int("int", i))
+		chunkFilename := path.Join(uploadPath, n)
+		p.logger.Info(fmt.Sprintf("processing chunk %d", i), zap.String("chunk", chunkFilename))
+
+		chunk, err := os.Open(chunkFilename)
+		defer chunk.Close()
+		if err != nil {
+			p.logger.Error("error opening chunk file", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		//n, err := io.CopyN(assembledFile, chunk, int64(chunkInfo.ClientLength))
+		_, err = io.Copy(assembledFile, chunk)
+		if err != nil && err != io.EOF {
+			p.logger.Error("error copying chunk file", zap.Error(err))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		/*
+			if n != int64(chunkInfo.ClientLength) {
+				return nil, fmt.Errorf("chunk size in disk is different from chunk size sent from client. Read: %d Sent: %d", n, chunkInfo.ClientLength)
+			}
+		*/
+		chunk.Close()
+	}
+	assembledFile.Close()
+
+	// check that assembled file has the correct length.
+	// Request URL: https://demo.owncloud.com/remote.php/dav/uploads/admin/web-file-upload-81e3dd22d83b5c72c693fcfecc155b40-1579738529908/.file
+	// Request Method: MOVE
+	// Status Code: 201
+	// oc-lazyops: 1
+	// oc-total-length: 11216723
+	// x-oc-mtime: 1558075197.538
+	lengthString := r.Header.Get("oc-total-length")
+	length, err := strconv.ParseInt(lengthString, 10, 64)
+	if err != nil {
+		p.logger.Error("error parsing oc-total-length header", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// re-open file so fd is valid
+	assembledFile, err = os.Open(assembledFilename)
+	if err != nil {
+		p.logger.Error("error opening assembled file after it has been filled with chunks", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	defer assembledFile.Close()
+
+	info, err := assembledFile.Stat()
+	if err != nil {
+		p.logger.Error("error stating assembled file after it has been filled with chunks", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if info.Size() != length {
+		msg := fmt.Sprintf("length sent by owncloud client in header oc-total-length does not match with size of assembled file. sent=%s computed=%d", length, info.Size())
+		p.logger.Error(msg, zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+
+	}
+
+	gCtx := GetContextWithAuth(ctx)
+	revaPath := p.getRevaPath(ctx, destinationPath)
+	gReq := &reva_api.PathReq{Path: revaPath}
+	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("error getting storage client", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if mdRes.Status != reva_api.StatusCode_OK {
+		if mdRes.Status != reva_api.StatusCode_STORAGE_NOT_FOUND {
+			p.writeError(mdRes.Status, w, r)
+			return
+		}
+	}
+
+	md := mdRes.Metadata
+	if md != nil && md.IsDir {
+		p.logger.Warn("file already exists and is a folder", zap.String("path", md.Path))
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	// if If-Match header contains an Etag we need to check it against the ETag from the server
+	// so see if they match or not. If they do not match, StatusPreconditionFailed is returned
+	if md != nil {
+		md.Path = p.getOCPath(ctx, md)
+		clientETag := r.Header.Get("If-Match")
+		serverETag := md.Etag
+		if clientETag != "" {
+			if err := p.handleIfMatchHeader(clientETag, serverETag, w, r); err != nil {
+				p.logger.Error("", zap.Error(err))
+				w.WriteHeader(http.StatusPreconditionRequired)
+				return
+			}
+		}
+	}
+
+	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
+	if err != nil {
+		p.logger.Error("error getting storage client", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if txInfoRes.Status != reva_api.StatusCode_OK {
+		p.writeError(txInfoRes.Status, w, r)
+		return
+	}
+
+	txInfo := txInfoRes.TxInfo
+
+	stream, err := p.getStorageClient().WriteChunk(gCtx)
+	if err != nil {
+		p.logger.Error("error writing chunk", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	buffer := make([]byte, 1024*1024*3)
+	offset := uint64(0)
+	numChunks := uint64(0)
+
+	for {
+		n, err := assembledFile.Read(buffer)
+		if n > 0 {
+			dc := &reva_api.TxChunk{
+				TxId:   txInfo.TxId,
+				Length: uint64(n),
+				Data:   buffer,
+				Offset: offset,
+			}
+			if err := stream.Send(dc); err != nil {
+				p.logger.Error("error sending chunk", zap.Error(err))
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			numChunks++
+			offset += uint64(n)
+
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			p.logger.Error("error sending chunk", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writeSummaryRes, err := stream.CloseAndRecv()
+	if err != nil {
+		p.logger.Error("error getting summary", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if writeSummaryRes.Status != reva_api.StatusCode_OK {
+		p.writeError(writeSummaryRes.Status, w, r)
+		return
+	}
+
+	// all the chunks have been sent, we need to close the tx
+	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
+	if err != nil {
+		p.logger.Error("error closing the tx", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if emptyRes.Status != reva_api.StatusCode_OK {
+		p.writeError(emptyRes.Status, w, r)
+		return
+	}
+
+	modifiedMdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
+	if err != nil {
+		p.logger.Error("error inspecting", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if modifiedMdRes.Status != reva_api.StatusCode_OK {
+		p.writeError(modifiedMdRes.Status, w, r)
+		return
+	}
+	modifiedMd := modifiedMdRes.Metadata
+
+	w.Header().Add("Content-Type", modifiedMd.Mime)
+	w.Header().Set("ETag", modifiedMd.Etag)
+	w.Header().Set("OC-FileId", modifiedMd.Id)
+	w.Header().Set("OC-ETag", modifiedMd.Etag)
+	t := time.Unix(int64(modifiedMd.Mtime), 0)
+	lastModifiedString := t.Format(time.RFC1123)
+	w.Header().Set("Last-Modified", lastModifiedString)
+	w.Header().Set("X-OC-MTime", "accepted")
+
+	// if object did not exist, http code is 201, else 204.
+	if md == nil {
+		w.WriteHeader(http.StatusCreated)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+
+	assembledFile.Close()
+	// TODO: remove uploadid directory
+}
+
+func (p *proxy) getSortedChunkSlice(names []string) []string {
+	// sort names numerically by chunk
+	sort.Slice(names, func(i, j int) bool {
+		previous := names[i]
+		next := names[j]
+
+		previousOffset, err := strconv.ParseInt(strings.Split(previous, "-")[0], 10, 64)
+		if err != nil {
+			panic("chunk name cannot be casted to int: " + previous)
+		}
+		nextOffset, err := strconv.ParseInt(strings.Split(next, "-")[0], 10, 64)
+		if err != nil {
+			panic("chunk name cannot be casted to int: " + next)
+		}
+		return previousOffset < nextOffset
+	})
+	return names
+}
+
+func (p *proxy) infoToMD(info os.FileInfo, uploadid string) *reva_api.Metadata {
+	/*
+				type Metadata struct {
+					Id          string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+					Path        string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+					Size        uint64 `protobuf:"varint,3,opt,name=size,proto3" json:"size,omitempty"`
+					Mtime       uint64 `protobuf:"varint,4,opt,name=mtime,proto3" json:"mtime,omitempty"`
+					IsDir       bool   `protobuf:"varint,5,opt,name=is_dir,json=isDir,proto3" json:"is_dir,omitempty"`
+					Etag        string `protobuf:"bytes,6,opt,name=etag,proto3" json:"etag,omitempty"`
+					Checksum    string `protobuf:"bytes,7,opt,name=checksum,proto3" json:"checksum,omitempty"`
+					DerefPath   string `protobuf:"bytes,8,opt,name=deref_path,json=derefPath,proto3" json:"deref_path,omitempty"`
+					IsReadOnly  bool   `protobuf:"varint,9,opt,name=is_read_only,json=isReadOnly,proto3" json:"is_read_only,omitempty"`
+					IsShareable bool   `protobuf:"varint,10,opt,name=is_shareable,json=isShareable,proto3" json:"is_shareable,omitempty"`
+					Mime        string `protobuf:"bytes,11,opt,name=mime,proto3" json:"mime,omitempty"`
+					Sys         []byte `protobuf:"bytes,12,opt,name=sys,proto3" json:"sys,omitempty"`
+					TreeCount   uint64 `protobuf:"varint,13,opt,name=tree_count,json=treeCount,proto3" json:"tree_count,omitempty"`
+					// EOS filesytem extended metadata records
+					EosFile     string `protobuf:"bytes,14,opt,name=eos_file,json=eosFile,proto3" json:"eos_file,omitempty"`
+					EosInstance string `protobuf:"bytes,15,opt,name=eos_instance,json=eosInstance,proto3" json:"eos_instance,omitempty"`
+					// Share extended metadata records
+					ShareTarget string `protobuf:"bytes,16,opt,name=share_target,json=shareTarget,proto3" json:"share_target,omitempty"`
+					// Migration extended metadata records
+					MigId                string   `protobuf:"bytes,17,opt,name=mig_id,json=migId,proto3" json:"mig_id,omitempty"`
+					MigPath              string   `protobuf:"bytes,18,opt,name=mig_path,json=migPath,proto3" json:"mig_path,omitempty"`
+					XXX_NoUnkeyedLiteral struct{} `json:"-"`
+					XXX_unrecognized     []byte   `json:"-"`
+					XXX_sizecache        int32    `json:"-"`
+				}
+		type FileInfo interface {
+			Name() string       // base name of the file
+			Size() int64        // length in bytes for regular files; system-dependent for others
+			Mode() FileMode     // file mode bits
+			ModTime() time.Time // modification time
+			IsDir() bool        // abbreviation for Mode().IsDir()
+			Sys() interface{}   // underlying data source (can return nil)
+		}
+
+	*/
+	id := fmt.Sprintf("%s-%s", uploadid, info.Name())
+	md := &reva_api.Metadata{}
+	md.Id = id
+	md.Path = path.Join("/", uploadid, info.Name())
+	md.Size = uint64(info.Size())
+	md.IsDir = info.IsDir()
+	md.Etag = id // what else?
+	md.Mime = reva_api.DetectMimeType(md.IsDir, info.Name())
+
+	return md
+}
+
+func (p *proxy) propfindNG(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	username := mux.Vars(r)["username"]
+	uploadid := mux.Vars(r)["uploadid"]
+
+	pf, status, err := readPropfind(r.Body)
+	if err != nil {
+		p.logger.Error("error reading propfind request", zap.Error(err))
+		w.WriteHeader(status)
+		return
+	}
+
+	var children bool
+	depth := r.Header.Get("Depth")
+	if depth == "1" {
+		children = true
+	}
+
+	var mds []*reva_api.Metadata
+
+	uploadFolder := path.Join(p.ngChunkPath, username, uploadid)
+	fd, err := os.Open(uploadFolder)
+	if err != nil {
+		p.logger.Error("error opening ng upload folder: "+uploadFolder, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer fd.Close()
+
+	info, err := fd.Stat()
+
+	md := p.infoToMD(info, uploadid)
+	mds = append(mds, md)
+
+	if children && md.IsDir {
+		infos, err := fd.Readdir(-1)
+		if err != nil {
+			p.logger.Error("error listing ng chunks inside: "+uploadFolder, zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		for _, i := range infos {
+			md := p.infoToMD(i, uploadid)
+			mds = append(mds, md)
+		}
+	}
+
+	mdsInXML, err := p.mdsToXML(ctx, &pf, mds)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("DAV", "1, 3, extended-mkcol")
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.WriteHeader(207)
+	w.Write([]byte(mdsInXML))
+	w.WriteHeader(207)
+}
+
+func (p *proxy) mkcolNG(w http.ResponseWriter, r *http.Request) {
+	/*
+		First, the client generates a transfer id and creates a directory for uploading the chunks
+		MKCOL /remote.php/dav/uploads/<user-id>/<transfer-id>
+		The MKCOL SHOULD have a OC-Total-Length header which is the final size of the file
+		The server should reply with 201 Created.
+	*/
+
+	// TODO(labkode): store the header in a special file inside the
+	// dav/uploads/hugo/uploadid/file-length.txt
+	// so we can read it when assembling the final file.
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	username := mux.Vars(r)["username"]
+	uploadid := mux.Vars(r)["uploadid"]
+
+	uploadPath := path.Join(p.ngChunkPath, username, uploadid)
+	// TODO(labkode):  validate that username matches loggedin user
+	if err := os.MkdirAll(uploadPath, 0755); err != nil {
+		p.logger.Error("error ng mkcol path: "+uploadPath, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (p *proxy) putOrMoveNG(w http.ResponseWriter, r *http.Request) {
+	if strings.ToUpper(r.Method) == "MOVE" {
+		p.moveNG(w, r)
+		return
+	}
+	p.putNG(w, r)
+	return
+}
+
+func (p *proxy) putNG(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	username := mux.Vars(r)["username"]
+	uploadid := mux.Vars(r)["uploadid"]
+	chunkoffset := mux.Vars(r)["chunkoffset"]
+
+	if r.Body == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	readCloser := http.MaxBytesReader(w, r.Body, p.maxUploadFileSize)
+
+	chunk := path.Join(p.ngChunkPath, username, uploadid, chunkoffset)
+
+	fd, err := os.Create(chunk) // create or truncate
+	if err != nil {
+		p.logger.Error("error opening chunk file: "+chunk, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer fd.Close()
+
+	// copy http body to file
+	if _, err := io.Copy(fd, readCloser); err != nil {
+		p.logger.Error("error copying http body to chunk file: "+chunk, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	info, err := fd.Stat()
+	if err != nil {
+		p.logger.Error("error stating chunk file: "+chunk, zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fd.Close()
+
+	//w.Header().Add("Content-Type", md.Mime)
+	//w.Header().Set("ETag", modifiedMd.Etag)
+	//w.Header().Set("OC-FileId", modifiedMd.Id)
+	//w.Header().Set("OC-ETag", modifiedMd.Etag)
+	lastModifiedString := info.ModTime().Format(time.RFC1123)
+	w.Header().Set("Last-Modified", lastModifiedString)
+	//w.Header().Set("X-OC-MTime", "accepted")
+
+	w.WriteHeader(http.StatusCreated)
+	return
+
+}
+
 func (p *proxy) proppatch(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
+
 func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	oldPath := mux.Vars(r)["path"]
@@ -6901,7 +7446,7 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-		
+
 			if res.Status != reva_api.StatusCode_OK {
 				p.writeError(res.Status, w, r)
 				p.logger.Error("wrong grpc status", zap.Int("status", int(res.Status)))
@@ -7081,11 +7626,16 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 	var ref string
 	// TODO(labkode): harden check for user
 	if user, ok := reva_api.ContextGetUser(ctx); ok {
-		// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
-		if val := ctx.Value("user-dav-uri"); val != nil {
-			ref = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+		// check for ng chunking
+		if val := ctx.Value("upload-dav-uri"); val != nil {
+			ref = path.Join("/remote.php/dav/uploads", user.AccountId, md.Path)
 		} else {
-			ref = path.Join("/remote.php/webdav", md.Path)
+			// check for remote.php/webdav and remote.php/dav/files/gonzalhu/
+			if val := ctx.Value("user-dav-uri"); val != nil {
+				ref = path.Join("/remote.php/dav/files", user.AccountId, md.Path)
+			} else {
+				ref = path.Join("/remote.php/webdav", md.Path)
+			}
 		}
 	} else { // public link access
 		ref = path.Join("/public.php/webdav", md.Path)
@@ -7128,7 +7678,6 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 	if md.IsShareable {
 		perm += "R"
 	}
-
 
 	// when allprops has been requested
 	if pf.Allprop != nil {
@@ -7288,7 +7837,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 				case "getcontenttype": // phoenix
 					/*if md.IsDir {
 						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getcontenttype", "httpd/unix-directory"))
-					} else*/ if !md.IsDir && md.Mime != "" {
+					} else*/if !md.IsDir && md.Mime != "" {
 						propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getcontenttype", md.Mime))
 					} else {
 						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:getcontenttype", ""))
@@ -7333,7 +7882,6 @@ func (p *proxy) newProp(key, val string) *propertyXML {
 		InnerXML: []byte(val),
 	}
 }
-
 
 // http://www.webdav.org/specs/rfc4918.html#ELEMENT_prop (for propfind)
 type propfindProps []xml.Name

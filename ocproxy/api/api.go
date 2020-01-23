@@ -80,7 +80,7 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.mkcolNG)).Methods("MKCOL")
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/.file", p.tokenAuth(p.moveNG)).Methods("MOVE")
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.propfindNG)).Methods("PROPFIND")
-	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/{chunknumber}", p.tokenAuth(p.putNG)).Methods("PUT")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/{chunkoffset}", p.tokenAuth(p.putNG)).Methods("PUT")
 
 	// user-relative routes
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
@@ -6704,7 +6704,7 @@ func (p *proxy) putNG(w http.ResponseWriter, r *http.Request) {
 	ctx = context.WithValue(ctx, "upload-dav-uri", true)
 	username := mux.Vars(r)["username"]
 	uploadid := mux.Vars(r)["uploadid"]
-	chunknumber := mux.Vars(r)["chunknumber"]
+	chunkoffset := mux.Vars(r)["chunkoffset"]
 
 	if r.Body == nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -6713,7 +6713,7 @@ func (p *proxy) putNG(w http.ResponseWriter, r *http.Request) {
 
 	readCloser := http.MaxBytesReader(w, r.Body, p.maxUploadFileSize)
 
-	chunk := path.Join(p.ngChunkPath, username, uploadid, chunknumber)
+	chunk := path.Join(p.ngChunkPath, username, uploadid, chunkoffset)
 
 	fd, err := os.Create(chunk) // create or truncate
 	if err != nil {

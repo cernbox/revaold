@@ -78,7 +78,7 @@ func (p *proxy) registerRoutes() {
 
 	// new chunking routes
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.mkcolNG)).Methods("MKCOL")
-	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.moveNG)).Methods("MOVE")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/.file", p.tokenAuth(p.moveNG)).Methods("MOVE")
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.propfindNG)).Methods("PROPFIND")
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/{chunknumber}", p.tokenAuth(p.putNG)).Methods("PUT")
 
@@ -6354,6 +6354,21 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 	}
 	assembledFile.Close()
 
+	// check that assembled file has the correct length.
+	// Request URL: https://demo.owncloud.com/remote.php/dav/uploads/admin/web-file-upload-81e3dd22d83b5c72c693fcfecc155b40-1579738529908/.file
+	// Request Method: MOVE
+	// Status Code: 201
+	// oc-lazyops: 1
+	// oc-total-length: 11216723
+	// x-oc-mtime: 1558075197.538
+	lengthString := r.Header.Get("oc-total-length")
+	length, err := strconv.ParseInt(lengthString, 10, 64)
+	if err != nil {
+		p.logger.Error("error parsing oc-total-length header", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
 	// re-open file so fd is valid
 	assembledFile, err = os.Open(assembledFilename)
 	if err != nil {
@@ -6362,6 +6377,21 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer assembledFile.Close()
+
+	info, err := assembledFile.Stat()
+	if err != nil {
+		p.logger.Error("error stating assembled file after it has been filled with chunks", zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if info.Size() != length {
+		msg := fmt.Sprintf("length sent by owncloud client in header oc-total-length does not match with size of assembled file. sent=%s computed=%d", length, info.Size())
+		p.logger.Error(msg, zap.Error(err))
+		w.WriteHeader(http.StatusBadRequest)
+		return
+
+	}
 
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, destinationPath)

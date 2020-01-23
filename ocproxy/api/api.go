@@ -6289,7 +6289,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	username := mux.Vars(r)["username"]
-	davPrefix := fmt.Sprintf("remote.php/dav/uploads/%s", username)
+	davPrefix := fmt.Sprintf("remote.php/dav/files/%s", username)
 	index := strings.Index(destinationURL.Path, davPrefix)
 	destinationPath := path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
 

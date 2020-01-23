@@ -4464,6 +4464,10 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
+		ctx = context.WithValue(ctx, "isMobile", true)
+	}
+
 	if newShare.ShareType == ShareTypePublicLink {
 		p.createPublicLinkShare(ctx, newShare, readOnly, dropOnly, expiration, w, r)
 		return
@@ -4489,6 +4493,10 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	onlySharedByLink := r.URL.Query().Get("only_shared_by_link") == "true"
 	originalPath := r.URL.Query().Get("path")
 	path, ctx := p.stripCBOXMappedPath(r, originalPath)
+
+	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
+		ctx = context.WithValue(ctx, "isMobile", true)
+	}
 
 	sharedWithMe := r.URL.Query().Get("shared_with_me")
 
@@ -4718,6 +4726,16 @@ func (p *proxy) receivedFolderShareToOCSShare(ctx context.Context, share *reva_a
 		ShareWith:            &shareWith,
 		ShareWithDisplayName: shareWith,
 	}
+
+	isMobile, _ := ctx.Value("isMobile").(bool)
+	if isMobile {
+		ids := strings.Split(md.Id, ":")
+		if len(ids) >= 1 {
+			ocsShare.FileSource = ids[1]
+			ocsShare.ItemSource = ids[1]
+		}
+	}
+
 	return ocsShare, nil
 }
 func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.FolderShare) (*OCSShare, error) {
@@ -4767,6 +4785,16 @@ func (p *proxy) folderShareToOCSShare(ctx context.Context, share *reva_api.Folde
 		ShareWithDisplayName: shareWith,
 	}
 	//p.logger.Debug("reva folder share to oc share", zap.String("folder_share", fmt.Sprintf("%+v", share)), zap.String("ocs_share", fmt.Sprintf("%+v", ocsShare)))
+
+	isMobile, _ := ctx.Value("isMobile").(bool)
+	if isMobile {
+		ids := strings.Split(md.Id, ":")
+		if len(ids) >= 1 {
+			ocsShare.FileSource = ids[1]
+			ocsShare.ItemSource = ids[1]
+		}
+	}
+
 	return ocsShare, nil
 }
 func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLink) (*OCSShare, error) {
@@ -4848,6 +4876,16 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		Expiration:           expiration,
 		URL:                  fmt.Sprintf("https://%s/index.php/s/%s", p.overwriteHost, pl.Token),
 	}
+
+	isMobile, _ := ctx.Value("isMobile").(bool)
+	if isMobile {
+		ids := strings.Split(md.Id, ":")
+		if len(ids) >= 1 {
+			ocsShare.FileSource = ids[1]
+			ocsShare.ItemSource = ids[1]
+		}
+	}
+
 	return ocsShare, nil
 }
 
@@ -4944,6 +4982,10 @@ func (p *proxy) getShare(w http.ResponseWriter, r *http.Request) {
 	// so we query both backends, and the first that responds we use it
 	shareID := mux.Vars(r)["share_id"]
 
+	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
+		ctx = context.WithValue(ctx, "isMobile", true)
+	}
+
 	ocsShare, found, err := p.getOCSPublicLink(ctx, shareID)
 	ocsShare2, found2, err2 := p.getOCSFolderShare(ctx, shareID)
 
@@ -5002,7 +5044,7 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 			p.writeError(res.Status, w, r)
 			return
 		}
-		p.writeOCSResponse(w, r, "ok", 100, nil, nil, "")
+		p.writeOCSResponse(w, r, "ok", 200, nil, nil, "")
 		return
 	}
 
@@ -5025,7 +5067,7 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		p.writeOCSResponse(w, r, "ok", 100, nil, nil, "")
+		p.writeOCSResponse(w, r, "ok", 200, nil, nil, "")
 		return
 	}
 
@@ -5058,6 +5100,11 @@ func (p *proxy) isFolderShare(ctx context.Context, shareID string) (bool, error)
 // TODO(labkode): check for updateReadOnly
 func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
+		ctx = context.WithValue(ctx, "isMobile", true)
+	}
+
 	req := &reva_api.UpdateFolderShareReq{Id: shareID, ReadOnly: readOnly, UpdateReadOnly: true}
 	gCtx := GetContextWithAuth(ctx)
 	res, err := p.getShareClient().UpdateFolderShare(gCtx, req)
@@ -5081,7 +5128,7 @@ func (p *proxy) updateFolderShare(shareID string, readOnly bool, w http.Response
 		return
 	}
 
-	p.writeOCSResponse(w, r, "ok", 100, ocsShare, nil, "")
+	p.writeOCSResponse(w, r, "ok", 200, ocsShare, nil, "")
 }
 
 // TODO(labkode): check for updateReadOnly
@@ -5096,6 +5143,11 @@ func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSReque
 		Password:         newShare.Password.Value,
 		Expiration:       uint64(expiration),
 		Id:               shareID,
+	}
+
+
+	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
+		ctx = context.WithValue(ctx, "isMobile", true)
 	}
 
 	gCtx := GetContextWithAuth(ctx)
@@ -5119,7 +5171,7 @@ func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSReque
 		return
 	}
 
-	p.writeOCSResponse(w, r, "ok", 100, ocsShare, nil, "")
+	p.writeOCSResponse(w, r, "ok", 200, ocsShare, nil, "")
 }
 func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

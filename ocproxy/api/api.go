@@ -77,10 +77,10 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuth(p.move)).Methods("MOVE")
 
 	// new chunking routes
+	//p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/.file}", p.tokenAuth(p.moveNG)).Methods("MOVE")
+	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/{chunkoffset}", p.tokenAuth(p.putOrMoveNG)).Methods("PUT", "MOVE")
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.mkcolNG)).Methods("MKCOL")
-	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/.file", p.tokenAuth(p.moveNG)).Methods("MOVE")
 	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}", p.tokenAuth(p.propfindNG)).Methods("PROPFIND")
-	p.router.HandleFunc("/remote.php/dav/uploads/{username}/{uploadid}/{chunkoffset}", p.tokenAuth(p.putNG)).Methods("PUT")
 
 	// user-relative routes
 	p.router.HandleFunc("/remote.php/webdav{path:.*}", p.tokenAuth(p.get)).Methods("GET")
@@ -6697,6 +6697,15 @@ func (p *proxy) mkcolNG(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
+}
+
+func (p *proxy) putOrMoveNG(w http.ResponseWriter, r *http.Request) {
+	if strings.ToUpper(r.Method) == "MOVE" {
+		p.moveNG(w, r)
+		return
+	}
+	p.putNG(w, r)
+	return
 }
 
 func (p *proxy) putNG(w http.ResponseWriter, r *http.Request) {

@@ -16,6 +16,7 @@ github.com/cernbox/cboxredirectd v1.0.16 h1:+DnYK49NOKAZ3XWTIPPzG7jCIQDhi6oWB2yS
 github.com/cernbox/cboxredirectd v1.0.16/go.mod h1:z2eZAnX9/Zvr00FmZOXfW5ade5v7gw3DWmBZF259aaU=
 github.com/cernbox/gohub v1.0.3 h1:LJA1p+ISkqtneCSHIPNwut5/40y5Yi/FELSZCA+O87M=
 github.com/cernbox/gohub v1.0.3/go.mod h1:46+jaU2qYhJtGcG5al8zAOwS65G3OzUKcH9RT47YKtg=
+github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/cespare/xxhash/v2 v2.1.0 h1:yTUvW7Vhb89inJ+8irsUqiWjh8iT6sQPZiQzI6ReGkA=
 github.com/cespare/xxhash/v2 v2.1.0/go.mod h1:dgIUBU3pDso/gPgZ1osOZ0iQf77oPR28Tjxl5dIMyVM=

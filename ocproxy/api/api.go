@@ -5638,6 +5638,8 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	p.logger.Info("sent request for preview", zap.String("path", reqPath), zap.Int64("width", width), zap.Int64("height", height))
+
 	revaPath := p.getRevaPath(ctx, reqPath)
 	gCtx := GetContextWithAuth(ctx)
 	gReq := &reva_api.PathReq{Path: revaPath}

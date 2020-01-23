@@ -6249,8 +6249,8 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 	// How do we assembly the chunks?
 	// https://github.com/owncloud/core/blob/2de709ee929ff8ffd480019c82e09929134ad41d/apps/dav/lib/Upload/ChunkingPlugin.php#L96
 	ctx := r.Context()
-	uploadid := mux.Vars(r)["uploadid"]
 	ctx = context.WithValue(ctx, "upload-dav-uri", true)
+	uploadid := mux.Vars(r)["uploadid"]
 
 	destination := r.Header.Get("Destination")
 	overwrite := r.Header.Get("Overwrite")
@@ -6352,21 +6352,23 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 		*/
 		chunk.Close()
 	}
-	defer assembledFile.Close()
+	assembledFile.Close()
 
-	fd, err = os.Open(assembledFilename)
+	// re-open file so fd is valid
+	assembledFile, err = os.Open(assembledFilename)
 	if err != nil {
 		p.logger.Error("error opening assembled file after it has been filled with chunks", zap.Error(err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	defer assembledFile.Close()
 
 	gCtx := GetContextWithAuth(ctx)
 	revaPath := p.getRevaPath(ctx, destinationPath)
 	gReq := &reva_api.PathReq{Path: revaPath}
 	mdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("error getting storage client", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -6402,7 +6404,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 
 	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("error getting storage client", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -6415,7 +6417,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 
 	stream, err := p.getStorageClient().WriteChunk(gCtx)
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("error writing chunk", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -6424,11 +6426,8 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 	offset := uint64(0)
 	numChunks := uint64(0)
 
-	readCloser := http.MaxBytesReader(w, assembledFile, p.maxUploadFileSize)
-	defer readCloser.Close()
-
 	for {
-		n, err := readCloser.Read(buffer)
+		n, err := assembledFile.Read(buffer)
 		if n > 0 {
 			dc := &reva_api.TxChunk{
 				TxId:   txInfo.TxId,
@@ -6437,7 +6436,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 				Offset: offset,
 			}
 			if err := stream.Send(dc); err != nil {
-				p.logger.Error("", zap.Error(err))
+				p.logger.Error("error sending chunk", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -6449,7 +6448,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("error sending chunk", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -6457,7 +6456,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 
 	writeSummaryRes, err := stream.CloseAndRecv()
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("error getting summary", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -6469,7 +6468,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 	// all the chunks have been sent, we need to close the tx
 	emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("error closing the tx", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -6481,7 +6480,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 
 	modifiedMdRes, err := p.getStorageClient().Inspect(gCtx, gReq)
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("error inspecting", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -6506,9 +6505,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-	return
 
-	w.WriteHeader(http.StatusCreated)
 	assembledFile.Close()
 	// TODO: remove uploadid directory
 }

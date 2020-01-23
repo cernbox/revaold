@@ -14,6 +14,8 @@ const (
 	tokenKey           key = 1
 	publicLinkKey      key = 2
 	publicLinkTokenKey key = 3
+
+	defaultFileMime = "application/octet-stream"
 )
 
 func ContextGetUser(ctx context.Context) (*User, bool) {
@@ -245,6 +247,10 @@ func DetectMimeType(isDir bool, path string) string {
 
 	if mimeType == "" {
 		mimeType = mime.TypeByExtension(ext)
+	}
+
+	if mimeType == "" {
+		mimeType = defaultFileMime
 	}
 
 	return mimeType

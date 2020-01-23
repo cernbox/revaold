@@ -119,6 +119,11 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/gallery/preview/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/gallery/preview.public/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
 
+	// other thumbnail routes for example used by the Android mobile client.
+	// index.php/apps/files/api/v1/thumbnail/448/448/bmw/IMG_20190921_095922.jpg
+	// we can reuse the get requests for previews
+	p.router.HandleFunc("/index.php/apps/files/api/v1/thumbnail/{w}/{h}/{path:.*}", p.tokenAuth(p.getGalleryPreview)).Methods("GET")
+
 	// requests targeting a file/folder
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.getShares)).Methods("GET")
 	p.router.HandleFunc("/ocs/v2.php/apps/files_sharing/api/v1/shares", p.tokenAuth(p.createShare)).Methods("POST")
@@ -5611,6 +5616,13 @@ func (p *proxy) getGalleryPreview(w http.ResponseWriter, r *http.Request) {
 	reqPath := mux.Vars(r)["path"]
 	widthString := r.URL.Query().Get("width")
 	heightString := r.URL.Query().Get("height")
+
+	if widthString == "" {
+		widthString = mux.Vars(r)["w"]
+	}
+	if heightString == "" {
+		heightString = mux.Vars(r)["h"]
+	}
 
 	width, err := strconv.ParseInt(widthString, 10, 64)
 	if err != nil {

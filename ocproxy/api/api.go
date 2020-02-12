@@ -6369,6 +6369,8 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
+			
+	p.logger.Info("MOVE ng", zap.String("destination path", destinationPath))
 
 	names, err := fd.Readdirnames(-1)
 	if err != nil {
@@ -7531,8 +7533,9 @@ func (p *proxy) isChunkedUpload(path string) (bool, error) {
 }
 
 func (p *proxy) handleIfMatchHeader(clientETag, serverETag string, w http.ResponseWriter, r *http.Request) error {
-	// ownCloud adds double quotes around ETag value
-	serverETag = fmt.Sprintf(`"%s"`, serverETag)
+	// remove double quotes for checking match
+	serverETag = strings.Trim(serverETag, "\"")
+	clientETag = strings.Trim(clientETag, "\"")
 	if clientETag != serverETag {
 		err := fmt.Errorf("etags do not match")
 		p.logger.Error("can not accept conditional request", zap.String("client-etag", clientETag), zap.String("server-etag", serverETag))

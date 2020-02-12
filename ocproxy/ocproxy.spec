@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.56
+Version: 0.0.57
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Thu Jan 23 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.56
+- supports new oc chunking algorithm and files/api previews
 * Wed Jan 15 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.56
 - Forbid sharing files with users/groups
 * Mon Jan 10 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.55

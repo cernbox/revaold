@@ -103,6 +103,11 @@ func (c *Client) execute(cmd *exec.Cmd) (string, string, error) {
 		"EOS_MGM_URL=" + c.opt.URL,
 	}
 
+	keytab := os.Getenv("XrdSecsssKT")
+	if keytab != "" {
+		cmd.Env = append(cmd.Env, "XrdSecsssKT=" + keytab)
+	}
+
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 	cmd.Stdout = outBuf

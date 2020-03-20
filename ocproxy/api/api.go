@@ -8513,10 +8513,10 @@ func (p *proxy) authAux(h http.HandlerFunc, popup bool) http.HandlerFunc {
 		if popup && token == "" {
 			p.logger.Warn("auth token not provided", zap.String("X-Access-Token", token))
 
-			bToReturn := []byte("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\"><s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception><s:message>No public access to this resource., No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured, No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured</s:message></d:error>")
+			bToReturn := []byte("<?xml version=\"1.0\" encoding=\"utf-8\"?><d:error xmlns:d=\"DAV:\" xmlns:s=\"http://sabredav.org/ns\"><s:exception>Sabre\\DAV\\Exception\\NotAuthenticated</s:exception><s:message>No public access to this resource., No 'Authorization: Bearer' header found. Either the client didn't send one, or the server is misconfigured, No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured</s:message></d:error>")
 			w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 			w.Header().Set("Content-Length", strconv.Itoa(len(bToReturn)))
-			w.Header().Set("www-authenticate", "Basic realm=\"ownCloud\"")
+			w.Header().Set("www-authenticate", "Bearer realm=\"ownCloud\"")
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write(bToReturn)
 			return

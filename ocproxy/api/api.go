@@ -7072,10 +7072,6 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
 	}
 
-	if p.baseUrl != "" {
-		destinationPath = path.Join("/", p.baseUrl, destinationPath)
-	}
-
 	gCtx := GetContextWithAuth(ctx)
 	oldRevaPath := p.getRevaPath(ctx, oldPath)
 	destinationRevaPath := p.getRevaPath(ctx, destinationPath)
@@ -8443,7 +8439,6 @@ func (p *proxy) tokenAuthPopup(h http.HandlerFunc) http.HandlerFunc {
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 	return p.authAux(h, false)
 }
-
 
 func (p *proxy) authAux(h http.HandlerFunc, popup bool) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

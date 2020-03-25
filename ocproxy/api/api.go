@@ -4309,13 +4309,23 @@ func (p *proxy) writeOCSResponse(w http.ResponseWriter, r *http.Request, status 
 	}
 
 	meta := &ResponseMeta{Status: status, StatusCode: statusCode, Message: message}
-	payload := &OCSPayload{Meta: meta, Data: data}
+	
 
 	var encoded []byte
 	var err error
 	if useXML {
-		encoded, err = xml.Marshal(payload)
+
+		switch data.(type) {
+			case []*OCSShare:
+				payload := &OCSPayloadMulti{Meta: meta, Data: data}
+				encoded, err = xml.Marshal(payload)
+			default:
+				payload := &OCSPayload{Meta: meta, Data: data}
+				encoded, err = xml.Marshal(payload)
+		}
+
 	} else {
+		payload := &OCSPayload{Meta: meta, Data: data}
 		ocsRes := &OCSResponse{OCS: payload}
 		encoded, err = json.Marshal(ocsRes)
 	}
@@ -5590,6 +5600,12 @@ type ResponseMeta struct {
 }
 
 type OCSPayload struct {
+	XMLName xml.Name      `xml:"ocs" json:"-"`
+	Meta    *ResponseMeta `json:"meta" xml:"meta"`
+	Data    interface{}   `json:"data" xml:"data"`
+}
+
+type OCSPayloadMulti struct {
 	XMLName xml.Name      `xml:"ocs" json:"-"`
 	Meta    *ResponseMeta `json:"meta" xml:"meta"`
 	Data    interface{}   `json:"data" xml:"data>element"`

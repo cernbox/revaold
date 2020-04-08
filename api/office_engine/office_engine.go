@@ -9,12 +9,14 @@ import (
 )
 
 type Manager struct {
-	db *sql.DB
+	db 				*sql.DB
+	defaultOffice 	string
 }
 
 type Options struct {
 	DBUsername, DBPassword, DBHost, DBName string
 	DBPort                                 int
+	DefaultOffice 						   string
 }
 
 func New(opts *Options) *Manager {
@@ -23,7 +25,7 @@ func New(opts *Options) *Manager {
 		panic(err)
 	}
 
-	return &Manager{db: db}
+	return &Manager{db: db, defaultOffice: opts.DefaultOffice}
 }
 
 func (cm *Manager) GetOfficeEngine(username string) (string, error) {
@@ -32,7 +34,7 @@ func (cm *Manager) GetOfficeEngine(username string) (string, error) {
 	if err := cm.db.QueryRow(query, username).Scan(&username, &office); err != nil {
 
 		if err == sql.ErrNoRows {
-			return "microsoft", nil
+			return cm.defaultOffice, nil
 		}
 
 		fmt.Println(err)

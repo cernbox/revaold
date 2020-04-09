@@ -622,6 +622,48 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
+		// Unlock the file
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+
+		client := &http.Client{Transport: tr}
+		url = fmt.Sprintf("%s/cbox/unlock", p.wopiServer)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		md, err := p.getMetadata(ctx, revaPath)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		q := req.URL.Query()
+		q.Add("filename", md.EosFile)
+		q.Add("endpoint", md.EosInstance)
+		req.URL.RawQuery = q.Encode()
+
+		req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
+		res, err := client.Do(req)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if res.StatusCode != http.StatusOK {
+			p.logger.Error("error calling wopi at /cbox/unlock", zap.Int("status", res.StatusCode))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+
+		}
+
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(encoded)
 		return
@@ -708,8 +750,40 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.overwriteHost, path.Dir(fn))
 	lang := "en"
 
+	// Try to lock the file in WOPI (to avoid conflicts with other Office clients)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+	url := fmt.Sprintf("%s/cbox/lock", p.wopiServer)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	q := req.URL.Query()
+	q.Add("filename", md.EosFile)
+	q.Add("endpoint", md.EosInstance)
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
+	res, err := client.Do(req)
+	if err != nil {
+		p.logger.Error("Failed to set the lock in WOPI from OnlyOffice", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if res.StatusCode != http.StatusOK {
+		p.logger.Info("Asking for lock in WOPI from OnlyOffice returned NOT OK", zap.Int("StatusCode", res.StatusCode))
+		title += " (locked by another app)"
+	}
+	
 	mode := "edit"
-	if md.IsReadOnly {
+	if md.IsReadOnly || res.StatusCode != http.StatusOK {
 		mode = "view"
 	}
 
@@ -755,7 +829,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	p.onlyOfficeMutex.Unlock()
 
 	p.logger.Info(fmt.Sprintf("office-engine onlyoffice config: key=%s for path=%s for md=%+v", key, fn, md))
-	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download", p.hostname) + md.Path + "?x-access-token=" + accessToken
+	url = fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download", p.hostname) + md.Path + "?x-access-token=" + accessToken
 
 	msg := `{
   "document": {

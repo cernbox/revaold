@@ -72,6 +72,8 @@ func init() {
 
 	gc.Add("ng-chunk-path", "/var/ng-chunk", "where to store NG dav chunks")
 
+	gc.Add("default-office", "microsoft", "Default Office engine, returned when user hasn't picked one")
+
 	gc.BindFlags()
 	gc.ReadConfig()
 }
@@ -92,11 +94,12 @@ func main() {
 	cm := canary.New(canaryOpts)
 
 	officeOpts := &office_engine.Options{
-		DBUsername: gc.GetString("dbusername"),
-		DBPassword: gc.GetString("dbpassword"),
-		DBHost:     gc.GetString("dbhost"),
-		DBPort:     gc.GetInt("dbport"),
-		DBName:     gc.GetString("dbname"),
+		DBUsername: 	gc.GetString("dbusername"),
+		DBPassword: 	gc.GetString("dbpassword"),
+		DBHost:     	gc.GetString("dbhost"),
+		DBPort:     	gc.GetInt("dbport"),
+		DBName:     	gc.GetString("dbname"),
+		DefaultOffice:	gc.GetString("default-office"),
 	}
 	oem := office_engine.New(officeOpts)
 

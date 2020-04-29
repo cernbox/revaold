@@ -602,9 +602,9 @@ func parseRecycleList(raw string) ([]*DeletedEntry, error) {
 func parseRecycleEntry(raw string) (*DeletedEntry, error) {
 	partsBySpace := strings.Split(raw, " ")
 	restoreKeyPair, partsBySpace := partsBySpace[len(partsBySpace)-1], partsBySpace[:len(partsBySpace)-1]
-	restorePathPair := strings.Join(partsBySpace[9:], " ")
+	restorePathPair := strings.Join(partsBySpace[8:], " ")
 
-	partsBySpace = partsBySpace[:9]
+	partsBySpace = partsBySpace[:8]
 	partsBySpace = append(partsBySpace, restorePathPair)
 	partsBySpace = append(partsBySpace, restoreKeyPair)
 

@@ -665,7 +665,7 @@ func (p *proxy) unlockWopi(ctx context.Context, revaPath string) bool {
 
 	client := &http.Client{Transport: tr}
 	url := fmt.Sprintf("%s/cbox/unlock", p.wopiServer)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		return false

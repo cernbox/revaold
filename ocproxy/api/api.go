@@ -522,8 +522,13 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusForceSavingError {
 		url := req.URL
 		resp, err := http.Get(url)
-		if err != nil {
-			p.logger.Error(err.Error())
+		if err != nil || resp.StatusCode != http.StatusOK {
+
+			if err != nil {
+				p.logger.Error(err.Error())
+			} else {
+				p.logger.Error("Retrieving file from OnlyOffice returned status not OK", zap.Int("Status", resp.StatusCode))
+			}
 			payload := struct {
 				Err     int    `json:"error"`
 				Message string `json:"message"`

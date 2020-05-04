@@ -522,8 +522,13 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusForceSavingError {
 		url := req.URL
 		resp, err := http.Get(url)
-		if err != nil {
-			p.logger.Error(err.Error())
+		if err != nil || resp.StatusCode != http.StatusOK {
+
+			if err != nil {
+				p.logger.Error(err.Error())
+			} else {
+				p.logger.Error("Retrieving file from OnlyOffice returned status not OK", zap.Int("Status", resp.StatusCode))
+			}
 			payload := struct {
 				Err     int    `json:"error"`
 				Message string `json:"message"`
@@ -660,7 +665,7 @@ func (p *proxy) unlockWopi(ctx context.Context, revaPath string) bool {
 
 	client := &http.Client{Transport: tr}
 	url := fmt.Sprintf("%s/cbox/unlock", p.wopiServer)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		return false
@@ -741,7 +746,7 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
-	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":false},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":false},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":false},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
 	settings := &onlyOfficeSettings{}
 	json.Unmarshal([]byte(msg), settings)
 	return settings.Formats[ext].Type
@@ -990,7 +995,7 @@ func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
 
 	client := &http.Client{Transport: tr}
 	url := fmt.Sprintf("%s/cbox/lock", p.wopiServer)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return false
 	}
@@ -1026,7 +1031,7 @@ type onlyOfficeSettings struct {
 }
 
 func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
-	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":true},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":true},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":true},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":false},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":false},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":false},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(msg))
 }

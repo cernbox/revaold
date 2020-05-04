@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.58
+Version: 0.0.59
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon May 04 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.59
+- Improve only office locking
 * Wed Feb 12 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.57
 - fix etag match logic and add more logging to chunking ng (MOVE)
 * Thu Jan 23 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.56

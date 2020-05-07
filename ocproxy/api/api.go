@@ -766,7 +766,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileType := strings.TrimPrefix(path.Ext(revaPath), ".")
-	title := md.Path
+	title := path.Base(md.Path)
 	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
 	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
 	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.overwriteHost, path.Dir(fn))
@@ -838,9 +838,16 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
   "editorConfig": {
     "callbackUrl": "%s",
     "customization": {
+	  "compactHeader": "true" ,
       "goback": {
+		"blank": false,
+		"requestClose": true,
         "url": "%s"
-      }
+	  },
+	  "hideRightMenu": false,
+	  "logo": {
+		  "url": null
+	  }
     },
     "lang": "%s",
     "mode": "%s",

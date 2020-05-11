@@ -1949,7 +1949,7 @@ type fileResponse struct {
 func (p *proxy) mdsToPersonalProjectsRes(ctx context.Context, mds []*reva_api.Metadata) *personalProjectsRes {
 	files := []*fileResponse{}
 	for _, md := range mds {
-		file := &fileResponse{FileID: md.Id, Mtime: md.Mtime, Size: md.Size, Name: path.Base(md.Path), MimeType: md.Mime, Permissions: 1, Path: path.Dir(md.Path), Type: "dir", CustomPerm: 1}
+		file := &fileResponse{FileID: md.Id, Mtime: md.Mtime * 1000, Size: md.Size, Name: path.Base(md.Path), MimeType: md.Mime, Permissions: 1, Path: path.Dir(md.Path), Type: "dir", CustomPerm: 1}
 		files = append(files, file)
 	}
 	data := &personalProjectsData{Directory: "/", Permissions: 1, Files: files}

@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.60
+Version: 0.0.61
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,9 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon May 14 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.61
+- New locking mechanism and checks (with conflicts)
+- Changed OO configs when opening a file
 * Mon May 11 2020 Ishank Arora <ishank.arora@cern.ch> 0.0.60
 - Pass mtime in milliseconds to files_projectspaces
 * Mon May 04 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.59

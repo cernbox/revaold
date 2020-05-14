@@ -481,20 +481,32 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	}
 
 	revaPath := p.getRevaPath(ctx, fn)
+	md, err := p.getMetadata(ctx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	req := &callbackRequest{}
 	if err := json.Unmarshal(data, req); err != nil {
+		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	p.logger.Info(fmt.Sprintf("onlyoffice/track: %+v", req))
-	if req.Status == trackerStatusEditing || req.Status == trackerStatusClosed {
+
+	// 1st case: OO closed without changes
+	// just unlock the file
+	if req.Status == trackerStatusClosed {
 		payload := struct {
 			Err int `json:"error"`
 		}{
@@ -502,33 +514,76 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		}
 		encoded, err := json.Marshal(payload)
 		if err != nil {
+			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		if (req.Status == trackerStatusClosed) {
-			succeeded := p.unlockWopi(ctx, revaPath)
-			if succeeded {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
+			p.unlockWopi(ctx, revaPath)
 		}
 
+		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Write(encoded)
 		return
 	}
 
+	// Has a conflict been created?
+	// Also create a version if the lock was removed, just to be safe
+	status := p.getLockWopi(md)
+	if status == 1 {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	conflict := status == http.StatusConflict || status == http.StatusNotFound
+
+	// 2nd case: still editing the file
+	// If conflict, give error
+	// 3rd case: request to save but a conflict was detected
+	if req.Status == trackerStatusEditing || (req.Status == trackerStatusEditingMustSave && conflict) {
+
+		errorCode := 0
+		msg := ""
+		if conflict {
+			errorCode = 1
+			msg = "File modified outside OnlyOffice"
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			succeeded := p.lockWopi(md)
+			if !succeeded {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}
+
+		payload := struct {
+			Err int `json:"error"`
+			Message string `json:"message"`
+		}{
+			Err: errorCode,
+			Message: msg,
+		}
+		encoded, err := json.Marshal(payload)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Write(encoded)
+		return
+	}
+
+	// All other cases: save the file
+	// If a conflict was detected, save in a different file
+	// Unlock the file once saved
 	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusForceSavingError {
 		url := req.URL
 		resp, err := http.Get(url)
 		if err != nil || resp.StatusCode != http.StatusOK {
 
-			if err != nil {
-				p.logger.Error(err.Error())
-			} else {
-				p.logger.Error("Retrieving file from OnlyOffice returned status not OK", zap.Int("Status", resp.StatusCode))
-			}
 			payload := struct {
 				Err     int    `json:"error"`
 				Message string `json:"message"`
@@ -538,12 +593,32 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 			}
 			encoded, err := json.Marshal(payload)
 			if err != nil {
+				p.logger.Error("", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.Write(encoded)
-			return
+
+			if err != nil {
+				p.logger.Error(err.Error())
+
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.Write(encoded)
+				return
+
+			} else {
+				p.logger.Error("Retrieving file from OnlyOffice returned status not OK. Trying once more...", zap.Int("Status", resp.StatusCode))
+
+				time.Sleep(time.Second * 2)
+
+				resp, err = http.Get(url)
+				if err != nil || resp.StatusCode != http.StatusOK {
+					p.logger.Error("Failed again to retrieve file from OnlyOffice. Giving up...")
+
+					w.Header().Set("Content-Type", "application/json; charset=utf-8")
+					w.Write(encoded)
+					return
+				}
+			}
 		}
 
 		// write to file
@@ -614,7 +689,15 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		}
 
 		// all the chunks have been sent, we need to close the tx
-		emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: revaPath, TxId: txInfo.TxId})
+		// If there was a conflict, save in a new file with the current date
+		newRevaPath := revaPath
+		if conflict {
+			extension := filepath.Ext(newRevaPath)
+			dt := time.Now()
+			newRevaPath = fmt.Sprintf("%s.conflict_%s%s", newRevaPath[0: len(newRevaPath) - len(extension)], dt.Format("01022006_150405"), extension)
+			p.logger.Warn("A conflict was detected. Saving the file with a different name")
+		}
+		emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: newRevaPath, TxId: txInfo.TxId})
 		if err != nil {
 			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
@@ -633,14 +716,19 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		}
 		encoded, err := json.Marshal(payload)
 		if err != nil {
+			p.logger.Error("", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		if (req.Status == trackerStatusMustSave) { // + trackerStatusCorrupted + trackerStatusForceSavingError ???
-			succeeded := p.unlockWopi(ctx, revaPath)
-			if succeeded {
-				w.WriteHeader(http.StatusInternalServerError)
+		// If the save was called after the file being closed, unlock.
+		// Otherwise, refresh the lock
+		if (req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusForceSavingError) {
+			p.unlockWopi(ctx, revaPath)
+		} else { // req.Status == trackerStatusEditingMustSave 
+			succeeded := p.lockWopi(md)
+			if !succeeded {
+				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
 		}
@@ -651,8 +739,8 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	}
 
 	//ONLYOFFICE: {"key":"65020dfd-cd75-42b1-a118-a0886f1669c8","status":2,"url":"https://cbox-wopi-01.cern.ch:9443/cache/files/65020dfd-cd75-42b1-a118-a0886f1669c8_4907/output.pptx/output.pptx?md5=8q6RMPp1L17mQE7OdDPfdQ==&expires=1543412647&disposition=attachment&ooname=output.pptx","changesurl":"https://cbox-wopi-01.cern.ch:9443/cache/files/65020dfd-cd75-42b1-a118-a0886f1669c8_4907/changes.zip/changes.zip?md5=9HDBPxh1BKUpXqRpPR46Uw==&expires=1543412647&disposition=attachment&ooname=output.zip","history":{"serverVersion":"5.2.3","changes":[{"created":"2018-11-28 13:26:51","user":{"id":"gonzalhu","name":"Hugo Gonzalez Labrador,31 1-002,+41227663986, ()"}}]},"users":["gonzalhu"],"actions":[{"type":0,"userid":"gonzalhu"}],"lastsave":"2018-11-28T13:28:00.417Z","notmodified":false}
-
-	w.WriteHeader(http.StatusInternalServerError)
+	p.logger.Warn("Unknown status")
+	w.WriteHeader(http.StatusBadRequest)
 	return
 }
 
@@ -694,6 +782,7 @@ func (p *proxy) unlockWopi(ctx context.Context, revaPath string) bool {
 		return false
 
 	}
+	p.logger.Info("File unlocked in WOPI", zap.String("file",  md.EosFile))
 	return true
 }
 
@@ -766,7 +855,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileType := strings.TrimPrefix(path.Ext(revaPath), ".")
-	title := md.Path
+	title := path.Base(md.Path)
 	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
 	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
 	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.overwriteHost, path.Dir(fn))
@@ -838,9 +927,16 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
   "editorConfig": {
     "callbackUrl": "%s",
     "customization": {
+	  "compactHeader": "true" ,
       "goback": {
+		"blank": false,
+		"requestClose": true,
         "url": "%s"
-      }
+	  },
+	  "hideRightMenu": false,
+	  "logo": {
+		  "url": null
+	  }
     },
     "lang": "%s",
     "mode": "%s",
@@ -1013,10 +1109,41 @@ func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		p.logger.Info("Asking for lock in WOPI from OnlyOffice returned NOT OK", zap.Int("StatusCode", res.StatusCode))
+		p.logger.Error("Asking for lock in WOPI from OnlyOffice returned NOT OK", zap.Int("StatusCode", res.StatusCode))
 		return false
 	}
+
+	p.logger.Info("File locked in WOPI", zap.String("file",  md.EosFile))
 	return true
+}
+
+func (p *proxy) getLockWopi(md *reva_api.Metadata) int {
+
+	// Try to lock the file in WOPI (to avoid conflicts with other Office clients)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := &http.Client{Transport: tr}
+	url := fmt.Sprintf("%s/cbox/lock", p.wopiServer)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 1
+	}
+
+	q := req.URL.Query()
+	q.Add("filename", md.EosFile)
+	q.Add("endpoint", md.EosInstance)
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
+	res, err := client.Do(req)
+	if err != nil || res.StatusCode == http.StatusInternalServerError || res.StatusCode == http.StatusUnauthorized {
+		p.logger.Error("Failed to get the lock in WOPI from OnlyOffice", zap.Error(err))
+		return 1
+	}
+
+	return res.StatusCode
 }
 
 type onlyOfficeFormatInfo struct {

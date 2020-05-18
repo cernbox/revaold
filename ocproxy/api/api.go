@@ -861,15 +861,16 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.overwriteHost, path.Dir(fn))
 	lang := "en"
 
-	locked := p.lockWopi(md)
-
-	if !locked {
-		title += " (locked by another app)"
-	}
-	
 	mode := "edit"
-	if md.IsReadOnly || !locked {
+	if md.IsReadOnly {
 		mode = "view"
+	} else {
+		locked := p.lockWopi(md)
+
+		if !locked {
+			title += " (locked by another app)"
+			mode = "view"
+		}
 	}
 
 	user, _ := reva_api.ContextGetUser(ctx)

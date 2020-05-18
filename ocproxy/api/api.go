@@ -950,7 +950,8 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
   "editorConfig": {
     "callbackUrl": "%s",
     "customization": {
-	  "compactHeader": "true" ,
+	  "compactHeader": true ,
+	  "forcesave": true,
       "goback": {
 		"blank": false,
 		"requestClose": true,
@@ -1086,7 +1087,8 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
   "editorConfig": {
     "callbackUrl": "%s",
     "customization": {
-	  "compactHeader": "true",
+	  "compactHeader": true,
+	  "forcesave": true,
       "goback": {
 		"blank": false,
         "url": "%s"

@@ -202,6 +202,8 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/apps/onlyoffice/ajax/new", p.tokenAuth(p.onlyOfficeNew)).Methods("POST")
 	p.router.HandleFunc("/index.php/apps/onlyoffice/config", p.onlyOfficeMainConfig).Methods("GET")
 
+	p.router.HandleFunc("/index.php/apps/collabora/new", p.tokenAuth(p.collaboraNew)).Methods("POST")
+
 	// gant routes
 	p.router.HandleFunc("/index.php/apps/gantt/config", p.getGanttConfig).Methods("GET")
 
@@ -305,6 +307,14 @@ type ocFileInfo struct {
 }
 
 func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
+	p.officeNew("var/www/html/cernbox/apps/onlyoffice/assets/en/", w, r)
+}
+
+func (p *proxy) collaboraNew(w http.ResponseWriter, r *http.Request) {
+	p.officeNew("var/www/html/cernbox/apps/collabora/assets/", w, r)
+}
+
+func (p *proxy) officeNew(assetPath string, w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	err := r.ParseForm()
 	if err != nil {
@@ -320,7 +330,7 @@ func (p *proxy) onlyOfficeNew(w http.ResponseWriter, r *http.Request) {
 	revaPath := p.getRevaPath(ctx, fn)
 
 	newFile := "new" + path.Ext(fn)
-	data, err := static.Asset("var/www/html/cernbox/apps/onlyoffice/assets/en/" + newFile)
+	data, err := static.Asset(assetPath + newFile)
 	if err != nil {
 		p.logger.Error(err.Error())
 		w.WriteHeader(http.StatusInternalServerError)

@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.61
+Version: 0.0.62
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,7 +54,13 @@ rm -rf %buildroot/
 
 
 %changelog
-* Mon May 14 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.61
+* Mon May 18 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.62
+- Remove locking when opening files in RO mode
+- Close OO redirect in the same tab now for Public links as well
+- Enable force save
+- Create new files for Collabora
+- Do not replace office files if they already exist
+* Thu May 14 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.61
 - New locking mechanism and checks (with conflicts)
 - Changed OO configs when opening a file
 * Mon May 11 2020 Ishank Arora <ishank.arora@cern.ch> 0.0.60

@@ -329,6 +329,19 @@ func (p *proxy) officeNew(assetPath string, w http.ResponseWriter, r *http.Reque
 	fn := path.Join(dir, name)
 	revaPath := p.getRevaPath(ctx, fn)
 
+	gCtx := GetContextWithAuth(ctx)
+	mdRes, err := p.getStorageClient().Inspect(gCtx, &reva_api.PathReq{Path: revaPath})
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if mdRes.Status == reva_api.StatusCode_OK {
+		// File already exists
+		w.WriteHeader(http.StatusPreconditionFailed)
+		return
+	}
+
 	newFile := "new" + path.Ext(fn)
 	data, err := static.Asset(assetPath + newFile)
 	if err != nil {
@@ -338,7 +351,6 @@ func (p *proxy) officeNew(assetPath string, w http.ResponseWriter, r *http.Reque
 	}
 
 	// write to file
-	gCtx := GetContextWithAuth(ctx)
 	txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
 	if err != nil {
 		p.logger.Error("", zap.Error(err))

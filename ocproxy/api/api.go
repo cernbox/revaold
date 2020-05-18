@@ -1064,7 +1064,9 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
   "editorConfig": {
     "callbackUrl": "%s",
     "customization": {
+	  "compactHeader": "true",
       "goback": {
+		"blank": false,
         "url": "%s"
       }
     },

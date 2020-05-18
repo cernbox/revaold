@@ -519,7 +519,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 
-		if (req.Status == trackerStatusClosed) {
+		if req.Status == trackerStatusClosed {
 			p.unlockWopi(ctx, revaPath)
 		}
 
@@ -559,10 +559,10 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		}
 
 		payload := struct {
-			Err int `json:"error"`
+			Err     int    `json:"error"`
 			Message string `json:"message"`
 		}{
-			Err: errorCode,
+			Err:     errorCode,
 			Message: msg,
 		}
 		encoded, err := json.Marshal(payload)
@@ -694,7 +694,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		if conflict {
 			extension := filepath.Ext(newRevaPath)
 			dt := time.Now()
-			newRevaPath = fmt.Sprintf("%s.conflict_%s%s", newRevaPath[0: len(newRevaPath) - len(extension)], dt.Format("01022006_150405"), extension)
+			newRevaPath = fmt.Sprintf("%s.conflict_%s%s", newRevaPath[0:len(newRevaPath)-len(extension)], dt.Format("01022006_150405"), extension)
 			p.logger.Warn("A conflict was detected. Saving the file with a different name")
 		}
 		emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: newRevaPath, TxId: txInfo.TxId})
@@ -723,9 +723,9 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 
 		// If the save was called after the file being closed, unlock.
 		// Otherwise, refresh the lock
-		if (req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusForceSavingError) {
+		if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusForceSavingError {
 			p.unlockWopi(ctx, revaPath)
-		} else { // req.Status == trackerStatusEditingMustSave 
+		} else { // req.Status == trackerStatusEditingMustSave
 			succeeded := p.lockWopi(md)
 			if !succeeded {
 				w.WriteHeader(http.StatusBadRequest)
@@ -782,7 +782,7 @@ func (p *proxy) unlockWopi(ctx context.Context, revaPath string) bool {
 		return false
 
 	}
-	p.logger.Info("File unlocked in WOPI", zap.String("file",  md.EosFile))
+	p.logger.Info("File unlocked in WOPI", zap.String("file", md.EosFile))
 	return true
 }
 
@@ -1025,7 +1025,7 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 	mode := "view"
 	if !pl.ReadOnly {
 		locked := p.lockWopi(md)
-		if (locked) {
+		if locked {
 			mode = "edit"
 		} else {
 			title += " (locked by another app)"
@@ -1116,7 +1116,7 @@ func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
 		return false
 	}
 
-	p.logger.Info("File locked in WOPI", zap.String("file",  md.EosFile))
+	p.logger.Info("File locked in WOPI", zap.String("file", md.EosFile))
 	return true
 }
 
@@ -5385,7 +5385,6 @@ func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSReque
 		Id:               shareID,
 	}
 
-
 	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
 		ctx = context.WithValue(ctx, "isMobile", true)
 	}
@@ -5760,7 +5759,8 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	officeEngine, _ := p.officeEngineManager.GetOfficeEngine(pl.OwnerId)
+	// officeEngine, _ := p.officeEngineManager.GetOfficeEngine(pl.OwnerId)
+	officeEngine := "onlyoffice"
 
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
 
@@ -6609,7 +6609,7 @@ func (p *proxy) moveNG(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
-			
+
 	p.logger.Info("MOVE ng", zap.String("destination path", destinationPath))
 
 	names, err := fd.Readdirnames(-1)
@@ -8489,7 +8489,6 @@ func (p *proxy) tokenAuthPopup(h http.HandlerFunc) http.HandlerFunc {
 func (p *proxy) tokenAuth(h http.HandlerFunc) http.HandlerFunc {
 	return p.authAux(h, false)
 }
-
 
 func (p *proxy) authAux(h http.HandlerFunc, popup bool) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

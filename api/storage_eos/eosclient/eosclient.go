@@ -782,10 +782,21 @@ func (c *Client) mapToFileInfo(kv map[string]string) (*FileInfo, error) {
 		}
 	}
 
-	// mtime is split by a dot, we only take the first part, do we need subsec precision?
-	mtime, err := strconv.ParseUint(strings.Split(kv["mtime"], ".")[0], 10, 64)
-	if err != nil {
-		return nil, err
+	// look for the stime first as mtime is not updated for parent dirs; if that isn't set, we use mtime
+	// stime/mtime is split by a dot, we only take the first part, do we need subsec precision?
+	var mtime uint64
+	var mtimeSet bool
+	if val, ok := kv["stime"]; ok && val != "" {
+		mtime, err = strconv.ParseUint(strings.Split(val, ".")[0], 10, 64)
+		if err == nil {
+			mtimeSet = true
+		}
+	}
+	if !mtimeSet {
+		mtime, err = strconv.ParseUint(strings.Split(kv["mtime"], ".")[0], 10, 64)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// parse ctime if set

@@ -524,7 +524,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	p.logger.Info(fmt.Sprintf("onlyoffice/track: %+v", req))
+	p.logger.Info(fmt.Sprintf("onlyoffice/track: %+v", req), zap.String("path", revaPath))
 
 	// 1st case: OO closed without changes
 	// just unlock the file
@@ -899,37 +899,13 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	userId := user.AccountId
 	displayName := user.DisplayName
 
-	// TODO(labkode): maybe base64 is not good enough, check what they expect as doc id in the express router (nodejs)
-	// onlyoffice API server does not like doc ids with colon :
-	//[labkode@labradorbox cernbox]$ curl https://cbox-wopi-01.cern.ch:9443/v5.2.3-64//doc/home:27167144273772544/c/info?t=1542811227805
-	//<!DOCTYPE html>
-	//<html lang="en">
-	//<head>
-	//<meta charset="utf-8">
-	//<title>Error</title>
-	//</head>
-	//<body>
-	//<pre>Cannot GET /doc/home:27167144273772544/c/info</pre>
-	//</body>
-	//</html>
-
-	// poor man approach to get 20 characters unique sessions
-	// request sent to onlyoffice to increase this value.
-	// create uuid key and set it to map
-	// TODO(labkode): onlyOffice to increase key value
-	//key := md.Etag
-	//if len(key) > 20 {
-	//key = key[0:20]
-	//}
-	// remove special chars
-	//key = strings.Replace(key, ":", "", -1)
-	//key = strings.Replace(key, "\"", "", -1)
-
+	gCtx := GetContextWithAuth(ctx)
 	// key cannot contain colon (:), use ._. as separator
-	key := md.Id
-	// if migration id set, use it
-	if md.MigId != "" {
-		key = md.MigId
+	key, err := p.getVersionFolderID(gCtx, revaPath)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	key = strings.Replace(key, ":", "._.", -1)
 	p.onlyOfficeMutex.Lock()
@@ -975,33 +951,6 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	p.logger.Info("onlyoffice/config response=" + msg)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(msg))
-
-	/*
-			$params = [
-		            "document" => [
-		                "fileType" => $ext,
-		                "key" => DocumentService::GenerateRevisionId($key),
-		                "title" => $fileName,
-		                "url" => $fileUrl,
-		            ],
-		            "documentType" => $format["type"],
-		            "editorConfig" => [
-		                "callbackUrl" => $callback,
-		                "customization" => [
-		                    "goback" => [
-		                        "url" => $folderLink
-		                    ]
-		                ],
-		                "lang" => str_replace("_", "-", \OC::$server->getL10NFactory("")->get("")->getLanguageCode()),
-		                "mode" => (empty($callback) ? "view" : "edit"),
-		                "user" => [
-		                    "id" => $userId,
-		                    "name" => $this->userSession->getUser()->getDisplayName()
-		                ]
-		            ],
-		            "type" => $type
-		        ];
-	*/
 }
 
 func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Request) {
@@ -1056,19 +1005,19 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 
 	}
 
+	gCtx := GetContextWithAuth(ctx)
 	// key cannot contain colon (:), use ._. as separator
-	// key := pl.Path
-	// if migration id set, use it
-	// if md.MigId != "" {
-	// 	key = md.MigId
-	// }
-
+	key, err := p.getVersionFolderID(gCtx, md.EosFile)
+	if err != nil {
+		p.logger.Error("", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	paths := strings.Split(pl.Path, ":")
-	etags := strings.Split(md.Etag, ":")
-	key := fmt.Sprintf("%s:%s", paths[0], etags[0])
-	key = strings.Replace(key, "\"", "", -1)
-
+	etags := strings.Split(key, ":")
+	key = fmt.Sprintf("%s:%s", paths[0], etags[1])
 	key = strings.Replace(key, ":", "._.", -1)
+
 	p.onlyOfficeMutex.Lock()
 	p.onlyOfficeMap[md.EosFile] = key
 	p.onlyOfficeMutex.Unlock()
@@ -1136,7 +1085,7 @@ func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		p.logger.Error("Asking for lock in WOPI from OnlyOffice returned NOT OK", zap.Int("StatusCode", res.StatusCode))
+		p.logger.Error("Asking for lock in WOPI from OnlyOffice returned NOT OK", zap.Int("StatusCode", res.StatusCode), zap.String("filename", md.EosFile))
 		return false
 	}
 
@@ -8828,4 +8777,35 @@ func (p *proxy) renderTemplate(w http.ResponseWriter, templateName, templateStr 
 	}
 
 	tpl.Execute(w, data)
+}
+
+func getVersionFolder(revaPath string) string {
+	basename := path.Base(revaPath)
+	versionFolder := path.Join(path.Dir(revaPath), ".sys.v#."+basename)
+	return versionFolder
+}
+
+func (p *proxy) getVersionFolderID(ctx context.Context, revaPath string) (string, error) {
+	versionFolder := getVersionFolder(revaPath)
+	md, err := p.getMetadata(ctx, versionFolder)
+	if err != nil {
+		emptyRes, err := p.getStorageClient().CreateDir(ctx, &reva_api.PathReq{Path: versionFolder}); 
+		
+		if err != nil {
+			return "", err
+		}
+		if emptyRes.Status != reva_api.StatusCode_OK {
+			return "", errors.New(fmt.Sprintf("Reva non ok code: %s", emptyRes.Status))
+		}
+
+		md, err = p.getMetadata(ctx, versionFolder)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if md.MigId != "" {
+		return md.MigId, nil
+	}
+	return md.Id, nil
 }

@@ -37,6 +37,7 @@ var publicLinkTemplate string = `
 		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/upload.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/collabora/css/style.css">
 			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/main.css">
 			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/editor.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/gallery/css/slideshow.css">
@@ -148,6 +149,7 @@ var publicLinkTemplate string = `
 		})(jQuery, OC);
 		</script>
 		<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/collabora/js/script.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>
 		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
@@ -320,6 +322,7 @@ var publicLinkTemplatePassword = `
     <link rel="stylesheet" href="{{ .BaseUrl }}/core/css/jquery.ocdialog.css">
     <link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_sharing/css/authenticate.css">
 	<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+	<link rel="stylesheet" href="{{ .BaseUrl }}/apps/collabora/css/style.css">
 	<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/main.css">
 	<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/editor.css">
     <script src="{{ .BaseUrl }}/index.php/core/js/oc.js"></script>
@@ -371,6 +374,7 @@ var publicLinkTemplatePassword = `
     <script src="{{ .BaseUrl }}/core/js/files/client.js"></script>
     <script src="{{ .BaseUrl }}/apps/files_sharing/js/authenticate.js"></script>
     <script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+    <script src="{{ .BaseUrl }}/apps/collabora/js/script.js"></script>
 	<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
 	<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>
   </head>
@@ -577,6 +581,7 @@ var publicLinkTemplateFile = `
 		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files/css/upload.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/cernbox-theme/core/css/styles.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/wopiviewer/css/style.css">
+    		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/collabora/css/style.css">
 			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/main.css">
 			<link rel="stylesheet" href="{{ .BaseUrl }}/apps/onlyoffice/css/editor.css">
     		<link rel="stylesheet" href="{{ .BaseUrl }}/apps/files_pdfviewer/css/style.css">
@@ -676,6 +681,7 @@ var publicLinkTemplateFile = `
 		})(jQuery, OC);
 		</script>
     	<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
+    	<script src="{{ .BaseUrl }}/apps/collabora/js/script.js"></script>
 		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>

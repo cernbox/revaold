@@ -2348,12 +2348,12 @@ type statRes struct {
 }
 
 type storageStat struct {
-	UploadMaxFilesize int    `json:"uploadMaxFilesize"`
-	MaxHumanFilesize  string `json:"maxHumanFilesize"`
-	FreeSpace         int    `json:"freeSpace"`
-	UsedSpacePercent  int    `json:"usedSpacePercent"`
-	Owner             string `json:"owner"`
-	OwnerDisplayName  string `json:"ownerDisplayName"`
+	UploadMaxFilesize int     `json:"uploadMaxFilesize"`
+	MaxHumanFilesize  string  `json:"maxHumanFilesize"`
+	FreeSpace         int     `json:"freeSpace"`
+	UsedSpacePercent  float32 `json:"usedSpacePercent"`
+	Owner             string  `json:"owner"`
+	OwnerDisplayName  string  `json:"ownerDisplayName"`
 }
 
 func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
@@ -2383,7 +2383,7 @@ func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
 		UploadMaxFilesize: 10 * 1024 * 1024 * 1024, // 10 GiB
 		MaxHumanFilesize:  "Upload (max. 10GB)",
 		FreeSpace:         int(res.TotalBytes), // 2TiB
-		UsedSpacePercent:  int((float32(res.UsedBytes) / float32(res.TotalBytes)) * 100),
+		UsedSpacePercent:  (float32(res.UsedBytes) / float32(res.TotalBytes)) * 100,
 		Owner:             owner,
 		OwnerDisplayName:  owner,
 	}

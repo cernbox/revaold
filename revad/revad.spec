@@ -4,7 +4,7 @@
 
 Name: revad
 Summary: REVA is a gRPC backend server for CERNBox
-Version: 0.0.45
+Version: 0.0.46
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -53,6 +53,8 @@ rm -rf %buildroot/
 %config(noreplace) /etc/revad/revad.yaml
 
 %changelog
+* Tue May 26 2020 Ishank Arora <ishank.arora@cern.ch> 0.0.46
+- Read stime from EOS instead of mtime, correct quota info
 * Wed Apr 29 2020 Ishank Arora <ishank.arora@cern.ch> 0.0.45
 - Fix parsing of deleted files with spaces 
 * Thu Jan 23 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.44

@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.63
+Version: 0.0.64
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,9 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue Jun 02 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.64
+- ocproxy: use versions folder id for OO instead of real id
+- ocproxy: add collabora to public links
 * Tue May 26 2020 Ishank Arora <ishank.arora@cern.ch> 0.0.63
 - Read stime from EOS instead of mtime, correct quota info
 * Mon May 18 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.62

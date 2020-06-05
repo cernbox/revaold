@@ -604,7 +604,16 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusForceSavingError {
 		url := req.URL
 		resp, err := http.Get(url)
-		if err != nil || resp.StatusCode != http.StatusOK {
+
+		if err != nil {
+			p.logger.Error("Error while getting file from OO", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if resp.StatusCode != http.StatusOK {
+
+			p.logger.Error("Retrieving file from OnlyOffice returned status not OK.", zap.Int("Status", resp.StatusCode))
 
 			payload := struct {
 				Err     int    `json:"error"`
@@ -620,27 +629,10 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 				return
 			}
 
-			if err != nil {
-				p.logger.Error(err.Error())
-
-				w.Header().Set("Content-Type", "application/json; charset=utf-8")
-				w.Write(encoded)
-				return
-
-			} else {
-				p.logger.Error("Retrieving file from OnlyOffice returned status not OK. Trying once more...", zap.Int("Status", resp.StatusCode))
-
-				time.Sleep(time.Second * 2)
-
-				resp, err = http.Get(url)
-				if err != nil || resp.StatusCode != http.StatusOK {
-					p.logger.Error("Failed again to retrieve file from OnlyOffice. Giving up...")
-
-					w.Header().Set("Content-Type", "application/json; charset=utf-8")
-					w.Write(encoded)
-					return
-				}
-			}
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Write(encoded)
+			return
 		}
 
 		// write to file
@@ -1069,6 +1061,7 @@ func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
 	url := fmt.Sprintf("%s/cbox/lock", p.wopiServer)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
+		p.logger.Error("", zap.Error(err))
 		return false
 	}
 
@@ -1104,6 +1097,7 @@ func (p *proxy) getLockWopi(md *reva_api.Metadata) int {
 	url := fmt.Sprintf("%s/cbox/lock", p.wopiServer)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		p.logger.Error("Error while getting lock in WOPI", zap.Error(err))
 		return 1
 	}
 
@@ -1114,8 +1108,12 @@ func (p *proxy) getLockWopi(md *reva_api.Metadata) int {
 
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
 	res, err := client.Do(req)
-	if err != nil || res.StatusCode == http.StatusInternalServerError || res.StatusCode == http.StatusUnauthorized {
-		p.logger.Error("Failed to get the lock in WOPI from OnlyOffice", zap.Error(err))
+	if err != nil {
+		p.logger.Error("Error while getting lock in WOPI", zap.Error(err))
+		return 1
+	}
+	if res.StatusCode == http.StatusInternalServerError || res.StatusCode == http.StatusUnauthorized {
+		p.logger.Error("Failed to get the lock in WOPI from OnlyOffice")
 		return 1
 	}
 

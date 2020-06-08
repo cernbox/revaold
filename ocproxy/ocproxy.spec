@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.64
+Version: 0.0.65
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon Jun 08 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.65
+- Unique OO keys per session
 * Tue Jun 02 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.64
 - ocproxy: use versions folder id for OO instead of real id
 - ocproxy: add collabora to public links

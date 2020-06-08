@@ -32,7 +32,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -553,7 +552,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 
 	// Has a conflict been created?
 	// Also create a version if the lock was removed, just to be safe
-	status := p.getLockWopi(md)
+	status, _ := p.getLockWopi(md)
 	if status == 1 {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -572,7 +571,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 			msg = "File modified outside OnlyOffice"
 			w.WriteHeader(http.StatusConflict)
 		} else {
-			succeeded := p.lockWopi(md)
+			succeeded, _ := p.lockWopi(md)
 			if !succeeded {
 				w.WriteHeader(http.StatusBadRequest)
 				return
@@ -740,7 +739,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusForceSavingError {
 			p.unlockWopi(ctx, revaPath)
 		} else { // req.Status == trackerStatusEditingMustSave
-			succeeded := p.lockWopi(md)
+			succeeded, _ := p.lockWopi(md)
 			if !succeeded {
 				w.WriteHeader(http.StatusBadRequest)
 				return
@@ -871,15 +870,22 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	fileType := strings.TrimPrefix(path.Ext(revaPath), ".")
 	title := path.Base(md.Path)
 	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
-	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track", p.hostname) + md.Path + "?x-access-token=" + accessToken
+	callbackUrl := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/track%s?x-access-token=%s", p.hostname, md.Path, accessToken)
 	goBackUrl := fmt.Sprintf("https://%s/index.php/apps/files/?dir=%s", p.overwriteHost, path.Dir(fn))
 	lang := "en"
 
 	mode := "edit"
+	var sessionID string
 	if md.IsReadOnly {
 		mode = "view"
+		// If the file is open by someone, show that session to the user
+		status, session := p.getLockWopi(md)
+		if status == http.StatusOK {
+			sessionID = session
+		}
 	} else {
-		locked := p.lockWopi(md)
+		locked, session := p.lockWopi(md)
+		sessionID = session
 
 		if !locked {
 			title += " (locked by another app)"
@@ -887,25 +893,30 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Force users to land always on a different key
+	// otherwise they might land on a stale version
+	if sessionID == "" {
+		now := time.Now().Unix()
+		sessionID = fmt.Sprint(now)
+	}
+
 	user, _ := reva_api.ContextGetUser(ctx)
 	userId := user.AccountId
 	displayName := user.DisplayName
 
 	gCtx := GetContextWithAuth(ctx)
-	// key cannot contain colon (:), use ._. as separator
+	// key cannot contain colon (:), use . as separator
 	key, err := p.getVersionFolderID(gCtx, revaPath)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	key = strings.Replace(key, ":", "._.", -1)
-	p.onlyOfficeMutex.Lock()
-	p.onlyOfficeMap[md.EosFile] = key
-	p.onlyOfficeMutex.Unlock()
+	key = strings.Replace(key, ":", ".", -1)
+	key = fmt.Sprintf("%s.%s", key, sessionID)
 
-	p.logger.Info(fmt.Sprintf("office-engine onlyoffice config: key=%s for path=%s for md=%+v", key, fn, md))
-	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download", p.hostname) + md.Path + "?x-access-token=" + accessToken
+	p.logger.Info("office-engine onlyoffice config", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md",fmt.Sprintf("%+v",md)))
+	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download%s?x-access-token=%s", p.hostname, md.Path, accessToken)
 
 	msg := `{
   "document": {
@@ -987,18 +998,32 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 	title := strings.Replace(fn, "//", "", -1)
 
 	mode := "view"
-	if !pl.ReadOnly {
-		locked := p.lockWopi(md)
+	var sessionID string
+	if pl.ReadOnly {
+		// If the file is open by someone, show that session to the user
+		status, session := p.getLockWopi(md)
+		if status == http.StatusOK {
+			sessionID = session
+		}
+	} else {
+		locked, session := p.lockWopi(md)
+		sessionID = session
 		if locked {
 			mode = "edit"
 		} else {
 			title += " (locked by another app)"
 		}
+	}
 
+	// Force users to land always on a different key
+	// otherwise they might land on a stale version
+	if sessionID == "" {
+		now := time.Now().Unix()
+		sessionID = fmt.Sprint(now)
 	}
 
 	gCtx := GetContextWithAuth(ctx)
-	// key cannot contain colon (:), use ._. as separator
+	// key cannot contain colon (:), use . as separator
 	key, err := p.getVersionFolderID(gCtx, md.EosFile)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
@@ -1007,14 +1032,10 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 	}
 	paths := strings.Split(pl.Path, ":")
 	etags := strings.Split(key, ":")
-	key = fmt.Sprintf("%s:%s", paths[0], etags[1])
-	key = strings.Replace(key, ":", "._.", -1)
+	key = fmt.Sprintf("%s.%s.%s", paths[0], etags[1], sessionID)
 
-	p.onlyOfficeMutex.Lock()
-	p.onlyOfficeMap[md.EosFile] = key
-	p.onlyOfficeMutex.Unlock()
+	p.logger.Info("office-engine onlyoffice config public", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md",fmt.Sprintf("%+v",md)))
 
-	p.logger.Info(fmt.Sprintf("office-engine onlyoffice config: key=%s for path=%s for md=%+v", key, fn, md))
 	url := fmt.Sprintf("https://%s/index.php/s/%s/download?x-access-token=%s&path=%s&files=%s", p.hostname, token, accessToken, path.Dir(fn), path.Base(fn))
 
 	msg := `{
@@ -1050,7 +1071,7 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 	w.Write([]byte(msg))
 }
 
-func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
+func (p *proxy) lockWopi(md *reva_api.Metadata) (bool, string) {
 
 	// Try to lock the file in WOPI (to avoid conflicts with other Office clients)
 	tr := &http.Transport{
@@ -1062,7 +1083,7 @@ func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		p.logger.Error("", zap.Error(err))
-		return false
+		return false, ""
 	}
 
 	q := req.URL.Query()
@@ -1074,19 +1095,26 @@ func (p *proxy) lockWopi(md *reva_api.Metadata) bool {
 	res, err := client.Do(req)
 	if err != nil {
 		p.logger.Error("Failed to set the lock in WOPI from OnlyOffice", zap.Error(err))
-		return false
+		return false, ""
 	}
 
 	if res.StatusCode != http.StatusOK {
 		p.logger.Error("Asking for lock in WOPI from OnlyOffice returned NOT OK", zap.Int("StatusCode", res.StatusCode), zap.String("filename", md.EosFile))
-		return false
+		return false, ""
 	}
 
-	p.logger.Info("File locked in WOPI", zap.String("file", md.EosFile))
-	return true
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		p.logger.Error("Failed to set the lock sesseionID", zap.Error(err))
+		return false, ""
+	}
+	bodyStr := string(body)
+
+	p.logger.Info("File locked in WOPI", zap.String("file", md.EosFile), zap.String("sessionID", bodyStr))
+	return true, bodyStr
 }
 
-func (p *proxy) getLockWopi(md *reva_api.Metadata) int {
+func (p *proxy) getLockWopi(md *reva_api.Metadata) (int, string) {
 
 	// Try to lock the file in WOPI (to avoid conflicts with other Office clients)
 	tr := &http.Transport{
@@ -1098,7 +1126,7 @@ func (p *proxy) getLockWopi(md *reva_api.Metadata) int {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		p.logger.Error("Error while getting lock in WOPI", zap.Error(err))
-		return 1
+		return 1, ""
 	}
 
 	q := req.URL.Query()
@@ -1110,14 +1138,21 @@ func (p *proxy) getLockWopi(md *reva_api.Metadata) int {
 	res, err := client.Do(req)
 	if err != nil {
 		p.logger.Error("Error while getting lock in WOPI", zap.Error(err))
-		return 1
+		return 1, ""
 	}
 	if res.StatusCode == http.StatusInternalServerError || res.StatusCode == http.StatusUnauthorized {
 		p.logger.Error("Failed to get the lock in WOPI from OnlyOffice")
-		return 1
+		return 1, ""
 	}
 
-	return res.StatusCode
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		p.logger.Error("Failed to set the lock sesseionID", zap.Error(err))
+		return 1, ""
+	}
+	bodyStr := string(body)
+
+	return res.StatusCode, bodyStr
 }
 
 type onlyOfficeFormatInfo struct {
@@ -2617,8 +2652,6 @@ func New(opt *Options) (http.Handler, error) {
 		canaryCookieTTL:          opt.CanaryCookieTTL,
 		officeEngineManager:      opt.OfficeEngineManager,
 		hostname:                 opt.Hostname,
-		onlyOfficeMutex:          &sync.Mutex{},
-		onlyOfficeMap:            map[string]string{},
 		onlyOfficeDocumentServer: opt.OnlyOfficeDocumentServer,
 		ganttServer:              opt.GanttServer,
 
@@ -2683,8 +2716,6 @@ type proxy struct {
 	officeEngineManager *office_engine.Manager
 	hostname            string
 
-	onlyOfficeMutex          *sync.Mutex
-	onlyOfficeMap            map[string]string
 	onlyOfficeDocumentServer string
 
 	ganttServer string
@@ -8787,8 +8818,8 @@ func (p *proxy) getVersionFolderID(ctx context.Context, revaPath string) (string
 	versionFolder := getVersionFolder(revaPath)
 	md, err := p.getMetadata(ctx, versionFolder)
 	if err != nil {
-		emptyRes, err := p.getStorageClient().CreateDir(ctx, &reva_api.PathReq{Path: versionFolder}); 
-		
+		emptyRes, err := p.getStorageClient().CreateDir(ctx, &reva_api.PathReq{Path: versionFolder})
+
 		if err != nil {
 			return "", err
 		}

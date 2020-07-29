@@ -473,11 +473,11 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 	var query string
 
 	if len(groups) > 1 {
-		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
+		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (accepted=0 or accepted=1) AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted from oc_share where id=? and (accepted=0 or accepted=1) and (share_with=?) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
+		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (accepted=0 or accepted=1) AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
 		queryArgs = append(queryArgs, accountID)
 	}
 
@@ -508,11 +508,11 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	var query string
 
 	if len(groups) > 1 {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=? or share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
+		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "select id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target from oc_share where (accepted=0 or accepted=1) and (share_type=? or share_type=?) and uid_owner!=? and (share_with=?) and id not in (select distinct(id) from oc_share_acl where rejected_by=?)"
+		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
 		queryArgs = append(queryArgs, accountID)
 	}
 	rows, err := sm.db.Query(query, queryArgs...)
@@ -569,7 +569,7 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 		permissions int
 	)
 
-	query := "select coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where uid_owner=? and id=?"
+	query := "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND uid_owner=? and id=?"
 	if err := sm.db.QueryRow(query, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
@@ -582,7 +582,7 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 }
 
 func (sm *shareManager) getDBShares(ctx context.Context, accountID, filterByFileID string) ([]*dbShare, error) {
-	query := "select id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type from oc_share where uid_owner=? and (share_type=? or share_type=?) "
+	query := "SELECT id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 OR orphan IS NULL) AND uid_owner=? AND (share_type=? OR share_type=?) "
 	params := []interface{}{accountID, 0, 1}
 	if filterByFileID != "" {
 		prefix, itemSource := splitFileID(filterByFileID)

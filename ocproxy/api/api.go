@@ -62,7 +62,8 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
 
 	// user prefixed webdav routes
-	p.router.HandleFunc("/remote.php/dav/files/", p.tokenAuthPopup(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/dav/files", p.tokenAuthPopup(p.get)).Methods("GET") //for iOS app auth
+	p.router.HandleFunc("/remote.php/dav/files{r:\\/?}", p.tokenAuthPopup(p.propfindDav)).Methods("PROPFIND")//for Android app auth; optional trailing / for iOS
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.get)).Methods("GET")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.put)).Methods("PUT")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.options)).Methods("OPTIONS")
@@ -71,7 +72,7 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.head)).Methods("HEAD")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.mkcol)).Methods("MKCOL")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.proppatch)).Methods("PROPPATCH")
-	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.propfind)).Methods("PROPFIND")
+	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.propfindDav)).Methods("PROPFIND")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.delete)).Methods("DELETE")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.move)).Methods("MOVE")
 
@@ -5224,6 +5225,11 @@ func (p *proxy) getShare(w http.ResponseWriter, r *http.Request) {
 	// so we query both backends, and the first that responds we use it
 	shareID := mux.Vars(r)["share_id"]
 
+	if shareID == "pending" {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
 	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
 		ctx = context.WithValue(ctx, "isMobile", true)
 	}
@@ -5266,6 +5272,11 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	gCtx := GetContextWithAuth(ctx)
 	shareID := mux.Vars(r)["share_id"]
+
+	if shareID == "pending" {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
 
 	found, err := p.isPublicLinkShare(ctx, shareID)
 	if err != nil {
@@ -5417,6 +5428,11 @@ func (p *proxy) updatePublicLinkShare(shareID string, newShare *NewShareOCSReque
 func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	shareID := mux.Vars(r)["share_id"]
+
+	if shareID == "pending" {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
 
 	newShare := &NewShareOCSRequest{}
 	if r.Header.Get("Content-Type") == "application/json" {
@@ -6253,8 +6269,9 @@ func (p *proxy) getPreview(w http.ResponseWriter, r *http.Request) {
 
 	format, err := imaging.FormatFromFilename(basename)
 	if err != nil {
+		// i.e File format not supported
 		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
 
@@ -7663,6 +7680,14 @@ func (p *proxy) putChunked(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
+	p.propfindInternal(w, r, false)
+}
+
+func (p *proxy) propfindDav(w http.ResponseWriter, r *http.Request) {
+	p.propfindInternal(w, r, true)
+}
+
+func (p *proxy) propfindInternal(w http.ResponseWriter, r *http.Request, dav bool) {
 	ctx := r.Context()
 	path := mux.Vars(r)["path"]
 
@@ -7674,7 +7699,7 @@ func (p *proxy) propfind(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// request comes from remote.php/dav/files/gonzalhu/...
-	if mux.Vars(r)["username"] != "" {
+	if dav { // || mux.Vars(r)["username"] != ""
 		ctx = context.WithValue(ctx, "user-dav-uri", true)
 	}
 
@@ -8160,6 +8185,11 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 					} else {
 						propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:quota-available-bytes", ""))
 					}
+				case "supported-method-set":
+					methods := `<d:supported-method name="OPTIONS"/><d:supported-method name="GET"/><d:supported-method name="HEAD"/>
+<d:supported-method name="DELETE"/><d:supported-method name="PROPFIND"/><d:supported-method name="PUT"/><d:supported-method name="PROPPATCH"/>
+<d:supported-method name="MOVE"/><d:supported-method name="LOCK"/><d:supported-method name="UNLOCK"/><d:supported-method name="MKCOL"/>`
+					propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:supported-method-set", methods))
 				default:
 					propstatNotFound.Prop = append(propstatNotFound.Prop, p.newProp("d:"+pf.Prop[i].Local, ""))
 				}

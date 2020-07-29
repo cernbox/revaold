@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.65
+Version: 0.0.66
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Wed Jun 17 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.66
+- Compatibility with iOS client
 * Mon Jun 08 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.65
 - Unique OO keys per session
 * Tue Jun 02 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.64

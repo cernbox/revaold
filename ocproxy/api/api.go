@@ -1341,7 +1341,7 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 			"%s shared the folder '%s' with you (%s).\r\n\r\n" +
 			"If you are logged in as %s you can go to https://cernbox.cern.ch and click the tab 'Shared with you' to find the shared folder called '%s'.\r\n" +
 			"You can also access the share directly clicking on this link: https://cernbox.cern.ch/index.php/apps/files/?dir=/__myshares/%s \r\n\r\n" +
-			"If you want to sync the share in your desktop, follow this FAQ ( https://cern.service-now.com/service-portal/article.do?n=KB0003663 ) to add a new folder with this path:\r\n\r\n" +
+			"If you want to sync the share in your desktop, follow this FAQ ( https://cern.service-now.com/service-portal?id=kb_article&n=KB0003663 ) to add a new folder with this path:\r\n\r\n" +
 			"%s\r\n" +
 			"\r\n" +
 			"Best regards,\r\n" +
@@ -1355,7 +1355,7 @@ func (p *proxy) sendMail(w http.ResponseWriter, r *http.Request) {
 			"%s shared the folder '%s' with the e-group '%s' that you are part of it.\r\n\r\n" +
 			"If you go to https://cernbox.cern.ch and click the tab 'Shared with you' you will find the shared folder called '%s'.\r\n" +
 			"You can also access the share directly clicking on this link: https://cernbox.cern.ch/index.php/apps/files/?dir=/__myshares/%s \r\n\r\n" +
-			"If you want to sync the share in your desktop, follow this FAQ ( https://cern.service-now.com/service-portal/article.do?n=KB0003663 ) to add a new folder with this path:\r\n\r\n" +
+			"If you want to sync the share in your desktop, follow this FAQ ( https://cern.service-now.com/service-portal?id=kb_article&n=KB0003663 ) to add a new folder with this path:\r\n\r\n" +
 			"%s\r\n" +
 			"\r\n" +
 			"Best regards,\r\n" +

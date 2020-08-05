@@ -269,6 +269,10 @@ func getCustomMime(ext string) string {
 		return "application/vsd"
 	case ".mpp":
 		return "application/x-gantt"
+	case ".md":
+		return "text/markdown"
+	case ".zmd":
+		return "text/markdown"
 	default:
 		return ""
 	}

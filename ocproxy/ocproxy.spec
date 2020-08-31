@@ -1,10 +1,10 @@
-# 
+#
 # ocproxy spec file
 #
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.67
+Version: 0.0.68
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon Aug 31 2020 Ishank Arora <ishank.arora@cern.ch> 0.0.68
+- Assign document type to directories
 * Wed Aug 05 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.67
 - Update KB link in shares email
 * Wed Jun 17 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.66
@@ -126,7 +128,7 @@ rm -rf %buildroot/
 * Thu Mar 21 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.44
 - Support project space migration
 * Tue Mar 05 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.43
-- Fix image preview aspect ratio 
+- Fix image preview aspect ratio
 * Mon Feb 18 2019 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.42
 - Add restart=always to systemd
 * Thu Dec 13 2018 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.41

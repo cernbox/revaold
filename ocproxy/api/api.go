@@ -62,8 +62,8 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
 
 	// user prefixed webdav routes
-	p.router.HandleFunc("/remote.php/dav/files", p.tokenAuthPopup(p.get)).Methods("GET") //for iOS app auth
-	p.router.HandleFunc("/remote.php/dav/files{r:\\/?}", p.tokenAuthPopup(p.propfindDav)).Methods("PROPFIND")//for Android app auth; optional trailing / for iOS
+	p.router.HandleFunc("/remote.php/dav/files", p.tokenAuthPopup(p.get)).Methods("GET")                      //for iOS app auth
+	p.router.HandleFunc("/remote.php/dav/files{r:\\/?}", p.tokenAuthPopup(p.propfindDav)).Methods("PROPFIND") //for Android app auth; optional trailing / for iOS
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.get)).Methods("GET")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.put)).Methods("PUT")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.options)).Methods("OPTIONS")
@@ -850,10 +850,16 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 
 func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
 	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":false},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":false},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":false},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
-	settings := &onlyOfficeSettings{}
-	json.Unmarshal([]byte(msg), settings)
-	return settings.Formats[ext].Type
 
+	settings := &onlyOfficeSettings{}
+	if err := json.Unmarshal([]byte(msg), settings); err != nil {
+		return ""
+	}
+
+	if docFormat := settings.Formats[ext]; docFormat != nil {
+		return docFormat.Type
+	}
+	return "httpd/unix-directory"
 }
 
 func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
@@ -916,7 +922,7 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 	key = strings.Replace(key, ":", ".", -1)
 	key = fmt.Sprintf("%s.%s", key, sessionID)
 
-	p.logger.Info("office-engine onlyoffice config", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md",fmt.Sprintf("%+v",md)))
+	p.logger.Info("office-engine onlyoffice config", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md", fmt.Sprintf("%+v", md)))
 	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download%s?x-access-token=%s", p.hostname, md.Path, accessToken)
 
 	msg := `{
@@ -1035,7 +1041,7 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 	etags := strings.Split(key, ":")
 	key = fmt.Sprintf("%s.%s.%s", paths[0], etags[1], sessionID)
 
-	p.logger.Info("office-engine onlyoffice config public", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md",fmt.Sprintf("%+v",md)))
+	p.logger.Info("office-engine onlyoffice config public", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md", fmt.Sprintf("%+v", md)))
 
 	url := fmt.Sprintf("https://%s/index.php/s/%s/download?x-access-token=%s&path=%s&files=%s", p.hostname, token, accessToken, path.Dir(fn), path.Base(fn))
 
@@ -4351,7 +4357,7 @@ type searchEntry struct {
 func (p *proxy) getShareType(ldapType LDAPAccountType) ShareType {
 	if ldapType == LDAPAccountTypePrimary || ldapType == LDAPAccountTypeSecondary || ldapType == LDAPAccountTypeService {
 		return ShareTypeUser
-	} else if ldapType == LDAPAccountTypeEGroup || ldapType == LDAPAccountTypeEGroup {
+	} else if ldapType == LDAPAccountTypeEGroup {
 		return ShareTypeGroup
 	} else {
 		// fallback to user

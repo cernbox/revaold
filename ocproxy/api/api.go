@@ -1058,6 +1058,8 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
     "customization": {
 	  "compactHeader": true,
 	  "forcesave": true,
+	  "reviewDisplay": "markup",
+	  "showReviewChanges": true,
       "goback": {
 		"blank": false,
         "url": "%s"

@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.69
+Version: 0.0.70
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Thu Sep 24 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.70
+- OO: persistent key when opening in RO
 * Mon Sep 07 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.69
 - Show markup changes by default when opening a file in a public link
 * Mon Aug 31 2020 Ishank Arora <ishank.arora@cern.ch> 0.0.68

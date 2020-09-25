@@ -900,27 +900,31 @@ func (p *proxy) onlyOfficeConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Force users to land always on a different key
-	// otherwise they might land on a stale version
-	if sessionID == "" {
-		now := time.Now().Unix()
-		sessionID = fmt.Sprint(now)
-	}
-
 	user, _ := reva_api.ContextGetUser(ctx)
 	userId := user.AccountId
 	displayName := user.DisplayName
 
-	gCtx := GetContextWithAuth(ctx)
-	// key cannot contain colon (:), use . as separator
-	key, err := p.getVersionFolderID(gCtx, revaPath)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+	// If there's no session, no file is open, so open the latest version always
+	// This way, in RO, we always open the same file or the latest being edited
+	var key string
+	if sessionID == "" {
+		key = md.Id
+		// if migration id set, use it
+		if md.MigId != "" {
+			key = md.MigId
+		}
+	} else {
+		gCtx := GetContextWithAuth(ctx)
+		// key cannot contain colon (:), use . as separator
+		key, err = p.getVersionFolderID(gCtx, revaPath)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		key = fmt.Sprintf("%s.%s", key, sessionID)
 	}
 	key = strings.Replace(key, ":", ".", -1)
-	key = fmt.Sprintf("%s.%s", key, sessionID)
 
 	p.logger.Info("office-engine onlyoffice config", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md", fmt.Sprintf("%+v", md)))
 	url := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/download%s?x-access-token=%s", p.hostname, md.Path, accessToken)
@@ -1022,24 +1026,26 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Force users to land always on a different key
-	// otherwise they might land on a stale version
-	if sessionID == "" {
-		now := time.Now().Unix()
-		sessionID = fmt.Sprint(now)
-	}
-
-	gCtx := GetContextWithAuth(ctx)
-	// key cannot contain colon (:), use . as separator
-	key, err := p.getVersionFolderID(gCtx, md.EosFile)
-	if err != nil {
-		p.logger.Error("", zap.Error(err))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	// If there's no session, no file is open, so open the latest version always
+	// This way, in RO, we always open the same file or the latest being edited
+	var key string
 	paths := strings.Split(pl.Path, ":")
-	etags := strings.Split(key, ":")
-	key = fmt.Sprintf("%s.%s.%s", paths[0], etags[1], sessionID)
+	if sessionID == "" {
+		etags := strings.Split(md.Etag, ":")
+		key = fmt.Sprintf("%s.%s", paths[0], etags[0])
+		key = strings.Replace(key, "\"", "", -1)
+	} else {
+		gCtx := GetContextWithAuth(ctx)
+		// key cannot contain colon (:), use . as separator
+		key, err = p.getVersionFolderID(gCtx, md.EosFile)
+		if err != nil {
+			p.logger.Error("", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		etags := strings.Split(key, ":")
+		key = fmt.Sprintf("%s.%s.%s", paths[0], etags[1], sessionID)
+	}
 
 	p.logger.Info("office-engine onlyoffice config public", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md", fmt.Sprintf("%+v", md)))
 

@@ -62,8 +62,9 @@ func (p *proxy) registerRoutes() {
 	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
 
 	// user prefixed webdav routes
-	p.router.HandleFunc("/remote.php/dav/files", p.tokenAuthPopup(p.get)).Methods("GET")                      //for iOS app auth
-	p.router.HandleFunc("/remote.php/dav/files{r:\\/?}", p.tokenAuthPopup(p.propfindDav)).Methods("PROPFIND") //for Android app auth; optional trailing / for iOS
+	p.router.HandleFunc("/remote.php/dav/files", p.tokenAuthPopup(p.get)).Methods("GET")                         //for iOS app auth
+	p.router.HandleFunc("/remote.php/dav/files{r:\\/?}", p.tokenAuthPopup(p.propfindDav)).Methods("PROPFIND")    //for Android app auth; optional trailing / for iOS
+	p.router.HandleFunc("/remote.php/dav/files/{username}", p.tokenAuthPopup(p.propfindDav)).Methods("PROPFIND") //optional trailing / for Android
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.get)).Methods("GET")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.put)).Methods("PUT")
 	p.router.HandleFunc("/remote.php/dav/files/{username}/{path:.*}", p.tokenAuthPopup(p.options)).Methods("OPTIONS")

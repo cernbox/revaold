@@ -4,7 +4,7 @@ import (
 	"os"
 
 	"github.com/cernbox/revaold/reva-cli/cmds"
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 )
 
 func main() {

@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/codegangsta/cli"
+	"github.com/urfave/cli"
 
 	"github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/reva-cli/cmds/authcmd"

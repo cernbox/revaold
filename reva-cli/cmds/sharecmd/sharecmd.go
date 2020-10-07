@@ -9,8 +9,8 @@ import (
 	"github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/reva-cli/util"
 
-	"github.com/codegangsta/cli"
 	"github.com/ryanuber/columnize"
+	"github.com/urfave/cli"
 )
 
 var CreateFolderShareCommand = cli.Command{
@@ -261,8 +261,25 @@ func listPublicLinks(c *cli.Context) error {
 			return cli.NewExitError(linkRes.Status, 1)
 		}
 		link := linkRes.PublicLink
-		line := fmt.Sprintf("%s|%s|%t|%d|%t|%d|%s", link.Id, link.Token, link.Protected, link.Expires, link.ReadOnly, link.Mtime, link.Path)
-		lines = append(lines, line)
+
+		path := link.Path
+
+		sclient, err := util.GetStorageClient()
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+
+		req := &api.PathReq{Path: path}
+		mdRes, err := sclient.Inspect(util.GetContextWithAllAuths(path), req)
+		if err == nil {
+			if mdRes.Status == api.StatusCode_OK {
+				md := mdRes.Metadata
+
+				line := fmt.Sprintf("%s|https://cernbox.cern.ch/index.php/s/%s|%t|%d|%t|%d|%s|%s", link.Id, link.Token, link.Protected, link.Expires, link.ReadOnly, link.Mtime, link.Path, md.Path)
+				lines = append(lines, line)
+
+			}
+		}
 	}
 	fmt.Fprintln(c.App.Writer, columnize.SimpleFormat(lines))
 	return nil

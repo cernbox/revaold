@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.71
+Version: 0.0.72
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Thu Oct 15 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.72
+- Bump logger version
 * Tue Sep 29 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.71
 - Fix api endpoint for Android app
 * Thu Sep 24 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.70

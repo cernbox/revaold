@@ -7140,7 +7140,7 @@ func (p *proxy) move(w http.ResponseWriter, r *http.Request) {
 		davPrefix := "remote.php/webdav"
 		index := strings.Index(destinationURL.Path, davPrefix)
 		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
-	} else if strings.HasPrefix(destinationURL.Path, "public.php/webdav") {
+	} else if strings.HasPrefix(destinationURL.Path, "/public.php/webdav") {
 		davPrefix := "public.php/webdav"
 		index := strings.Index(destinationURL.Path, davPrefix)
 		destinationPath = path.Join("/", string(destinationURL.Path[index+len(davPrefix):]))
@@ -8632,6 +8632,7 @@ func (p *proxy) getRevaPath(ctx context.Context, ocPath string) string {
 		if pl, ok := reva_api.ContextGetPublicLink(ctx); ok {
 			// apply  public link
 			revaPath = strings.TrimPrefix(ocPath, p.ownCloudPublicLinkPrefix)
+
 			revaPath = path.Join(p.revaPublicLinkPrefix, pl.Token, revaPath)
 
 			// if public link is drop only we add random uuid to avoid

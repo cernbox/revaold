@@ -4750,6 +4750,14 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	onlySharedWithOthers := r.URL.Query().Get("only_shared_with_others") == "true"
 	onlySharedByLink := r.URL.Query().Get("only_shared_by_link") == "true"
 	originalPath := r.URL.Query().Get("path")
+
+	// When using new endpoint, it might pass subfile as an option
+	// But if the path given is /, then we should just show all shares
+	// (used by the mobile client)
+	if originalPath == "/" && r.URL.Query().Get("subfiles") == "true" {
+		originalPath = ""
+	}
+
 	path, ctx := p.stripCBOXMappedPath(r, originalPath)
 
 	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
@@ -8053,7 +8061,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 		}
 		// Finder needs the the getLastModified property to work.
 		t := time.Unix(int64(md.Mtime), 0).UTC()
-		lastModifiedString := t.Format(time.RFC1123)
+		lastModifiedString := t.Format(http.TimeFormat)
 		response.Propstat[0].Prop = append(response.Propstat[0].Prop, p.newProp("d:getlastmodified", lastModifiedString))
 
 		// Diogo: we don't have checksum in revaold?
@@ -8184,7 +8192,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 				case "getlastmodified": // both
 					// TODO we cannot find out if md.Mtime is set or not because ints in go default to 0
 					t := time.Unix(int64(md.Mtime), 0).UTC()
-					lastModifiedString := t.Format(time.RFC1123)
+					lastModifiedString := t.Format(http.TimeFormat)
 					propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getlastmodified", lastModifiedString))
 				case "quota-used-bytes":
 					quota, _ := ctx.Value("quota-used-bytes").(string)

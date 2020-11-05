@@ -150,6 +150,7 @@ var publicLinkTemplate string = `
 		</script>
 		<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
 		<script src="{{ .BaseUrl }}/apps/collabora/js/script.js"></script>
+		<script src="{{ .BaseUrl }}/apps/codimd/js/script.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>
 		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
@@ -375,6 +376,7 @@ var publicLinkTemplatePassword = `
     <script src="{{ .BaseUrl }}/apps/files_sharing/js/authenticate.js"></script>
     <script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
     <script src="{{ .BaseUrl }}/apps/collabora/js/script.js"></script>
+    <script src="{{ .BaseUrl }}/apps/codimd/js/script.js"></script>
 	<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
 	<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>
   </head>
@@ -682,6 +684,7 @@ var publicLinkTemplateFile = `
 		</script>
     	<script src="{{ .BaseUrl }}/apps/wopiviewer/js/script.js"></script>
     	<script src="{{ .BaseUrl }}/apps/collabora/js/script.js"></script>
+    	<script src="{{ .BaseUrl }}/apps/codimd/js/script.js"></script>
 		<script src="{{ .BaseUrl }}/apps/files_pdfviewer/js/previewplugin.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/main.js"></script>
 		<script src="{{ .BaseUrl }}/apps/onlyoffice/js/editor.js"></script>

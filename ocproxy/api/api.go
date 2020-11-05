@@ -2441,6 +2441,7 @@ type OCSShare struct {
 	ItemSource           string     `json:"item_source" xml:"item_source"`
 	FileSource           string     `json:"file_source" xml:"file_source"`
 	FileTarget           string     `json:"file_target" xml:"file_target"`
+	FileParent           string     `json:"file_parent" xml:"file_parent"`
 	ShareWith            *string    `json:"share_with" xml:"share_with"`
 	ShareWithDisplayName string     `json:"share_with_displayname" xml:"share_with_displayname"`
 	Name                 string     `json:"name" xml:"name"`
@@ -5126,11 +5127,12 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		DisplayNameFileOwner: owner,
 		DisplayNameOwner:     owner,
 		FileSource:           md.Id,
-		FileTarget:           md.Path,
+		FileTarget:           fmt.Sprintf("/%s", pl.Name),
+		FileParent:           "",
 		ItemSource:           md.Id,
 		ItemType:             itemType,
 		MimeType:             mimeType,
-		Name:                 pl.Name,
+		Name:                 "Public Link",
 		Path:                 p.joinCBOXMappedPath(ctx, md.Path),
 		Permissions:          permissions,
 		ShareTime:            int(pl.Mtime),

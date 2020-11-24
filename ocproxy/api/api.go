@@ -850,7 +850,7 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) onlyOfficeGetDocumentType(ext string) string {
-	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":false},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":false},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":false},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":false,"def":false},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":false,"def":false},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":false,"def":false},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
 
 	settings := &onlyOfficeSettings{}
 	if err := json.Unmarshal([]byte(msg), settings); err != nil {
@@ -1183,7 +1183,7 @@ type onlyOfficeSettings struct {
 }
 
 func (p *proxy) onlyOfficeSettings(w http.ResponseWriter, r *http.Request) {
-	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":true,"def":false},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":true,"def":false},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":true,"def":false},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
+	msg := `{"formats":{"docx":{"mime":"application\/vnd.openxmlformats-officedocument.wordprocessingml.document","type":"text","edit":true,"def":true},"xlsx":{"mime":"application\/vnd.openxmlformats-officedocument.spreadsheetml.sheet","type":"spreadsheet","edit":true,"def":true},"pptx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.presentation","type":"presentation","edit":true,"def":true},"ppsx":{"mime":"application\/vnd.openxmlformats-officedocument.presentationml.slideshow","type":"presentation","edit":true,"def":true},"txt":{"mime":"text\/plain","type":"text","edit":true,"def":false},"csv":{"mime":"text\/csv","type":"spreadsheet","edit":true,"def":false},"odt":{"mime":"application\/vnd.oasis.opendocument.text","type":"text","edit":false,"def":false},"ods":{"mime":"application\/vnd.oasis.opendocument.spreadsheet","type":"spreadsheet","edit":false,"def":false},"odp":{"mime":"application\/vnd.oasis.opendocument.presentation","type":"presentation","edit":false,"def":false},"doc":{"mime":"application\/msword","type":"text","conv":true},"xls":{"mime":"application\/vnd.ms-excel","type":"spreadsheet","conv":true},"ppt":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"pps":{"mime":"application\/vnd.ms-powerpoint","type":"presentation","conv":true},"epub":{"mime":"application\/epub+zip","type":"text","conv":true},"rtf":{"mime":"text\/rtf","type":"text","conv":true},"mht":{"mime":"message\/rfc822","conv":true},"html":{"mime":"text\/html","type":"text","conv":true},"htm":{"mime":"text\/html","type":"text","conv":true},"xps":{"mime":"application\/vnd.ms-xpsdocument","type":"text"},"pdf":{"mime":"application\/pdf","type":"text"},"djvu":{"mime":"image\/vnd.djvu","type":"text"}},"sameTab": true}`
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(msg))
 }
@@ -2441,6 +2441,7 @@ type OCSShare struct {
 	ItemSource           string     `json:"item_source" xml:"item_source"`
 	FileSource           string     `json:"file_source" xml:"file_source"`
 	FileTarget           string     `json:"file_target" xml:"file_target"`
+	FileParent           string     `json:"file_parent" xml:"file_parent"`
 	ShareWith            *string    `json:"share_with" xml:"share_with"`
 	ShareWithDisplayName string     `json:"share_with_displayname" xml:"share_with_displayname"`
 	Name                 string     `json:"name" xml:"name"`
@@ -4750,6 +4751,14 @@ func (p *proxy) getShares(w http.ResponseWriter, r *http.Request) {
 	onlySharedWithOthers := r.URL.Query().Get("only_shared_with_others") == "true"
 	onlySharedByLink := r.URL.Query().Get("only_shared_by_link") == "true"
 	originalPath := r.URL.Query().Get("path")
+
+	// When using new endpoint, it might pass subfile as an option
+	// But if the path given is /, then we should just show all shares
+	// (used by the mobile client)
+	if originalPath == "/" && r.URL.Query().Get("subfiles") == "true" {
+		originalPath = ""
+	}
+
 	path, ctx := p.stripCBOXMappedPath(r, originalPath)
 
 	if strings.Contains(r.Header.Get("User-Agent"), "ownCloud-android") {
@@ -5118,11 +5127,12 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		DisplayNameFileOwner: owner,
 		DisplayNameOwner:     owner,
 		FileSource:           md.Id,
-		FileTarget:           md.Path,
+		FileTarget:           fmt.Sprintf("/%s", pl.Name),
+		FileParent:           "",
 		ItemSource:           md.Id,
 		ItemType:             itemType,
 		MimeType:             mimeType,
-		Name:                 pl.Name,
+		Name:                 "Public Link",
 		Path:                 p.joinCBOXMappedPath(ctx, md.Path),
 		Permissions:          permissions,
 		ShareTime:            int(pl.Mtime),
@@ -8053,7 +8063,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 		}
 		// Finder needs the the getLastModified property to work.
 		t := time.Unix(int64(md.Mtime), 0).UTC()
-		lastModifiedString := t.Format(time.RFC1123)
+		lastModifiedString := t.Format(http.TimeFormat)
 		response.Propstat[0].Prop = append(response.Propstat[0].Prop, p.newProp("d:getlastmodified", lastModifiedString))
 
 		// Diogo: we don't have checksum in revaold?
@@ -8184,7 +8194,7 @@ func (p *proxy) mdToPropResponse(ctx context.Context, pf *propfindXML, md *reva_
 				case "getlastmodified": // both
 					// TODO we cannot find out if md.Mtime is set or not because ints in go default to 0
 					t := time.Unix(int64(md.Mtime), 0).UTC()
-					lastModifiedString := t.Format(time.RFC1123)
+					lastModifiedString := t.Format(http.TimeFormat)
 					propstatOK.Prop = append(propstatOK.Prop, p.newProp("d:getlastmodified", lastModifiedString))
 				case "quota-used-bytes":
 					quota, _ := ctx.Value("quota-used-bytes").(string)

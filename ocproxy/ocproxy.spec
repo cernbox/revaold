@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.73
+Version: 0.0.75
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,8 +54,15 @@ rm -rf %buildroot/
 
 
 %changelog
+* Thu Nov 19 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.75
+- Disable Open Format on OnlyOffice
+* Wed Nov 4 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.74
+- Small change in Public link response
+- Include CodiMD in public links
 * Thu Oct 15 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.73
 - Fix public link rename
+* Tue Oct 21 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.73
+- Fixes for Android app: time format and root path
 * Thu Oct 15 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.72
 - Bump logger version
 * Tue Sep 29 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.71

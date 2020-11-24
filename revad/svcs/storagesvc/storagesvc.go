@@ -323,7 +323,7 @@ func (s *svc) StartWriteTx(ctx context.Context, req *api.EmptyReq) (*api.TxInfoR
 	uuid := uuid.Must(uuid.NewV4())
 	txID := uuid.String()
 	txFolder := s.getTxFolder(txID)
-	if err := os.Mkdir(txFolder, 0755); err != nil {
+	if err := os.MkdirAll(txFolder, 0755); err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}

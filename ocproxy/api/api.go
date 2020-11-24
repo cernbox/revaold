@@ -39,6 +39,7 @@ import (
 	reva_api "github.com/cernbox/revaold/api"
 	"github.com/cernbox/revaold/api/canary"
 	"github.com/cernbox/revaold/api/office_engine"
+	"github.com/cernbox/revaold/api/otg"
 	"github.com/cernbox/revaold/ocproxy/api/static"
 	"github.com/disintegration/imaging"
 	"github.com/gofrs/uuid"
@@ -214,6 +215,9 @@ func (p *proxy) registerRoutes() {
 	// configure the correct office engine
 	p.router.HandleFunc("/index.php/apps/office", p.tokenAuth(p.getOfficeEngine)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/office", p.tokenAuth(p.setOfficeEngine)).Methods("POST")
+
+	// show otg
+	p.router.HandleFunc("/index.php/apps/cboxotg/getotg", p.getOTG).Methods("GET")
 
 }
 
@@ -2507,6 +2511,7 @@ type Options struct {
 	CanaryForceClean         bool
 	CanaryCookieTTL          int
 	OfficeEngineManager      *office_engine.Manager
+	OTGManager               *otg.Manager
 	Hostname                 string
 	OnlyOfficeDocumentServer string
 	GanttServer              string
@@ -2668,6 +2673,7 @@ func New(opt *Options) (http.Handler, error) {
 		canaryForceClean:         opt.CanaryForceClean,
 		canaryCookieTTL:          opt.CanaryCookieTTL,
 		officeEngineManager:      opt.OfficeEngineManager,
+		otgManager:               opt.OTGManager,
 		hostname:                 opt.Hostname,
 		onlyOfficeDocumentServer: opt.OnlyOfficeDocumentServer,
 		ganttServer:              opt.GanttServer,
@@ -2731,6 +2737,7 @@ type proxy struct {
 	canaryForceClean    bool
 	canaryCookieTTL     int
 	officeEngineManager *office_engine.Manager
+	otgManager          *otg.Manager
 	hostname            string
 
 	onlyOfficeDocumentServer string
@@ -8893,4 +8900,32 @@ func (p *proxy) getVersionFolderID(ctx context.Context, revaPath string) (string
 		return md.MigId, nil
 	}
 	return md.Id, nil
+}
+
+func (p *proxy) getOTG(w http.ResponseWriter, r *http.Request) {
+
+	otgMessage, err := p.otgManager.GetOTG()
+
+	if err != nil {
+		p.logger.Error("ocproxy: error getting otg", zap.Error(err))
+		// use 404 to not trigger page reload in case of some problem
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	type payload struct {
+		Message string `json:"message"`
+	}
+
+	pay := &payload{Message: otgMessage}
+	j, err := json.Marshal(pay)
+	if err != nil {
+		p.logger.Error("ocproxy: error getting otg", zap.Error(err))
+		// use 404 to not trigger page reload in case of some problem
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(j)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/cernbox/gohub/gologger"
 	"github.com/cernbox/revaold/api/canary"
 	"github.com/cernbox/revaold/api/office_engine"
+	"github.com/cernbox/revaold/api/otg"
 	"github.com/cernbox/revaold/ocproxy/api"
 	"github.com/gorilla/mux"
 	"go.uber.org/zap"
@@ -94,14 +95,23 @@ func main() {
 	cm := canary.New(canaryOpts)
 
 	officeOpts := &office_engine.Options{
-		DBUsername: 	gc.GetString("dbusername"),
-		DBPassword: 	gc.GetString("dbpassword"),
-		DBHost:     	gc.GetString("dbhost"),
-		DBPort:     	gc.GetInt("dbport"),
-		DBName:     	gc.GetString("dbname"),
-		DefaultOffice:	gc.GetString("default-office"),
+		DBUsername:    gc.GetString("dbusername"),
+		DBPassword:    gc.GetString("dbpassword"),
+		DBHost:        gc.GetString("dbhost"),
+		DBPort:        gc.GetInt("dbport"),
+		DBName:        gc.GetString("dbname"),
+		DefaultOffice: gc.GetString("default-office"),
 	}
 	oem := office_engine.New(officeOpts)
+
+	otgOpts := &otg.Options{
+		DBUsername: gc.GetString("dbusername"),
+		DBPassword: gc.GetString("dbpassword"),
+		DBHost:     gc.GetString("dbhost"),
+		DBPort:     gc.GetInt("dbport"),
+		DBName:     gc.GetString("dbname"),
+	}
+	otge := otg.New(otgOpts)
 
 	opts := &api.Options{
 		Router:                   router,
@@ -129,6 +139,7 @@ func main() {
 		CanaryForceClean:         gc.GetBool("canary-force-clean"),
 		CanaryCookieTTL:          gc.GetInt("canary-cookie-ttl"),
 		OfficeEngineManager:      oem,
+		OTGManager:               otge,
 		Hostname:                 gc.GetString("hostname"),
 		OnlyOfficeDocumentServer: gc.GetString("apps-onlyoffice-document-server"),
 		GanttServer:              gc.GetString("apps-gantt-server"),

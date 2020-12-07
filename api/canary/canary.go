@@ -2,6 +2,7 @@ package canary
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -25,51 +26,50 @@ func New(opts *Options) *Manager {
 	return &Manager{db: db}
 }
 
-func (cm *Manager) IsAdopter(username string) bool {
+func (cm *Manager) GetVersion(username string) string {
 	var adopter string
-	query := "select username,adopter from cbox_canary where username=?"
+	query := "select username, adopter from cbox_canary where username=?"
 	if err := cm.db.QueryRow(query, username).Scan(&username, &adopter); err != nil {
 		fmt.Println(err)
-		return false
+		return "production"
 	}
-	fmt.Println(adopter)
+
+	// For old data...
 	if adopter == "yes" {
-		return true
+		return "canary"
+	} else if adopter == "no" || adopter == "" {
+		return "production"
 	}
-	return false
+
+	return adopter
 }
 
-func (cm *Manager) SetStatus(username string, adopter bool) error {
-	isAdopter := "no"
-	if adopter {
-		isAdopter = "yes"
+func (cm *Manager) SetVersion(username, version string) error {
+
+	valid := Find([]string{"production", "canary", "ocis"}, version)
+	if !valid {
+		return errors.New("Invalid option")
 	}
 
-	query := "select username,adopter from cbox_canary where username=?"
-	if err := cm.db.QueryRow(query, username).Scan(); err != nil  && err != sql.ErrNoRows {
-		// entry exists update it
-		stmtString := "update cbox_canary set adopter=? where username=? "
-		stmt, err := cm.db.Prepare(stmtString)
-		if err != nil {
-			return err
-		}
-
-		_, err = stmt.Exec(isAdopter, username)
-		if err != nil {
-			return err
-		}
-	} else {
-		// entry does not exit we create one
-		query := "insert into cbox_canary(username, adopter) values(?, ?)"
-		stmt, err := cm.db.Prepare(query)
-		if err != nil {
-			return err
-		}
-
-		_, err = stmt.Exec(username, isAdopter)
-		if err != nil {
-			return err
-		}
+	query := "INSERT INTO cbox_canary (username, adopter) VALUES (?, ?) ON DUPLICATE KEY UPDATE adopter = ?"
+	stmt, err := cm.db.Prepare(query)
+	if err != nil {
+		return err
 	}
+
+	_, err = stmt.Exec(username, version, version)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+func Find(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
 }

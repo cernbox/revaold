@@ -118,6 +118,7 @@ var publicLinkTemplate string = `
 		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
 		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
 		<script>
+		var stop_heartbeat = true;
 		(function ($, OC) {
 
 			$(document).ready(function () {
@@ -654,6 +655,7 @@ var publicLinkTemplateFile = `
 		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootInterface.min.js"></script>
 		<script src="{{ .BaseUrl }}/apps/rootviewer/js/scripts/JSRootPainter.jquery.min.js"></script>
 		<script>
+		var stop_heartbeat = true;
 		(function ($, OC) {
 			$(document).ready(function () {
 				var data = $("data[key='cernboxauthtoken']");
@@ -901,6 +903,7 @@ var publicLinkDropOnly = `
 		<script src="{{ .BaseUrl }}/apps/files/js/filelist.js"></script>
 		<script src="{{ .BaseUrl }}/apps/files/js/keyboardshortcuts.js"></script>
 		<script>
+		var stop_heartbeat = true;
 		(function ($, OC) {
 
 			$(document).ready(function () {

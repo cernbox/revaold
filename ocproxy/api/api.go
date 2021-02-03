@@ -1009,9 +1009,12 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 
 	fileType := strings.TrimPrefix(path.Ext(md.EosFile), ".")
 	documentType := p.onlyOfficeGetDocumentType(fileType) // spreadsheet or text
-	callbackURL := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/trackpublic/%s?filename=%s&x-access-token=%s", p.hostname, token, fn, accessToken)
+	callbackURL := fmt.Sprintf("https://%s/index.php/apps/onlyoffice/storage/trackpublic/%s?filename=%s&x-access-token=%s", p.hostname, token, url.QueryEscape(fn), accessToken)
 	lang := "en"
 	title := strings.Replace(fn, "//", "", -1)
+	if strings.HasPrefix(title, "/") {
+		title = title[1:]
+	}
 
 	mode := "view"
 	var sessionID string
@@ -1054,7 +1057,7 @@ func (p *proxy) onlyOfficePublicLinkConfig(w http.ResponseWriter, r *http.Reques
 
 	p.logger.Info("office-engine onlyoffice config public", zap.String("key", key), zap.String("sessionID", sessionID), zap.String("path", fn), zap.String("md", fmt.Sprintf("%+v", md)))
 
-	url := fmt.Sprintf("https://%s/index.php/s/%s/download?x-access-token=%s&path=%s&files=%s", p.hostname, token, accessToken, path.Dir(fn), path.Base(fn))
+	url := fmt.Sprintf("https://%s/index.php/s/%s/download?x-access-token=%s&path=%s&files=%s", p.hostname, token, accessToken, url.QueryEscape(path.Dir(fn)), url.QueryEscape(path.Base(fn)))
 
 	msg := `{
   "document": {

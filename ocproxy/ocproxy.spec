@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.76
+Version: 0.0.77
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,9 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon Feb 3 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.77
+- URL encode for opening OO files in public links
+- Disable heartbeat on public links
 * Tue Nov 24 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.76
 - Add dynamic support for OTGS
 * Thu Nov 19 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.75

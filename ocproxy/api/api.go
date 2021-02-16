@@ -1491,15 +1491,15 @@ func (p *proxy) drawioSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 type canaryMsg struct {
-	Username  string `json:"username"`
-	IsAdopter bool   `json:"is_adopter"`
-	Reload    bool   `json:"reload"`
+	Username string `json:"username"`
+	Version  string `json:"version"`
+	Reload   bool   `json:"reload"`
 }
 
-func (p *proxy) upsertCanaryCookie(w http.ResponseWriter) {
+func (p *proxy) setCanaryCookie(w http.ResponseWriter, version string) {
 	c := &http.Cookie{
 		Name:   "web_canary",
-		Value:  "true",
+		Value:  version,
 		MaxAge: p.canaryCookieTTL,
 		Path:   "/",
 	}
@@ -1540,16 +1540,16 @@ func (p *proxy) canarySet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := p.canaryManager.SetStatus(user.AccountId, msg.IsAdopter); err != nil {
+	if err := p.canaryManager.SetVersion(user.AccountId, msg.Version); err != nil {
 		p.logger.Error("ocproxy: api: error setting canary status", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	p.logger.Info("ocproxy: canary status triggered", zap.String("username", user.AccountId), zap.Bool("adopter", msg.IsAdopter), zap.Int("max-age", p.canaryCookieTTL))
+	p.logger.Info("ocproxy: canary status triggered", zap.String("username", user.AccountId), zap.String("version", msg.Version), zap.Int("max-age", p.canaryCookieTTL))
 
-	if msg.IsAdopter {
-		p.upsertCanaryCookie(w)
+	if msg.Version != "production" {
+		p.setCanaryCookie(w, msg.Version)
 	} else {
 		p.invalidateCanaryCookie(w)
 	}
@@ -1580,28 +1580,22 @@ func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cm := &canaryMsg{Username: user.AccountId}
-	if p.isAdopter(user.AccountId) {
-		cm.IsAdopter = true
-	}
+	version := p.canaryManager.GetVersion(user.AccountId)
+	cm.Version = version
 
-	// magic check
-	if p.isCanaryEnabled {
-		if cm.IsAdopter {
-			p.upsertCanaryCookie(w)
-		} else {
-			p.invalidateCanaryCookie(w)
+	if version == "production" {
+		p.invalidateCanaryCookie(w)
+		if p.isCanaryEnabled { // This is canary machine
 			cm.Reload = true
 		}
-	} else {
-		if cm.IsAdopter {
-			p.upsertCanaryCookie(w)
+	} else { // Canary or OCIS
+		p.setCanaryCookie(w, version)
+		if !p.isCanaryEnabled || version == "ocis" { // This is a production machine or needs to redirect to ocis
 			cm.Reload = true
-		} else {
-			p.invalidateCanaryCookie(w)
 		}
 	}
 
-	p.logger.Info("ocproxy: canary: getting cookie", zap.Bool("reload", cm.Reload), zap.Bool("adopter", cm.IsAdopter), zap.Int("max-age", p.canaryCookieTTL), zap.String("username", cm.Username))
+	p.logger.Info("ocproxy: canary: getting cookie", zap.Bool("reload", cm.Reload), zap.String("version", cm.Version), zap.Int("max-age", p.canaryCookieTTL), zap.String("username", cm.Username))
 
 	data, err := json.Marshal(cm)
 	if err != nil {
@@ -1610,14 +1604,6 @@ func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(data)
-}
-
-func (p *proxy) isAdopter(username string) bool {
-	if p.canaryManager.IsAdopter(username) {
-		return true
-	} else {
-		return false
-	}
 }
 
 func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {

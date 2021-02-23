@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.78
+Version: 0.0.79
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue Feb 23 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.79
+- Do not unlock the files when receiving saving error status from oo
 * Mon Feb 3 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.78
 - New Canary with OCIS option
 * Mon Feb 3 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.77

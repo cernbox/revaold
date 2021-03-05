@@ -108,19 +108,7 @@ func (fs *eosStorage) getStorageForUser(ctx context.Context, u *api.User) (api.S
 }
 
 func (fs *eosStorage) isUserMigrated(ctx context.Context, key string) bool {
-	defaultUserNotFound := fs.migrator.GetDefaultUserNotFound(ctx)
-	migrated, found := fs.migrator.IsKeyMigrated(ctx, key)
-	if !found {
-		// if not found, we apply the default value
-		if defaultUserNotFound == cbox_api.DefaultUserNotFoundNewProxy {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("home", "newhome"))
-			return true
-		} else {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("home", "oldhome"))
-			return false
-		}
-	}
-	return migrated
+	return true // migration is complete, no traffic should be sent to old instance
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {

@@ -93,33 +93,10 @@ func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) 
 
 	fs.logger.Debug("migration key", zap.String("key", key))
 
-	migrated := fs.isPathMigrated(ctx, key)
-
-	if !migrated {
-		fs.logger.Info("forwarding to olduser", zap.String("path", letterPath))
-		return fs.oldUser, "olduser", "/old/user", letterPath
-	}
-
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
 	fs.logger.Info("forwarding to newuser", zap.String("path", letterPath))
 	// remove letter as /new/user/l mount already contains letter info
 	return s, mountID, mountPrefix, strings.TrimPrefix(letterPath, fmt.Sprintf("/%s", letter))
-}
-
-func (fs *eosStorage) isPathMigrated(ctx context.Context, key string) bool {
-	defaultUserNotFound := fs.migrator.GetDefaultUserNotFound(ctx)
-	migrated, found := fs.migrator.IsKeyMigrated(ctx, key)
-	if !found {
-		// if not found, we apply the default value
-		if defaultUserNotFound == cbox_api.DefaultUserNotFoundNewProxy {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("instance", "eosuser"))
-			return true
-		} else {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("instance", "eoshome"))
-			return false
-		}
-	}
-	return migrated
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {

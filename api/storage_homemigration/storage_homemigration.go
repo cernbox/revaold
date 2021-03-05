@@ -95,20 +95,9 @@ func (fs *eosStorage) getStorageForUser(ctx context.Context, u *api.User) (api.S
 	key := fmt.Sprintf("/eos/user/%s/%s", letter, u.AccountId)
 	fs.logger.Debug("migration key", zap.String("key", key))
 
-	migrated := fs.isUserMigrated(ctx, key)
-
-	if !migrated {
-		fs.logger.Info("forwarding user to oldhome", zap.String("username", username))
-		return fs.oldHome, "oldhome", "/oldhome"
-	}
-
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
 	fs.logger.Info("forwarding user to new_home", zap.String("username", username))
 	return s, mountID, mountPrefix
-}
-
-func (fs *eosStorage) isUserMigrated(ctx context.Context, key string) bool {
-	return true // migration is complete, no traffic should be sent to old instance
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {

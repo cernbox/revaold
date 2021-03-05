@@ -68,13 +68,6 @@ func (fs *eosStorage) getStorageForProject(ctx context.Context, fn string) (api.
 	key := fmt.Sprintf("/eos/project/%s/%s", letter, projectName)
 	fs.logger.Debug("migration: key", zap.String("key", key))
 
-	migrated := fs.isProjectMigrated(ctx, key)
-
-	if !migrated {
-		fs.logger.Info("migration: forwarding project request to oldproject", zap.String("path", fn))
-		return fs.oldProject, "oldproject", "/old/project"
-	}
-
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
 	fs.logger.Info("migration: forwarding project request to newproject", zap.String("path", fn))
 	return s, mountID, mountPrefix
@@ -88,22 +81,6 @@ func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (a
 	mountID := fmt.Sprintf("newproject-%s", letter)
 	mountPrefix := fmt.Sprintf("/new/project/%s", letter)
 	return s, mountID, mountPrefix
-}
-
-func (fs *eosStorage) isProjectMigrated(ctx context.Context, key string) bool {
-	defaultProjectNotFound := fs.migrator.GetDefaultProjectNotFound(ctx)
-	migrated, found := fs.migrator.IsKeyMigrated(ctx, key)
-	if !found {
-		// if not found, we apply the default value
-		if defaultProjectNotFound == cbox_api.DefaultNonDAVRequestNewProxy {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("project", "newproject"))
-			return true
-		} else {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("project", "oldproject"))
-			return false
-		}
-	}
-	return migrated
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {

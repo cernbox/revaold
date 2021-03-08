@@ -92,35 +92,10 @@ func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (a
 func (fs *eosStorage) getStorageForUser(ctx context.Context, u *api.User) (api.Storage, string, string) {
 	username := u.AccountId
 	letter := string(username[0])
-	key := fmt.Sprintf("/eos/user/%s/%s", letter, u.AccountId)
-	fs.logger.Debug("migration key", zap.String("key", key))
-
-	migrated := fs.isUserMigrated(ctx, key)
-
-	if !migrated {
-		fs.logger.Info("forwarding user to oldhome", zap.String("username", username))
-		return fs.oldHome, "oldhome", "/oldhome"
-	}
 
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
 	fs.logger.Info("forwarding user to new_home", zap.String("username", username))
 	return s, mountID, mountPrefix
-}
-
-func (fs *eosStorage) isUserMigrated(ctx context.Context, key string) bool {
-	defaultUserNotFound := fs.migrator.GetDefaultUserNotFound(ctx)
-	migrated, found := fs.migrator.IsKeyMigrated(ctx, key)
-	if !found {
-		// if not found, we apply the default value
-		if defaultUserNotFound == cbox_api.DefaultUserNotFoundNewProxy {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("home", "newhome"))
-			return true
-		} else {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("home", "oldhome"))
-			return false
-		}
-	}
-	return migrated
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
@@ -193,6 +168,8 @@ func (fs *eosStorage) executeScript(ctx context.Context, script, username, insta
 }
 
 func (fs *eosStorage) createHome(ctx context.Context, username, mountID string) error {
+	// it should not enter anymore here, but in case it does,
+	// the creation script takes care to only create homes in the new instances.
 	if mountID == "oldhome" {
 		if fs.oldScriptEnabled {
 			instance := "root://eosuser-internal.cern.ch"

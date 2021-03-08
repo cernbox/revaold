@@ -73,53 +73,28 @@ func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (a
 }
 
 func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) (api.Storage, string, string, string) {
-	var key, letter string
+	var userPath, letter string
 	tokens := strings.Split(strings.TrimPrefix(letterPath, "/"), "/")
 	if len(tokens) > 1 {
 		letter = tokens[0]
 		if len(tokens[0]) == 1 { // l/labradorsvc
-			key = path.Join(key, path.Join(tokens[0:2]...))
+			userPath = path.Join(userPath, path.Join(tokens[0:2]...))
 		} else {
-			key = path.Join(key, tokens[0]) // csc/Docs
+			userPath = path.Join(userPath, tokens[0]) // csc/Docs
 		}
 	}
 
 	if len(tokens) == 1 {
-		key = path.Join(key, tokens[0])
+		userPath = path.Join(userPath, tokens[0])
 	}
 
-	// add /eos/user to the key
-	key = path.Join("/eos/user", key)
-
-	fs.logger.Debug("migration key", zap.String("key", key))
-
-	migrated := fs.isPathMigrated(ctx, key)
-
-	if !migrated {
-		fs.logger.Info("forwarding to olduser", zap.String("path", letterPath))
-		return fs.oldUser, "olduser", "/old/user", letterPath
-	}
+	// add /eos/user to the userPath
+	userPath = path.Join("/eos/user", userPath)
 
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
-	fs.logger.Info("forwarding to newuser", zap.String("path", letterPath))
+	fs.logger.Info("forwarding to newuser", zap.String("path", letterPath), zap.String("user", userPath))
 	// remove letter as /new/user/l mount already contains letter info
 	return s, mountID, mountPrefix, strings.TrimPrefix(letterPath, fmt.Sprintf("/%s", letter))
-}
-
-func (fs *eosStorage) isPathMigrated(ctx context.Context, key string) bool {
-	defaultUserNotFound := fs.migrator.GetDefaultUserNotFound(ctx)
-	migrated, found := fs.migrator.IsKeyMigrated(ctx, key)
-	if !found {
-		// if not found, we apply the default value
-		if defaultUserNotFound == cbox_api.DefaultUserNotFoundNewProxy {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("instance", "eosuser"))
-			return true
-		} else {
-			fs.logger.Info("key not found, applying default", zap.String("key", key), zap.String("instance", "eoshome"))
-			return false
-		}
-	}
-	return migrated
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {

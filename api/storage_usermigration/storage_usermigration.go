@@ -73,28 +73,26 @@ func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (a
 }
 
 func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) (api.Storage, string, string, string) {
-	var key, letter string
+	var userPath, letter string
 	tokens := strings.Split(strings.TrimPrefix(letterPath, "/"), "/")
 	if len(tokens) > 1 {
 		letter = tokens[0]
 		if len(tokens[0]) == 1 { // l/labradorsvc
-			key = path.Join(key, path.Join(tokens[0:2]...))
+			userPath = path.Join(userPath, path.Join(tokens[0:2]...))
 		} else {
-			key = path.Join(key, tokens[0]) // csc/Docs
+			userPath = path.Join(userPath, tokens[0]) // csc/Docs
 		}
 	}
 
 	if len(tokens) == 1 {
-		key = path.Join(key, tokens[0])
+		userPath = path.Join(userPath, tokens[0])
 	}
 
-	// add /eos/user to the key
-	key = path.Join("/eos/user", key)
-
-	fs.logger.Debug("migration key", zap.String("key", key))
+	// add /eos/user to the userPath
+	userPath = path.Join("/eos/user", userPath)
 
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
-	fs.logger.Info("forwarding to newuser", zap.String("path", letterPath))
+	fs.logger.Info("forwarding to newuser", zap.String("path", letterPath), zap.String("user", userPath))
 	// remove letter as /new/user/l mount already contains letter info
 	return s, mountID, mountPrefix, strings.TrimPrefix(letterPath, fmt.Sprintf("/%s", letter))
 }

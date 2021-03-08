@@ -65,11 +65,10 @@ func (fs *eosStorage) getStorageForProject(ctx context.Context, fn string) (api.
 	}
 	letter := parts[0]      // "l"
 	projectName := parts[1] // "labradorprojecttest"
-	key := fmt.Sprintf("/eos/project/%s/%s", letter, projectName)
-	fs.logger.Debug("migration: key", zap.String("key", key))
+	projectPath := fmt.Sprintf("/eos/project/%s/%s", letter, projectName)
 
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
-	fs.logger.Info("migration: forwarding project request to newproject", zap.String("path", fn))
+	fs.logger.Info("migration: forwarding project request to newproject", zap.String("path", fn), zap.String("project", projectPath))
 	return s, mountID, mountPrefix
 }
 

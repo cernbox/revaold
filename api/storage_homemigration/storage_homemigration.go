@@ -92,8 +92,6 @@ func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (a
 func (fs *eosStorage) getStorageForUser(ctx context.Context, u *api.User) (api.Storage, string, string) {
 	username := u.AccountId
 	letter := string(username[0])
-	key := fmt.Sprintf("/eos/user/%s/%s", letter, u.AccountId)
-	fs.logger.Debug("migration key", zap.String("key", key))
 
 	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
 	fs.logger.Info("forwarding user to new_home", zap.String("username", username))
@@ -170,6 +168,8 @@ func (fs *eosStorage) executeScript(ctx context.Context, script, username, insta
 }
 
 func (fs *eosStorage) createHome(ctx context.Context, username, mountID string) error {
+	// it should not enter anymore here, but in case it does,
+	// the creation script takes care to only create homes in the new instances.
 	if mountID == "oldhome" {
 		if fs.oldScriptEnabled {
 			instance := "root://eosuser-internal.cern.ch"

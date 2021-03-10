@@ -4,7 +4,7 @@
 
 Name: revad
 Summary: REVA is a gRPC backend server for CERNBox
-Version: 0.0.49
+Version: 0.0.50
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -53,6 +53,8 @@ rm -rf %buildroot/
 %config(noreplace) /etc/revad/revad.yaml
 
 %changelog
+* Wed Mar 10 2021 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.50
+- Remove migration logic for EOSUSER retirement
 * Thu Oct 15 2020 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.49
 - Bump logger version
 * Wed Aug 05 2020 Diogo Castro <diogo.castro@cern.ch> 0.0.48

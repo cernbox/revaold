@@ -742,7 +742,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 
 		// If the save was called after the file being closed, unlock.
 		// Otherwise, refresh the lock
-		if req.Status == trackerStatusMustSave || req.Status == trackerStatusForceSavingError {
+		if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted {
 			p.unlockWopi(ctx, revaPath)
 		} else { // req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusCorrupted
 			succeeded, _ := p.lockWopi(md)

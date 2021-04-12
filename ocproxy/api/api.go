@@ -533,7 +533,6 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 
 	// 1st case: OO closed without changes
 	// just unlock the file
-	// Is it possible to have "StatusClosed" with changes?
 	if req.Status == trackerStatusClosed {
 		payload := struct {
 			Err int `json:"error"`
@@ -872,7 +871,7 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: retrieve file error", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -886,7 +885,11 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 		if dc != nil {
 			if dc.Length > 0 {
 				w.Write(dc.Data)
+			} else {
+				p.logger.Error("onlyoffice: retrieve file error: empty chunk")
 			}
+		} else {
+			p.logger.Error("onlyoffice: retrieve file error: nil data chunk")
 		}
 	}
 

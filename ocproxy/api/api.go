@@ -510,21 +510,21 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	revaPath := p.getRevaPath(ctx, fn)
 	md, err := p.getMetadata(ctx, revaPath)
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("onlyoffice: error stating file "+fn, zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("onlyoffice: error reading request body", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	req := &callbackRequest{}
 	if err := json.Unmarshal(data, req); err != nil {
-		p.logger.Error("", zap.Error(err))
+		p.logger.Error("onlyoffice: error unmarsharing request body payload to json", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -541,18 +541,24 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		}
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: error encoding to json", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		if req.Status == trackerStatusClosed {
-			p.unlockWopi(ctx, revaPath)
+			ok := p.unlockWopi(ctx, revaPath)
+			if !ok {
+				p.logger.Error("onlyoffice: error removing session", zap.Error(err))
+				// should we abort here? what we risk if doc is closed but we keep the lock open? it should expire by itself.
+			}
 		}
 
-		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Write(encoded)
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write(encoded); err != nil {
+			p.logger.Error("onlyoffice: error writing payload 'ok' to onlyoffice", zap.Error(err))
+		}
 		return
 	}
 
@@ -560,6 +566,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	// Also create a version if the lock was removed, just to be safe
 	status, _ := p.getLockWopi(md)
 	if status == 1 {
+		p.logger.Info("onlyoffice: error getting wopi lock")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -575,10 +582,12 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		if conflict {
 			errorCode = 1
 			msg = "File modified outside OnlyOffice"
+			p.logger.Warn("onlyoffice: file modified outside onlyoffice")
 			w.WriteHeader(http.StatusConflict)
 		} else {
 			succeeded, _ := p.lockWopi(md)
 			if !succeeded {
+				p.logger.Error("onlyoffice: error creating wopi lock")
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -594,7 +603,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		}
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: error encoding json payload", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -608,17 +617,24 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 	// Unlock the file once saved
 	if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted || req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusForceSavingError {
 		url := req.URL
+		// verify url is not empty
+		if url == "" {
+			p.logger.Error(fmt.Sprintf("onlyoffice: url to fetch changes from onlyoffice server is empty"))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+
+		}
 		resp, err := http.Get(url)
 
 		if err != nil {
-			p.logger.Error("Error while getting file from OO", zap.Error(err))
+			p.logger.Error(fmt.Sprintf("onlyoffice: Error while getting file from OO. (GET %s)", url), zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		if resp.StatusCode != http.StatusOK {
 
-			p.logger.Error("Retrieving file from OnlyOffice returned status not OK.", zap.Int("Status", resp.StatusCode))
+			p.logger.Error("onlyoffice: Retrieving file from OnlyOffice returned status not OK.", zap.Int("Status", resp.StatusCode))
 
 			payload := struct {
 				Err     int    `json:"error"`
@@ -629,22 +645,39 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 			}
 			encoded, err := json.Marshal(payload)
 			if err != nil {
-				p.logger.Error("", zap.Error(err))
+				p.logger.Error("onlyoffice: error encoding json payload", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 
-			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusInternalServerError)
 			w.Write(encoded)
 			return
 		}
+
+		// verify that contents of remote url are not empty (0-size files).
+		// A blank office documents still has a size of a few kilobytes.
+
+		if resp.ContentLength == 0 {
+			p.logger.Error("onlyoffice: body is zero bytes, onlyoffice is giving us a zero size file", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		if resp.ContentLength == -1 {
+			p.logger.Error("onlyoffice: remote file size is unkown")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		p.logger.Info(fmt.Sprintf("onlyoffice: the remote file stored in onlyoffice has a size of %d bytes", resp.ContentLength))
 
 		// write to file
 		gCtx := GetContextWithAuth(ctx)
 		txInfoRes, err := p.getStorageClient().StartWriteTx(gCtx, &reva_api.EmptyReq{})
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: error starting write tx", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -657,7 +690,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 
 		stream, err := p.getStorageClient().WriteChunk(gCtx)
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: error writing tx chunk", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -678,7 +711,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 					Offset: offset,
 				}
 				if err := stream.Send(dc); err != nil {
-					p.logger.Error("", zap.Error(err))
+					p.logger.Error("onlyoffice: error sending data to revad", zap.Error(err))
 					w.WriteHeader(http.StatusInternalServerError)
 					return
 				}
@@ -690,7 +723,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 				break
 			}
 			if err != nil {
-				p.logger.Error("", zap.Error(err))
+				p.logger.Error("onlyoffice: error sending data to revad", zap.Error(err))
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -698,7 +731,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 
 		writeSummaryRes, err := stream.CloseAndRecv()
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: error closing write stream", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -714,11 +747,11 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 			extension := filepath.Ext(newRevaPath)
 			dt := time.Now()
 			newRevaPath = fmt.Sprintf("%s.conflict_%s%s", newRevaPath[0:len(newRevaPath)-len(extension)], dt.Format("01022006_150405"), extension)
-			p.logger.Warn("A conflict was detected. Saving the file with a different name")
+			p.logger.Warn("onlyoffice: A conflict was detected. Saving the file with a different name: " + newRevaPath)
 		}
 		emptyRes, err := p.getStorageClient().FinishWriteTx(gCtx, &reva_api.TxEnd{Path: newRevaPath, TxId: txInfo.TxId})
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: error finishing write tx", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -735,7 +768,7 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		}
 		encoded, err := json.Marshal(payload)
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: error encoding json payload", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -743,10 +776,15 @@ func (p *proxy) onlyOfficeTrackInternal(w http.ResponseWriter, r *http.Request, 
 		// If the save was called after the file being closed, unlock.
 		// Otherwise, refresh the lock
 		if req.Status == trackerStatusMustSave || req.Status == trackerStatusCorrupted {
-			p.unlockWopi(ctx, revaPath)
+			if ok := p.unlockWopi(ctx, revaPath); !ok {
+				p.logger.Error("onlyoffice: unlocking wopi")
+				// abort?
+			}
+
 		} else { // req.Status == trackerStatusEditingMustSave || req.Status == trackerStatusCorrupted
 			succeeded, _ := p.lockWopi(md)
 			if !succeeded {
+				p.logger.Error("onlyoffice:  error creating wopi lock after save operation")
 				w.WriteHeader(http.StatusBadRequest)
 				return
 			}
@@ -833,7 +871,7 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if err != nil {
-			p.logger.Error("", zap.Error(err))
+			p.logger.Error("onlyoffice: retrieve file error", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -847,7 +885,11 @@ func (p *proxy) onlyOfficeDownload(w http.ResponseWriter, r *http.Request) {
 		if dc != nil {
 			if dc.Length > 0 {
 				w.Write(dc.Data)
+			} else {
+				p.logger.Error("onlyoffice: retrieve file error: empty chunk")
 			}
+		} else {
+			p.logger.Error("onlyoffice: retrieve file error: nil data chunk")
 		}
 	}
 

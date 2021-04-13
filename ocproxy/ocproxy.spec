@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.80
+Version: 0.0.81
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon Apr 12 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.81
+- onlyoffice: improve logging
 * Fri Apr 2 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.80
 - Fix the previous commit
 * Tue Feb 23 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.79

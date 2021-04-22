@@ -57,6 +57,7 @@ func (p *proxy) registerRoutes() {
 	// route for checking canary status.
 	p.router.HandleFunc("/index.php/apps/canary", p.tokenAuth(p.canary)).Methods("GET")
 	p.router.HandleFunc("/index.php/apps/canary", p.tokenAuth(p.canarySet)).Methods("POST")
+	p.router.HandleFunc("/reset", p.canaryReset).Methods("GET") // NEEDS TO BE PROTECTED BY THE SSO
 
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
@@ -1646,6 +1647,27 @@ func (p *proxy) canary(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Write(data)
+}
+
+func (p *proxy) canaryReset(w http.ResponseWriter, r *http.Request) {
+
+	// This page needs to be protected behind the SSO
+	// It doesn't use the normal token based auth to allow us to serve it directly
+	username := r.Header.Get("adfs_login") // this comes back from shibolleth (the name of the header depends on shibd configuration)
+
+	if username == "" {
+		p.logger.Error("ocproxy: canary: no username given")
+		w.WriteHeader(http.StatusUnauthorized)
+	}
+
+	if err := p.canaryManager.SetVersion(username, "production"); err != nil {
+		p.logger.Error("ocproxy: api: error setting canary status", zap.Error(err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	p.invalidateCanaryCookie(w)
+	p.logger.Info("ocproxy: canary: resseting session", zap.String("username", username))
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (p *proxy) getCurrentUser(w http.ResponseWriter, r *http.Request) {

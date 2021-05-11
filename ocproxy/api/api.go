@@ -2664,8 +2664,15 @@ func New(opt *Options) (http.Handler, error) {
 		return nil, err
 	}
 
-	if err := os.MkdirAll(opt.NGChunkPath, 0755); err != nil {
-		return nil, err
+	// this path is mounted on ceph.
+	// the directory is a mount (in fstab) and MkdirAll fill fail
+	// when launched on this special device.
+	// This can cause problems during start-up.
+	// We only create the directory if the folder does not exist.
+	if _, err := os.Stat(opt.NGChunkPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(opt.NGChunkPath, 0755); err != nil {
+			return nil, err
+		}
 	}
 
 	tr := &http.Transport{

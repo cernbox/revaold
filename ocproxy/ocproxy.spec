@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.82
+Version: 0.0.83
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Tue May 11 2021 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.83
+- Do not create ceph folder if already exists. Fixes boot issues.
 * Thu Apr 22 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.82
 - canary reset endpoint
 * Mon Apr 12 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.81

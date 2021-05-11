@@ -8,8 +8,7 @@ New REVA code lives in github.com/cernbox/reva.
 # How to distribute RPMs in CERN infrastructure
 
 * Build with Dockerfile on repostiry root to have CC7 RPMS
-* Copy RPMS to `lxplus.cern.ch:/eos/project/s/storage-ci/www/cernbox/tag/el-7/x86_64/`
-* ssh lxplus
-* `createrepo --update /eos/project/s/storage-ci/www/cernbox/tag/el-7/x86_64/`
+* `scp *rpm lxplus.cern.ch:/eos/project/s/storage-ci/www/cernbox/tag/el-7/x86_64/`
+* `ssh lxplus "createrepo --update /eos/project/s/storage-ci/www/cernbox/tag/el-7/x86_64/"`
 
 

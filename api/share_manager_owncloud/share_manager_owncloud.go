@@ -11,8 +11,9 @@ import (
 	"github.com/cernbox/revaold/api"
 
 	"database/sql"
+
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
+	ctx_zap "github.com/grpc-ecosystem/go-grpc-middleware/tags/zap"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
@@ -508,11 +509,11 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	var query string
 
 	if len(groups) > 1 {
-		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
+		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
+		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
 		queryArgs = append(queryArgs, accountID)
 	}
 	rows, err := sm.db.Query(query, queryArgs...)

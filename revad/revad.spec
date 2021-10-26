@@ -4,7 +4,7 @@
 
 Name: revad
 Summary: REVA is a gRPC backend server for CERNBox
-Version: 0.0.51
+Version: 0.0.52
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -53,6 +53,8 @@ rm -rf %buildroot/
 %config(noreplace) /etc/revad/revad.yaml
 
 %changelog
+* Tue Oct 26 2021 Ishank Arora <ishank.arora@cern.ch> 0.0.52
+- Retrieve shares where current user is initiator as well
 * Wed Jun 17 2021 Diogo Castro <diogo.castro@cern.ch> 0.0.51
 - Remove file shares from shared with me
 * Wed Mar 10 2021 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.50

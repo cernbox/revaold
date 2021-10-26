@@ -570,8 +570,8 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 		permissions int
 	)
 
-	query := "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND uid_owner=? and id=?"
-	if err := sm.db.QueryRow(query, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
+	query := "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) and id=?"
+	if err := sm.db.QueryRow(query, accountID, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
 		}
@@ -583,8 +583,8 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 }
 
 func (sm *shareManager) getDBShares(ctx context.Context, accountID, filterByFileID string) ([]*dbShare, error) {
-	query := "SELECT id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 OR orphan IS NULL) AND uid_owner=? AND (share_type=? OR share_type=?) "
-	params := []interface{}{accountID, 0, 1}
+	query := "SELECT id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 OR orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) AND (share_type=? OR share_type=?) "
+	params := []interface{}{accountID, accountID, 0, 1}
 	if filterByFileID != "" {
 		prefix, itemSource := splitFileID(filterByFileID)
 		query += "and fileid_prefix=? and item_source=?"

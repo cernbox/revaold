@@ -62,7 +62,7 @@ func (sm *shareManager) rejectShare(ctx context.Context, receiver, id string) er
 		return err
 	}
 
-	query := "insert into oc_share_acl(id, rejected_by) values(?, ?)"
+	query := "insert into oc_share_status(id, recipient, state) values(?, ?, -1) ON DUPLICATE KEY UPDATE state = -1"
 	stmt, err := sm.db.Prepare(query)
 	if err != nil {
 		err = errors.Wrapf(err, "error preparing statement: id=%s", id)
@@ -474,11 +474,11 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 	var query string
 
 	if len(groups) > 1 {
-		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (accepted=0 or accepted=1) AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
+		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (accepted=0 or accepted=1) AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
+		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, accountID)
 	}
 
@@ -509,11 +509,11 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	var query string
 
 	if len(groups) > 1 {
-		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
+		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (accepted=0 OR accepted=1) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_acl WHERE rejected_by=?)"
+		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, accountID)
 	}
 	rows, err := sm.db.Query(query, queryArgs...)

@@ -474,11 +474,11 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 	var query string
 
 	if len(groups) > 1 {
-		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
+		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
+		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, accountID)
 	}
 
@@ -570,7 +570,7 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 		permissions int
 	)
 
-	query := "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 or orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) and id=?"
+	query := "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (share_type=2 OR item_type <> 'file') AND (orphan = 0 or orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) and id=?"
 	if err := sm.db.QueryRow(query, accountID, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
@@ -583,7 +583,7 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 }
 
 func (sm *shareManager) getDBShares(ctx context.Context, accountID, filterByFileID string) ([]*dbShare, error) {
-	query := "SELECT id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (orphan = 0 OR orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) AND (share_type=? OR share_type=?) "
+	query := "SELECT id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (share_type=2 OR item_type <> 'file') AND (orphan = 0 OR orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) AND (share_type=? OR share_type=?) "
 	params := []interface{}{accountID, accountID, 0, 1}
 	if filterByFileID != "" {
 		prefix, itemSource := splitFileID(filterByFileID)

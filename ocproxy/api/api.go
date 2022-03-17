@@ -2548,8 +2548,9 @@ type Options struct {
 
 	OverwriteHost string
 
-	WopiServer string
-	WopiSecret string
+	WopiServer       string
+	WopiSecret       string
+	WopiProxyMSCloud bool
 
 	DrawIOURL string
 

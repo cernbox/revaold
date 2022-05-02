@@ -1988,6 +1988,10 @@ func (p *proxy) wopiOpen(w http.ResponseWriter, r *http.Request) {
 	q.Add("folderurl", folderURL)
 	q.Add("username", user.AccountId)
 	q.Add("endpoint", md.EosInstance)
+	// if in proxy mode we pass proxy=true
+	if p.wopiProxyMSCloud {
+		q.Add("proxy", strconv.FormatBool(p.wopiProxyMSCloud))
+	}
 	req.URL.RawQuery = q.Encode()
 
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))
@@ -2548,8 +2552,9 @@ type Options struct {
 
 	OverwriteHost string
 
-	WopiServer string
-	WopiSecret string
+	WopiServer       string
+	WopiSecret       string
+	WopiProxyMSCloud bool
 
 	DrawIOURL string
 
@@ -2715,8 +2720,9 @@ func New(opt *Options) (http.Handler, error) {
 
 		overwriteHost: opt.OverwriteHost,
 
-		wopiServer: opt.WopiServer,
-		wopiSecret: opt.WopiSecret,
+		wopiServer:       opt.WopiServer,
+		wopiSecret:       opt.WopiSecret,
+		wopiProxyMSCloud: opt.WopiProxyMSCloud,
 
 		drawIOURL: opt.DrawIOURL,
 
@@ -2780,8 +2786,9 @@ type proxy struct {
 
 	overwriteHost string
 
-	wopiServer string
-	wopiSecret string
+	wopiServer       string
+	wopiSecret       string
+	wopiProxyMSCloud bool
 
 	drawIOURL string
 

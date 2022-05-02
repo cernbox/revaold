@@ -47,6 +47,7 @@ func init() {
 	gc.Add("overwrite-host", "", "if set, overwrites the hostname of the machine, usually used when server is after a proxy")
 	gc.Add("wopi-server", "http://wopihost.example.org", "hostname of the wopi server")
 	gc.Add("wopi-secret", "bar", "secret to use to connect to the wopi server")
+	gc.Add("wopi-proxy-mscloud", false, "if true, open office files in the ms cloud")
 
 	gc.Add("apps-drawio-url", "https://drawio.web.cern.ch", "The DrawIO URL")
 
@@ -129,6 +130,7 @@ func main() {
 		OverwriteHost:            gc.GetString("overwrite-host"),
 		WopiServer:               gc.GetString("wopi-server"),
 		WopiSecret:               gc.GetString("wopi-secret"),
+		WopiProxyMSCloud:         gc.GetBool("wopi-proxy-mscloud"),
 		DrawIOURL:                gc.GetString("apps-drawio-url"),
 		CacheSize:                gc.GetInt("cache-size"),
 		CacheEviction:            gc.GetInt("cache-eviction"),

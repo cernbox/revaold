@@ -1889,6 +1889,10 @@ func (p *proxy) wopiPublicOpen(w http.ResponseWriter, r *http.Request) {
 	q.Add("folderurl", folderURL)
 	q.Add("username", "")
 	q.Add("endpoint", md.EosInstance)
+	// if in proxy mode we pass proxy=true
+	if p.wopiProxyMSCloud {
+		q.Add("proxy", strconv.FormatBool(p.wopiProxyMSCloud))
+	}
 	req.URL.RawQuery = q.Encode()
 
 	req.Header.Set("authorization", fmt.Sprintf("Bearer %s", p.wopiSecret))

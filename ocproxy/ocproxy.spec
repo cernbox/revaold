@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Mon May 03 2022 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.85
+- Fix opening in MSCloud for public links
 * Mon May 02 2022 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.84
 - Adds support to use MSO365 in the cloud
 * Tue May 11 2021 Hugo Gonzalez Labrador <hugo.gonzalez.labrador@cern.ch> 0.0.83

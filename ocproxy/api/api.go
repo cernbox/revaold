@@ -2110,37 +2110,37 @@ func (p *proxy) listFolder(ctx context.Context, revaPath string) ([]*reva_api.Me
 }
 
 /*
-{
-   "data":{
-      "directory":"\/",
-      "files":[
-         {
-            "fileid":28159344,
-            "mtime":1510656728,
-            "size":"753647901797",
-            "storage_mtime":1510656728,
-            "path":"",
-            "path_hash":"8f7ff74eee5bdf3c31fd480311dde3fb",
-            "parent":12343478,
-            "encrypted":0,
-            "unencrypted_size":0,
-            "name":"  project castor",
-            "mimetype":"httpd\/unix-directory",
-            "permissions":31,
-            "project_owner":"castorc3",
-            "project_name":"castor",
-            "project_readers":"cernbox-project-castor-readers",
-            "project_writers":"cernbox-project-castor-writers",
-            "project_admins":"cernbox-project-castor-admins",
-            "custom_perm":1,
-            "isPreviewAvailable":false,
-            "type":"dir"
-         },
-      ],
-      "permissions":1
-   },
-   "status":"success"
-}
+	{
+	   "data":{
+	      "directory":"\/",
+	      "files":[
+	         {
+	            "fileid":28159344,
+	            "mtime":1510656728,
+	            "size":"753647901797",
+	            "storage_mtime":1510656728,
+	            "path":"",
+	            "path_hash":"8f7ff74eee5bdf3c31fd480311dde3fb",
+	            "parent":12343478,
+	            "encrypted":0,
+	            "unencrypted_size":0,
+	            "name":"  project castor",
+	            "mimetype":"httpd\/unix-directory",
+	            "permissions":31,
+	            "project_owner":"castorc3",
+	            "project_name":"castor",
+	            "project_readers":"cernbox-project-castor-readers",
+	            "project_writers":"cernbox-project-castor-writers",
+	            "project_admins":"cernbox-project-castor-admins",
+	            "custom_perm":1,
+	            "isPreviewAvailable":false,
+	            "type":"dir"
+	         },
+	      ],
+	      "permissions":1
+	   },
+	   "status":"success"
+	}
 */
 type personalProjectsRes struct {
 	Data   interface{} `json:"data"`
@@ -2462,33 +2462,33 @@ func (p *proxy) getStorageStats(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
- {
-            "id":"1",
-            "share_type":3,
-            "uid_owner":"admin",
-            "displayname_owner":"admin",
-            "permissions":1,
-            "stime":1528476368,
-            "parent":null,
-            "expiration":null,
-            "token":"wI9qedAsjltaihj",
-            "uid_file_owner":"admin",
-            "displayname_file_owner":"admin",
-            "path":"\/Reverse cowgirl hotness.mp4",
-            "item_type":"file",
-            "mimetype":"video\/mp4",
-            "storage_id":"home::admin",
-            "storage":3,
-            "item_source":82,
-            "file_source":82,
-            "file_parent":25,
-            "file_target":"\/Reverse cowgirl hotness.mp4",
-            "share_with":null,
-            "share_with_displayname":null,
-            "name":"Reverse cowgirl hotness.mp4 link",
-            "url":"https:\/\/demo.owncloud.org\/s\/wI9qedAsjltaihj",
-            "mail_send":0
-         }
+	{
+	           "id":"1",
+	           "share_type":3,
+	           "uid_owner":"admin",
+	           "displayname_owner":"admin",
+	           "permissions":1,
+	           "stime":1528476368,
+	           "parent":null,
+	           "expiration":null,
+	           "token":"wI9qedAsjltaihj",
+	           "uid_file_owner":"admin",
+	           "displayname_file_owner":"admin",
+	           "path":"\/Reverse cowgirl hotness.mp4",
+	           "item_type":"file",
+	           "mimetype":"video\/mp4",
+	           "storage_id":"home::admin",
+	           "storage":3,
+	           "item_source":82,
+	           "file_source":82,
+	           "file_parent":25,
+	           "file_target":"\/Reverse cowgirl hotness.mp4",
+	           "share_with":null,
+	           "share_with_displayname":null,
+	           "name":"Reverse cowgirl hotness.mp4 link",
+	           "url":"https:\/\/demo.owncloud.org\/s\/wI9qedAsjltaihj",
+	           "mail_send":0
+	        }
 */
 type OCSShare struct {
 	ID                   string     `json:"id" xml:"id"`
@@ -3032,13 +3032,13 @@ func (p *proxy) downloadVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-{
-   "data":{
-      "revision":"1529574036.646df75d",
-      "file":"\/ideas\/hello.txt"
-   },
-   "status":"success"
-}
+	{
+	   "data":{
+	      "revision":"1529574036.646df75d",
+	      "file":"\/ideas\/hello.txt"
+	   },
+	   "status":"success"
+	}
 */
 type rollbackVersionRes struct {
 	Data struct {
@@ -3092,53 +3092,53 @@ func (p *proxy) rollbackVersion(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-{
-  "data": {
-    "versions": {
-      "1529501898.64217314#/3769_001.pdf": {
-        "eos.size": "226665",
-        "eos.mtime": "1529501898",
-        "eos.ctime": "1529501898.117864887",
-        "eos.mode": "0644",
-        "eos.uid": "95491",
-        "eos.gid": "2763",
-        "eos.fxid": "64217314",
-        "eos.fid": "1679913748",
-        "eos.ino": "450948412985049088",
-        "eos.pid": "96056290",
-        "eos.pxid": "05b9b3e2",
-        "eos.xstype": "adler",
-        "eos.xs": "51163093",
-        "eos.etag": "450948412985049088:51163093",
-        "eos.layout": "replica",
-        "eos.nstripes": "2",
-        "eos.lid": "00600112",
-        "eos.nrep": "2",
-        "eos.fsid": "1030",
-        "eos.file": "/eos/user/g/gonzalhu/.sys.v#.3769_001.pdf/1529501898.64217314",
-        "etag": "450948412985049088:51163093",
-        "fileid": 450948412985049100,
-        "mtime": 1529501898,
-        "size": "226665",
-        "storage_mtime": 1529501898,
-        "path": "/3769_001.pdf",
-        "path_hash": "3bb79fa07612f1c538302dd35198e120",
-        "parent": 96056290,
-        "encrypted": 0,
-        "unencrypted_size": "226665",
-        "name": "3769_001.pdf",
-        "mimetype": "application/octet-stream",
-        "permissions": 31,
-        "current_revision_path": "files/3769_001.pdf",
-        "revision": "1529501898.64217314",
-        "cur": 0,
-        "version": "1529501898.64217314"
-      }
-    },
-    "endReached": true
-  },
-  "status": "success"
-}
+	{
+	  "data": {
+	    "versions": {
+	      "1529501898.64217314#/3769_001.pdf": {
+	        "eos.size": "226665",
+	        "eos.mtime": "1529501898",
+	        "eos.ctime": "1529501898.117864887",
+	        "eos.mode": "0644",
+	        "eos.uid": "95491",
+	        "eos.gid": "2763",
+	        "eos.fxid": "64217314",
+	        "eos.fid": "1679913748",
+	        "eos.ino": "450948412985049088",
+	        "eos.pid": "96056290",
+	        "eos.pxid": "05b9b3e2",
+	        "eos.xstype": "adler",
+	        "eos.xs": "51163093",
+	        "eos.etag": "450948412985049088:51163093",
+	        "eos.layout": "replica",
+	        "eos.nstripes": "2",
+	        "eos.lid": "00600112",
+	        "eos.nrep": "2",
+	        "eos.fsid": "1030",
+	        "eos.file": "/eos/user/g/gonzalhu/.sys.v#.3769_001.pdf/1529501898.64217314",
+	        "etag": "450948412985049088:51163093",
+	        "fileid": 450948412985049100,
+	        "mtime": 1529501898,
+	        "size": "226665",
+	        "storage_mtime": 1529501898,
+	        "path": "/3769_001.pdf",
+	        "path_hash": "3bb79fa07612f1c538302dd35198e120",
+	        "parent": 96056290,
+	        "encrypted": 0,
+	        "unencrypted_size": "226665",
+	        "name": "3769_001.pdf",
+	        "mimetype": "application/octet-stream",
+	        "permissions": 31,
+	        "current_revision_path": "files/3769_001.pdf",
+	        "revision": "1529501898.64217314",
+	        "cur": 0,
+	        "version": "1529501898.64217314"
+	      }
+	    },
+	    "endReached": true
+	  },
+	  "status": "success"
+	}
 */
 type getVersionsRes struct {
 	Status string       `json:"status"`
@@ -3851,10 +3851,10 @@ func (p *proxy) downloadArchive(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-{
-   "eos-instance":"root:\/\/eosuser-internal.cern.ch",
-   "eos-file":"\/eos\/user\/g\/gonzalhu\/University"
-}
+	{
+	   "eos-instance":"root:\/\/eosuser-internal.cern.ch",
+	   "eos-file":"\/eos\/user\/g\/gonzalhu\/University"
+	}
 */
 func (p *proxy) getEOSInfo(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -3893,51 +3893,51 @@ func (p *proxy) getEOSInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 /*
-{
-   "data":{
-      "permissions":0,
-      "directory":"\/",
-      "files":[
-         {
-            "eos.recycle":"ls",
-            "eos.recycle-bin":"\/eos\/uat\/proc\/recycle\/",
-            "eos.uid":"gonzalhu",
-            "eos.gid":"it",
-            "eos.size":"0",
-            "eos.deletion-time":1529487461000,
-            "eos.type":"recursive-dir",
-            "eos.keylength.restore-path":"72",
-            "eos.restore-path":"\/eos\/scratch\/user\/g\/gonzalhu\/Images\/Ourense\/Pozas\/Ceo\/.sys.v#.hello.txt\/",
-            "eos.restore-key":"00000000005d2688",
-            "path":"files\/Images\/Ourense\/Pozas\/Ceo\/.sys.v#.hello.txt",
-            "name":".sys.v#.hello.txt",
-            "mtime":1529487461000,
-            "id":0,
-            "permissions":1,
-            "mimetype":"httpd\/unix-directory"
-         },
-         {
-            "eos.recycle":"ls",
-            "eos.recycle-bin":"\/eos\/uat\/proc\/recycle\/",
-            "eos.uid":"gonzalhu",
-            "eos.gid":"it",
-            "eos.size":"283115530",
-            "eos.deletion-time":1529487461000,
-            "eos.type":"recursive-dir",
-            "eos.keylength.restore-path":"35",
-            "eos.restore-path":"\/eos\/scratch\/user\/g\/gonzalhu\/Images",
-            "eos.restore-key":"00000000005d1432",
-            "path":"files\/Images",
-            "name":"Images",
-            "mtime":1529487461000,
-            "id":1,
-            "permissions":1,
-            "mimetype":"httpd\/unix-directory"
-         }
-      ]
-   },
-   "status":"success"
-}
+	{
+	   "data":{
+	      "permissions":0,
+	      "directory":"\/",
+	      "files":[
+	         {
+	            "eos.recycle":"ls",
+	            "eos.recycle-bin":"\/eos\/uat\/proc\/recycle\/",
+	            "eos.uid":"gonzalhu",
+	            "eos.gid":"it",
+	            "eos.size":"0",
+	            "eos.deletion-time":1529487461000,
+	            "eos.type":"recursive-dir",
+	            "eos.keylength.restore-path":"72",
+	            "eos.restore-path":"\/eos\/scratch\/user\/g\/gonzalhu\/Images\/Ourense\/Pozas\/Ceo\/.sys.v#.hello.txt\/",
+	            "eos.restore-key":"00000000005d2688",
+	            "path":"files\/Images\/Ourense\/Pozas\/Ceo\/.sys.v#.hello.txt",
+	            "name":".sys.v#.hello.txt",
+	            "mtime":1529487461000,
+	            "id":0,
+	            "permissions":1,
+	            "mimetype":"httpd\/unix-directory"
+	         },
+	         {
+	            "eos.recycle":"ls",
+	            "eos.recycle-bin":"\/eos\/uat\/proc\/recycle\/",
+	            "eos.uid":"gonzalhu",
+	            "eos.gid":"it",
+	            "eos.size":"283115530",
+	            "eos.deletion-time":1529487461000,
+	            "eos.type":"recursive-dir",
+	            "eos.keylength.restore-path":"35",
+	            "eos.restore-path":"\/eos\/scratch\/user\/g\/gonzalhu\/Images",
+	            "eos.restore-key":"00000000005d1432",
+	            "path":"files\/Images",
+	            "name":"Images",
+	            "mtime":1529487461000,
+	            "id":1,
+	            "permissions":1,
+	            "mimetype":"httpd\/unix-directory"
+	         }
+	      ]
+	   },
+	   "status":"success"
+	}
 */
 type trashbinEntry struct {
 	EosRestoreKey  string `json:"eos.restore-key"`
@@ -4148,17 +4148,17 @@ func (p *proxy) getRecycleEntries(ctx context.Context) ([]*reva_api.RecycleEntry
 }
 
 /*
-{
-  "data": {
-    "success": [
-      {
-        "filename": "gantt.png.00000000620dbf7b",
-        "timestamp": 1529498980
-      }
-    ]
-  },
-  "status": "success"
-}
+	{
+	  "data": {
+	    "success": [
+	      {
+	        "filename": "gantt.png.00000000620dbf7b",
+	        "timestamp": 1529498980
+	      }
+	    ]
+	  },
+	  "status": "success"
+	}
 */
 type restoreResponse struct {
 	Status string       `json:"status"`
@@ -4226,12 +4226,12 @@ func (p *proxy) restoreRecycleEntry(ctx context.Context, restoreKey string) erro
 	return nil
 }
 
-/* This is x-www-form-urlencoded request
+/*
+	This is x-www-form-urlencoded request
 
 filecontents: Welcome to your ownCloud account!
 path: /welcome.txt
 mtime: 1528881571
-
 */
 func (p *proxy) saveFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -5220,7 +5220,7 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		ShareWith:            shareWithPointer,
 		ShareWithDisplayName: shareWith,
 		Expiration:           expiration,
-		URL:                  fmt.Sprintf("https://%s/index.php/s/%s", p.overwriteHost, pl.Token),
+		URL:                  fmt.Sprintf("https://cernbox.cern.ch/index.php/s/%s", p.overwriteHost, pl.Token),
 	}
 
 	isMobile, _ := ctx.Value("isMobile").(bool)

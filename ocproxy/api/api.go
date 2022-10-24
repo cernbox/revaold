@@ -5220,7 +5220,7 @@ func (p *proxy) publicLinkToOCSShare(ctx context.Context, pl *reva_api.PublicLin
 		ShareWith:            shareWithPointer,
 		ShareWithDisplayName: shareWith,
 		Expiration:           expiration,
-		URL:                  fmt.Sprintf("https://cernbox.cern.ch/index.php/s/%s", p.overwriteHost, pl.Token),
+		URL:                  fmt.Sprintf("https://%s/index.php/s/%s", p.overwriteHost, pl.Token),
 	}
 
 	isMobile, _ := ctx.Value("isMobile").(bool)

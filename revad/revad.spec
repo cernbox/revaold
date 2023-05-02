@@ -2,7 +2,7 @@
 # revad spec file
 #
 
-Name: revad
+Name: revad-old
 Summary: REVA is a gRPC backend server for CERNBox
 Version: 0.0.54
 Release: 1%{?dist}

@@ -9,21 +9,17 @@ import (
 
 	"github.com/cernbox/revaold/api"
 	"go.uber.org/zap"
-
-	cbox_api "github.com/cernbox/cboxredirectd/api"
 )
 
 type eosStorage struct {
-	logger   *zap.Logger
-	migrator cbox_api.Migrator
+	logger *zap.Logger
 
 	oldProject    api.Storage
 	newProjectMap map[string]api.Storage
 }
 
 type Options struct {
-	Logger   *zap.Logger
-	Migrator cbox_api.Migrator
+	Logger *zap.Logger
 
 	OldProject    api.Storage
 	NewProjectMap map[string]api.Storage
@@ -43,7 +39,6 @@ func New(opt *Options) (api.Storage, error) {
 		logger:        opt.Logger,
 		oldProject:    opt.OldProject,
 		newProjectMap: opt.NewProjectMap,
-		migrator:      opt.Migrator,
 	}
 	return eosStorage, nil
 }

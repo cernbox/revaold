@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/cernbox/cboxredirectd/api/redismigrator"
 	"github.com/cernbox/gohub/goconfig"
 	"github.com/cernbox/gohub/gologger"
 
@@ -408,17 +407,6 @@ func init() {
 	gc.Add("tag-manager-db-port", 3306, "Port where to access the  database.")
 	gc.Add("tag-manager-db-name", "", "Name of the  database.")
 
-	gc.Add("mig-redis-tcp-address", "localhost:6379", "redis tcp address")
-	gc.Add("mig-redis-read-timeout", 3, "timeout for socket reads. If reached, commands will fail with a timeout instead of blocking. Zero means default.")
-	gc.Add("mig-redis-write-timeout", 0, "timeout for socket writes. If reached, commands will fail with a timeout instead of blocking. Zero means mig-redis-read-timeout.")
-	gc.Add("mig-redis-dial-timeout", 5, "dial timeout for establishing new connections. Zero means default.")
-	gc.Add("mig-redis-idle-check-frequency", 60, "frequency of idle checks. Zero means default. When minus value is set, then idle check is disabled.")
-	gc.Add("mig-redis-idle-timeout", 300, "amount of time after which client closes idle connections. Should be less than server's timeout. Zero means default.")
-	gc.Add("mig-redis-max-retries", 0, "maximum number of retries before giving up. Zero means not retry failed commands.")
-	gc.Add("mig-redis-pool-size", 0, "maximum number of socket connections. Zermo means 10 connections per every CPU as reported by runtime.NumCPU.")
-	gc.Add("mig-redis-pool-timeout", 0, "time a client waits for connection if all connections are busy before returning an error. Zero means mig-redis-read-timeout + 1 second.")
-	gc.Add("mig-redis-password", "", "the password to authenticate to a protected Redis instance. Empty means no authentication.")
-
 	gc.Add("mig-eosuser-homedir-script", "/root/eosuser-homedir-creation.sh", "script to create home directory on EOSUSER")
 	gc.Add("mig-eosuser-homedir-script-enabled", false, "if set enables creation of home dirs in EOSUSER")
 
@@ -508,31 +496,10 @@ func applyMigrationLogic() {
 		newHomeMap[letter] = m.GetStorage()
 	}
 
-	migratorOpts := &redismigrator.Options{
-		Address:            gc.GetString("mig-redis-tcp-address"),
-		DialTimeout:        gc.GetInt("mig-redis-dial-timeout"),
-		IdleCheckFrequency: gc.GetInt("mig-redis-idle-check-frequency"),
-		IdleTimeout:        gc.GetInt("mig-redis-idle-timeout"),
-		Logger:             logger,
-		MaxRetries:         gc.GetInt("mig-redis-max-retries"),
-		PoolSize:           gc.GetInt("mig-redis-pool-size"),
-		PoolTimeout:        gc.GetInt("mig-redis-pool-timeout"),
-		ReadTimeout:        gc.GetInt("mig-redis-read-timeout"),
-		WriteTimeout:       gc.GetInt("mig-redis-write-timeout"),
-		Password:           gc.GetString("mig-redis-password"),
-	}
-
-	migrator, err := redismigrator.New(migratorOpts)
-	if err != nil {
-		logger.Error("", zap.Error(err))
-		panic(err)
-	}
-
 	opts := &storage_homemigration.Options{
 		OldHome:             oldHomeMount.GetStorage(),
 		Logger:              logger,
 		NewHomeMap:          newHomeMap,
-		Migrator:            migrator,
 		EosHomeEnableScript: gc.GetBool("mig-eoshome-homedir-script-enabled"),
 		EosUserEnableScript: gc.GetBool("mig-eosuser-homedir-script-enabled"),
 		EosUserScript:       gc.GetString("mig-eosuser-homedir-script"),
@@ -563,7 +530,6 @@ func applyMigrationLogic() {
 		OldUser:    oldUserMount.GetStorage(),
 		Logger:     logger,
 		NewUserMap: newUserMap,
-		Migrator:   migrator,
 	}
 
 	userStorage, err := storage_usermigration.New(opts2)
@@ -594,31 +560,10 @@ func applyMigrationLogicForProjects() {
 		newProjectMap[letter] = m.GetStorage()
 	}
 
-	migratorOpts := &redismigrator.Options{
-		Address:            gc.GetString("mig-redis-tcp-address"),
-		DialTimeout:        gc.GetInt("mig-redis-dial-timeout"),
-		IdleCheckFrequency: gc.GetInt("mig-redis-idle-check-frequency"),
-		IdleTimeout:        gc.GetInt("mig-redis-idle-timeout"),
-		Logger:             logger,
-		MaxRetries:         gc.GetInt("mig-redis-max-retries"),
-		PoolSize:           gc.GetInt("mig-redis-pool-size"),
-		PoolTimeout:        gc.GetInt("mig-redis-pool-timeout"),
-		ReadTimeout:        gc.GetInt("mig-redis-read-timeout"),
-		WriteTimeout:       gc.GetInt("mig-redis-write-timeout"),
-		Password:           gc.GetString("mig-redis-password"),
-	}
-
-	migrator, err := redismigrator.New(migratorOpts)
-	if err != nil {
-		logger.Error("", zap.Error(err))
-		panic(err)
-	}
-
 	opts := &storage_projectmigration.Options{
 		OldProject:    oldProjectMount.GetStorage(),
 		Logger:        logger,
 		NewProjectMap: newProjectMap,
-		Migrator:      migrator,
 	}
 
 	storage, err := storage_projectmigration.New(opts)

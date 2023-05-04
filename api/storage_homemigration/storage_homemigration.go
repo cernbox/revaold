@@ -13,8 +13,6 @@ import (
 
 	"github.com/cernbox/revaold/api"
 	"go.uber.org/zap"
-
-	cbox_api "github.com/cernbox/cboxredirectd/api"
 )
 
 func getUserFromContext(ctx context.Context) (*api.User, error) {
@@ -26,8 +24,7 @@ func getUserFromContext(ctx context.Context) (*api.User, error) {
 }
 
 type eosStorage struct {
-	logger   *zap.Logger
-	migrator cbox_api.Migrator
+	logger *zap.Logger
 
 	oldHome    api.Storage
 	newHomeMap map[string]api.Storage
@@ -37,8 +34,7 @@ type eosStorage struct {
 }
 
 type Options struct {
-	Logger   *zap.Logger
-	Migrator cbox_api.Migrator
+	Logger *zap.Logger
 
 	OldHome    api.Storage
 	NewHomeMap map[string]api.Storage
@@ -64,7 +60,6 @@ func New(opt *Options) (api.Storage, error) {
 		logger:           opt.Logger,
 		oldHome:          opt.OldHome,
 		newHomeMap:       opt.NewHomeMap,
-		migrator:         opt.Migrator,
 		oldScript:        opt.EosUserScript,
 		newScript:        opt.EosHomeScript,
 		oldScriptEnabled: opt.EosUserEnableScript,

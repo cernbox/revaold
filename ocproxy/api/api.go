@@ -61,9 +61,12 @@ func (p *proxy) registerRoutes() {
 
 	p.router.HandleFunc("/status.php", p.status).Methods("GET")
 	p.router.HandleFunc("/ocs/v1.php/cloud/capabilities", p.capabilities).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/cloud/capabilities", p.capabilities2).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/cloud/activity", p.activity).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/cloud/activity", p.activity).Methods("GET")
 	p.router.HandleFunc("/index.php/ocs/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
-	p.router.HandleFunc("/ocs/v1.php/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
-	p.router.HandleFunc("/ocs/v2.php/cloud/user", p.tokenAuth(p.getCurrentUser)).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/cloud/user", p.tokenAuthPopup(p.getCurrentUser)).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/cloud/user", p.tokenAuthPopup(p.getCurrentUser)).Methods("GET")
 
 	// user prefixed webdav routes
 	p.router.HandleFunc("/remote.php/dav/files", p.tokenAuthPopup(p.get)).Methods("GET")                         //for iOS app auth
@@ -5982,6 +5985,24 @@ func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
 	w.Write(statusJSON)
 }
 
+func (p *proxy) activity(w http.ResponseWriter, r *http.Request) {
+	activity := `
+	{
+		"ocs": {
+			"meta": {
+				"status": "failure",
+				"statuscode": 500,
+				"message": "Invalid query, please check the syntax. API specifications are here: http://www.freedesktop.org/wiki/Specifications/open-collaboration-services."
+			},
+			"data": []
+		}
+	}`
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(activity))
+}
+
 func (p *proxy) capabilities(w http.ResponseWriter, r *http.Request) {
 	capabilities := `
 	{
@@ -6011,6 +6032,92 @@ func (p *proxy) capabilities(w http.ResponseWriter, r *http.Request) {
 	      "statuscode": 100
 	    }
 	  }
+	}`
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(capabilities))
+}
+
+func (p *proxy) capabilities2(w http.ResponseWriter, r *http.Request) {
+	capabilities := `
+	{
+		"ocs": {
+			"meta": {
+				"status": "ok",
+				"statuscode": 200,
+				"message": "OK",
+				"totalitems": "",
+				"itemsperpage": ""
+			},
+			"data": {
+				"version": {
+					"major": 10,
+					"minor": 1,
+					"micro": 0,
+					"string": "10.1.0 prealpha",
+					"edition": "Community"
+				},
+				"capabilities": {
+					"core": {
+						"pollinterval": 60,
+						"webdav-root": "remote.php/webdav",
+						"status": {
+							"installed": true,
+							"maintenance": false,
+							"needsDbUpgrade": false,
+							"version": "10.1.0.1",
+							"versionstring": "10.1.0 prealpha",
+							"edition": "Community",
+							"productname": ""
+						}
+					},
+					"checksums": {
+						"supportedTypes": ["SHA1"],
+						"preferredUploadType": "SHA1"
+					},
+					"files": {
+						"privateLinks": true,
+						"bigfilechunking": true,
+						"blacklisted_files": [".htaccess"]
+					},
+					"dav": { "chunking": "1.0", "zsync": "1.0" },
+					"files_sharing": {
+						"api_enabled": true,
+						"public": {
+							"enabled": true,
+							"password": {
+								"enforced_for": {
+									"read_only": false,
+									"read_write": false,
+									"upload_only": false
+								},
+								"enforced": false
+							},
+							"expire_date": { "enabled": false },
+							"send_mail": false,
+							"social_share": true,
+							"upload": true,
+							"multiple": true,
+							"supports_upload_only": true
+						},
+						"user": { "send_mail": false },
+						"resharing": true,
+						"group_sharing": true,
+						"auto_accept_share": true,
+						"share_with_group_members_only": true,
+						"share_with_membership_groups_only": true,
+						"user_enumeration": {
+							"enabled": true,
+							"group_members_only": false
+						},
+						"default_permissions": 1,
+						"federation": { "outgoing": true, "incoming": true },
+						"search_min_length": 4
+					}
+				}
+			}
+		}
 	}`
 
 	w.Header().Add("Content-Type", "application/json")

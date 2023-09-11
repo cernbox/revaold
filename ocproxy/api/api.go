@@ -225,6 +225,14 @@ func (p *proxy) registerRoutes() {
 	// show otg
 	p.router.HandleFunc("/index.php/apps/cboxotg/getotg", p.getOTG).Methods("GET")
 
+	p.router.HandleFunc("/index.php/settings/personal", p.return200).Methods("GET")
+	p.router.HandleFunc("/ocs/v2.php/apps/notifications/api/v1/notifications", p.return200).Methods("GET")
+	p.router.HandleFunc("/ocs/v1.php/config", p.return200).Methods("GET")
+
+}
+
+func (p *proxy) return200(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
 }
 
 func (p *proxy) getGanttConfig(w http.ResponseWriter, r *http.Request) {

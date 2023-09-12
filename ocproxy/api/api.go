@@ -5961,10 +5961,10 @@ func (p *proxy) renderPublicLink(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
-	major := "8"
-	minor := "2"
+	major := "10"
+	minor := "1"
 	micro := "1"
-	edition := ""
+	edition := "cernbox"
 
 	version := fmt.Sprintf("%s.%s.%s.4", major, minor, micro)
 	versionString := fmt.Sprintf("%s.%s.%s", major, minor, micro)

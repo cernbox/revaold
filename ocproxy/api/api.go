@@ -7921,6 +7921,18 @@ func (p *proxy) propfindInternal(w http.ResponseWriter, r *http.Request, dav boo
 	// request comes from remote.php/dav/files/gonzalhu/...
 	if dav { // || mux.Vars(r)["username"] != ""
 		ctx = context.WithValue(ctx, "user-dav-uri", true)
+
+		// There's a bug with the Android client, where a PROPFIND request
+		// comes without the username in the url...
+		// We need to adapt to it
+		url_username := mux.Vars(r)["username"]
+		if user, ok := reva_api.ContextGetUser(ctx); ok {
+			if url_username != user.AccountId {
+				// The username was not passed in the url, so the path
+				// got matched on it
+				path = url_username + "/" + path
+			}
+		}
 	}
 
 	clientMapping := r.Header.Get("CBOXCLIENTMAPPING")

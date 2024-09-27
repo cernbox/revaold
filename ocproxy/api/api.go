@@ -159,7 +159,7 @@ func (p *proxy) registerRoutes() {
 
 	// public link routes
 	p.router.HandleFunc("/index.php/s/{token}", p.renderPublicLink).Methods("GET", "POST")
-	p.router.HandleFunc("/index.php/s/{token}/download", p.plAuth(p.downloadArchivePL)).Methods("GET")
+	p.router.HandleFunc("/index.php/s/{token}/download", p.plAuth(p.downloadArchivePL)).Methods("GET", "HEAD")
 	p.router.HandleFunc("/index.php/apps/files_sharing/ajax/publicpreview.php", p.tokenAuth(p.getPublicPreview)).Methods("GET")
 
 	// app routes

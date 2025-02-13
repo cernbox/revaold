@@ -3,7 +3,7 @@ package share_manager_owncloud
 import (
 	"context"
 	"fmt"
-	"path"
+	gopath "path"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +17,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
+
+const versionPrefix = ".sys.v#."
 
 func New(dbUsername, dbPassword, dbHost string, dbPort int, dbName string, vfs api.VirtualStorage, um api.UserManager) (api.ShareManager, error) {
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", dbUsername, dbPassword, dbHost, dbPort, dbName))
@@ -62,6 +64,7 @@ func (sm *shareManager) rejectShare(ctx context.Context, receiver, id string) er
 		return err
 	}
 
+	// Not used by clients
 	query := "insert into oc_share_status(id, recipient, state) values(?, ?, -1) ON DUPLICATE KEY UPDATE state = -1"
 	stmt, err := sm.db.Prepare(query)
 	if err != nil {
@@ -183,14 +186,14 @@ func (sm *shareManager) UpdateFolderShare(ctx context.Context, id string, update
 		return nil, err
 	}
 
-	stmtString := "update oc_share set "
+	stmtString := "update shares set "
 	stmtPairs := map[string]interface{}{}
 
 	if updateReadOnly {
 		if readOnly {
-			stmtPairs["permissions"] = 1
+			stmtPairs["permissions"] = uint8(1)
 		} else {
-			stmtPairs["permissions"] = 15
+			stmtPairs["permissions"] = uint8(15)
 		}
 	}
 
@@ -257,7 +260,7 @@ func (sm *shareManager) Unshare(ctx context.Context, id string) error {
 		return err
 	}
 
-	stmt, err := sm.db.Prepare("delete from oc_share where uid_owner=? and id=?")
+	stmt, err := sm.db.Prepare("delete from shares where uid_owner=? and id=?")
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return err
@@ -328,41 +331,39 @@ func (sm *shareManager) AddFolderShare(ctx context.Context, p string, recipient 
 		return nil, err
 	}
 
-	// TODO(labkode): use another error cde
-	if !md.IsDir {
-		return nil, api.NewError(api.StorageNotSupportedErrorCode)
-	}
-
-	itemType := "folder"
-
-	permissions := 15
-	if readOnly {
-		permissions = 1
-	}
-
-	var prefix string
-	var itemSource string
+	var prefix, itemSource string
 	if md.MigId != "" {
 		prefix, itemSource = splitFileID(md.MigId)
 	} else {
 		prefix, itemSource = splitFileID(md.Id)
 	}
 
-	fileSource, err := strconv.ParseUint(itemSource, 10, 64)
-	if err != nil {
-		l.Error("", zap.Error(err))
-		return nil, err
+	itemType := "file"
+	if md.IsDir {
+		itemType = "folder"
+	} else {
+		// if link points to a file we need to use the versions folder inode.
+		if !md.IsDir {
+			versionFolderID, err := sm.getVersionFolderID(ctx, md.Path)
+			_, itemSource = splitFileID(versionFolderID)
+			if err != nil {
+				l.Error("", zap.Error(err))
+				return nil, err
+			}
+		}
+
 	}
 
-	shareType := 0 // user
-	if recipient.Type == api.ShareRecipient_GROUP {
-		shareType = 1
+	permissions := 15
+	if readOnly {
+		permissions = 1
 	}
 
-	targetPath := path.Join("/", path.Base(p))
+	created := time.Unix(int64(time.Now().Unix()), 0)
 
-	stmtString := "insert into oc_share set share_type=?,uid_owner=?,uid_initiator=?,item_type=?,fileid_prefix=?,item_source=?,file_source=?,permissions=?,stime=?,share_with=?,file_target=?"
-	stmtValues := []interface{}{shareType, u.AccountId, u.AccountId, itemType, prefix, itemSource, fileSource, permissions, time.Now().Unix(), recipient.Identity, targetPath}
+	// This is incorrect for projects... The owner should be the service account
+	stmtString := "insert into shares set created_at=?,updated_at=?,uid_owner=?,uid_initiator=?,item_type=?,initial_path=?,inode=?,instance=?,permissions=?,orphan=?,share_with=?,shared_with_is_group=?"
+	stmtValues := []interface{}{created, created, u.AccountId, u.AccountId, itemType, md.EosFile, itemSource, prefix, uint8(permissions), 0, recipient.Identity, recipient.Type == api.ShareRecipient_GROUP}
 
 	stmt, err := sm.db.Prepare(stmtString)
 	if err != nil {
@@ -473,6 +474,7 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 
 	var query string
 
+	// Not used by the clients
 	if len(groups) > 1 {
 		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, groupArgs...)
@@ -508,6 +510,7 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 
 	var query string
 
+	// Not used by the clients
 	if len(groups) > 1 {
 		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
 		queryArgs = append(queryArgs, groupArgs...)
@@ -562,32 +565,41 @@ func (sm *shareManager) getDBShare(ctx context.Context, accountID, id string) (*
 
 	var (
 		uidOwner    string
-		shareWith   string
-		prefix      string
-		itemSource  string
-		shareType   int
-		stime       int
+		instance    string
+		inode       string
+		expiration  string
+		createdAt   string
 		permissions int
+		itemType    string
+		shareWith   string
+		isGroup     int
 	)
 
-	query := "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (share_type=2 OR item_type <> 'file') AND (orphan = 0 or orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) and id=?"
-	if err := sm.db.QueryRow(query, accountID, accountID, id).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType); err != nil {
+	query := "SELECT coalesce(instance, '') as instance, coalesce(inode, '') as inode, coalesce(uid_owner, '') as uid_owner, coalesce(expiration, '') as expiration, created_at, permissions, item_type, share_with, shared_with_is_group FROM shares WHERE (orphan = 0 or orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) and id=?"
+	if err := sm.db.QueryRow(query, accountID, accountID, id).Scan(&instance, &inode, &uidOwner, &expiration, &createdAt, &permissions, &itemType, &shareWith, &isGroup); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
 		}
 		return nil, err
 	}
-	dbShare := &dbShare{ID: int(intID), UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
+	t, err := time.Parse("2006-01-02 15:04:05", createdAt)
+	if err != nil {
+		fmt.Println("Error parsing time:", err)
+		return nil, err
+	}
+	// ShareTypeUser = 0
+	// ShareTypeGroup = 1
+	dbShare := &dbShare{ID: int(intID), UIDOwner: uidOwner, Prefix: instance, ItemSource: inode, ShareWith: shareWith, STime: int(t.Unix()), Permissions: permissions, ShareType: isGroup}
 	return dbShare, nil
 
 }
 
 func (sm *shareManager) getDBShares(ctx context.Context, accountID, filterByFileID string) ([]*dbShare, error) {
-	query := "SELECT id, coalesce(uid_owner, '') as uid_owner,  coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type FROM oc_share WHERE (share_type=2 OR item_type <> 'file') AND (orphan = 0 OR orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) AND (share_type=? OR share_type=?) "
-	params := []interface{}{accountID, accountID, 0, 1}
+	query := "SELECT id, coalesce(instance, '') as instance, coalesce(inode, '') as inode, coalesce(uid_owner, '') as uid_owner, coalesce(expiration, '') as expiration, created_at, permissions, item_type, share_with, shared_with_is_group FROM shares WHERE (orphan = 0 OR orphan IS NULL) AND (uid_owner=? OR uid_initiator=?) "
+	params := []interface{}{accountID, accountID}
 	if filterByFileID != "" {
 		prefix, itemSource := splitFileID(filterByFileID)
-		query += "and fileid_prefix=? and item_source=?"
+		query += "and instance=? and inode=?"
 		params = append(params, prefix, itemSource)
 	}
 
@@ -600,21 +612,30 @@ func (sm *shareManager) getDBShares(ctx context.Context, accountID, filterByFile
 	var (
 		id          int
 		uidOwner    string
-		shareWith   string
-		prefix      string
-		itemSource  string
-		shareType   int
-		stime       int
+		instance    string
+		inode       string
+		expiration  string
+		createdAt   string
 		permissions int
+		itemType    string
+		shareWith   string
+		isGroup     int
 	)
 
 	dbShares := []*dbShare{}
 	for rows.Next() {
-		err := rows.Scan(&id, &uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType)
+		err := rows.Scan(&id, &instance, &inode, &uidOwner, &expiration, &createdAt, &permissions, &itemType, &shareWith, &isGroup)
 		if err != nil {
 			return nil, err
 		}
-		dbShare := &dbShare{ID: id, UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType}
+		t, err := time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			fmt.Println("Error parsing time:", err)
+			return nil, err
+		}
+		// ShareTypeUser = 0
+		// ShareTypeGroup = 1
+		dbShare := &dbShare{ID: id, UIDOwner: uidOwner, Prefix: instance, ItemSource: inode, ShareWith: shareWith, STime: int(t.Unix()), Permissions: permissions, ShareType: isGroup}
 		dbShares = append(dbShares, dbShare)
 
 	}
@@ -674,6 +695,21 @@ func (sm *shareManager) convertToFolderShare(ctx context.Context, dbShare *dbSha
 
 }
 
+func (sm *shareManager) getVersionFolderID(ctx context.Context, p string) (string, error) {
+	versionFolder := getVersionFolder(p)
+	md, err := sm.vfs.GetMetadata(ctx, versionFolder)
+	if err != nil {
+		if err := sm.vfs.CreateDir(ctx, versionFolder); err != nil {
+			return "", err
+		}
+		md, err = sm.vfs.GetMetadata(ctx, versionFolder)
+		if err != nil {
+			return "", err
+		}
+	}
+	return md.Id, nil
+}
+
 func getUserFromContext(ctx context.Context) (*api.User, error) {
 	u, ok := api.ContextGetUser(ctx)
 	if !ok {
@@ -692,4 +728,10 @@ func splitFileID(fileID string) (string, string) {
 // joinFileID concatenates the prefix and the inode to form a valid fileID.
 func joinFileID(prefix, inode string) string {
 	return strings.Join([]string{prefix, inode}, ":")
+}
+
+func getVersionFolder(p string) string {
+	basename := gopath.Base(p)
+	versionFolder := gopath.Join(gopath.Dir(p), versionPrefix+basename)
+	return versionFolder
 }

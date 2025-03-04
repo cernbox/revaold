@@ -499,66 +499,66 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 }
 
 func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string) ([]*dbShare, error) {
-	l := ctx_zap.Extract(ctx)
-	groups, err := sm.um.GetUserGroups(ctx, accountID)
-	if err != nil {
-		l.Error("", zap.Error(err))
-		return nil, err
-	}
-	queryArgs := []interface{}{accountID, accountID}
-	groupArgs := []interface{}{}
-	for _, v := range groups {
-		groupArgs = append(groupArgs, v)
-	}
+	// l := ctx_zap.Extract(ctx)
+	// groups, err := sm.um.GetUserGroups(ctx, accountID)
+	// if err != nil {
+	// 	l.Error("", zap.Error(err))
+	// 	return nil, err
+	// }
+	// queryArgs := []interface{}{accountID, accountID}
+	// groupArgs := []interface{}{}
+	// for _, v := range groups {
+	// 	groupArgs = append(groupArgs, v)
+	// }
 
-	var query string
+	// var query string
 
-	if len(groups) > 1 {
-		query = "SELECT id, coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
-		queryArgs = append(queryArgs, groupArgs...)
-		queryArgs = append(queryArgs, accountID)
-	} else {
-		query = "SELECT id, coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
-		queryArgs = append(queryArgs, accountID)
-	}
+	// if len(groups) > 1 {
+	// 	query = "SELECT id, coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
+	// 	queryArgs = append(queryArgs, groupArgs...)
+	// 	queryArgs = append(queryArgs, accountID)
+	// } else {
+	// 	query = "SELECT id, coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
+	// 	queryArgs = append(queryArgs, accountID)
+	// }
 
-	rows, err := sm.db.Query(query, queryArgs...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+	// rows, err := sm.db.Query(query, queryArgs...)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer rows.Close()
 
-	var (
-		id           int
-		uidInitiator string
-		shareWith    string
-		instance     string
-		inode        string
-		createdAt    string
-		permissions  int
-		isGroup      int
-		initialPath  string
-	)
+	// var (
+	// 	id           int
+	// 	uidInitiator string
+	// 	shareWith    string
+	// 	instance     string
+	// 	inode        string
+	// 	createdAt    string
+	// 	permissions  int
+	// 	isGroup      int
+	// 	initialPath  string
+	// )
 
 	dbShares := []*dbShare{}
-	for rows.Next() {
-		err := rows.Scan(&id, &uidInitiator, &shareWith, &instance, &inode, &createdAt, &permissions, &isGroup, &initialPath)
-		if err != nil {
-			return nil, err
-		}
-		t, err := time.Parse("2006-01-02 15:04:05", createdAt)
-		if err != nil {
-			fmt.Println("Error parsing time:", err)
-			return nil, err
-		}
-		dbShare := &dbShare{ID: id, UIDOwner: uidInitiator, Prefix: instance, ItemSource: inode, ShareWith: shareWith, STime: int(t.Unix()), Permissions: permissions, ShareType: isGroup, FileTarget: filepath.Base(initialPath)}
-		dbShares = append(dbShares, dbShare)
+	// for rows.Next() {
+	// 	err := rows.Scan(&id, &uidInitiator, &shareWith, &instance, &inode, &createdAt, &permissions, &isGroup, &initialPath)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	t, err := time.Parse("2006-01-02 15:04:05", createdAt)
+	// 	if err != nil {
+	// 		fmt.Println("Error parsing time:", err)
+	// 		return nil, err
+	// 	}
+	// 	dbShare := &dbShare{ID: id, UIDOwner: uidInitiator, Prefix: instance, ItemSource: inode, ShareWith: shareWith, STime: int(t.Unix()), Permissions: permissions, ShareType: isGroup, FileTarget: filepath.Base(initialPath)}
+	// 	dbShares = append(dbShares, dbShare)
 
-	}
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
+	// }
+	// err = rows.Err()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return dbShares, nil
 }

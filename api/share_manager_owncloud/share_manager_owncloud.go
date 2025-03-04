@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	gopath "path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -64,8 +65,7 @@ func (sm *shareManager) rejectShare(ctx context.Context, receiver, id string) er
 		return err
 	}
 
-	// Not used by clients
-	query := "insert into oc_share_status(id, recipient, state) values(?, ?, -1) ON DUPLICATE KEY UPDATE state = -1"
+	query := "insert into share_states(share_id, user, hidden) values(?, ?, 1) ON DUPLICATE KEY UPDATE hidden = 1"
 	stmt, err := sm.db.Prepare(query)
 	if err != nil {
 		err = errors.Wrapf(err, "error preparing statement: id=%s", id)
@@ -449,15 +449,14 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 	}
 
 	var (
-		uidOwner    string
-		shareWith   string
-		prefix      string
-		itemSource  string
-		shareType   int
-		stime       int
-		permissions int
-		fileTarget  string
-		state       int
+		uidInitiator string
+		shareWith    string
+		instance     string
+		inode        string
+		createdAt    string
+		permissions  int
+		isGroup      int
+		initialPath  string
 	)
 
 	groups, err := sm.um.GetUserGroups(ctx, accountID)
@@ -474,23 +473,27 @@ func (sm *shareManager) getDBShareWithMe(ctx context.Context, accountID, id stri
 
 	var query string
 
-	// Not used by the clients
 	if len(groups) > 1 {
-		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
+		query = "SELECT coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "SELECT coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target, accepted FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
+		query = "SELECT coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND id=? AND (share_with=?) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
 		queryArgs = append(queryArgs, accountID)
 	}
 
-	if err := sm.db.QueryRow(query, queryArgs...).Scan(&uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget, &state); err != nil {
+	if err := sm.db.QueryRow(query, queryArgs...).Scan(&uidInitiator, &shareWith, &instance, &inode, &createdAt, &permissions, &isGroup, &initialPath); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, api.NewError(api.FolderShareNotFoundErrorCode)
 		}
 		return nil, err
 	}
-	dbShare := &dbShare{ID: int(intID), UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType, FileTarget: fileTarget, State: state}
+	t, err := time.Parse("2006-01-02 15:04:05", createdAt)
+	if err != nil {
+		fmt.Println("Error parsing time:", err)
+		return nil, err
+	}
+	dbShare := &dbShare{ID: int(intID), UIDOwner: uidInitiator, Prefix: instance, ItemSource: inode, ShareWith: shareWith, STime: int(t.Unix()), Permissions: permissions, ShareType: isGroup, FileTarget: filepath.Base(initialPath), State: 0}
 	return dbShare, nil
 
 }
@@ -502,7 +505,7 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	queryArgs := []interface{}{0, 1, accountID, accountID}
+	queryArgs := []interface{}{accountID, accountID}
 	groupArgs := []interface{}{}
 	for _, v := range groups {
 		groupArgs = append(groupArgs, v)
@@ -510,15 +513,15 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 
 	var query string
 
-	// Not used by the clients
 	if len(groups) > 1 {
-		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
+		query = "SELECT id, coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND uid_owner!=? AND (share_with=? OR share_with in (?" + strings.Repeat(",?", len(groups)-1) + ")) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
 		queryArgs = append(queryArgs, groupArgs...)
 		queryArgs = append(queryArgs, accountID)
 	} else {
-		query = "SELECT id, coalesce(uid_owner, '') as uid_owner, coalesce(share_with, '') as share_with, coalesce(fileid_prefix, '') as fileid_prefix, coalesce(item_source, '') as item_source, stime, permissions, share_type, file_target FROM oc_share WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND (share_type=? OR share_type=?) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(id) FROM oc_share_status WHERE recipient=? AND state = -1)"
+		query = "SELECT id, coalesce(uid_initiator, '') as uid_initiator, coalesce(share_with, '') as share_with, coalesce(instance, '') as instance, coalesce(inode, '') as inode, created_at, permissions, shared_with_is_group, coalesce(initial_path, '') as initial_path FROM shares WHERE item_type <> 'file' AND (orphan = 0 or orphan IS NULL) AND uid_owner!=? AND (share_with=?) AND id not in (SELECT distinct(share_id) FROM share_states WHERE user=? AND hidden = 1)"
 		queryArgs = append(queryArgs, accountID)
 	}
+
 	rows, err := sm.db.Query(query, queryArgs...)
 	if err != nil {
 		return nil, err
@@ -526,24 +529,29 @@ func (sm *shareManager) getDBSharesWithMe(ctx context.Context, accountID string)
 	defer rows.Close()
 
 	var (
-		id          int
-		uidOwner    string
-		shareWith   string
-		prefix      string
-		itemSource  string
-		shareType   int
-		stime       int
-		permissions int
-		fileTarget  string
+		id           int
+		uidInitiator string
+		shareWith    string
+		instance     string
+		inode        string
+		createdAt    string
+		permissions  int
+		isGroup      int
+		initialPath  string
 	)
 
 	dbShares := []*dbShare{}
 	for rows.Next() {
-		err := rows.Scan(&id, &uidOwner, &shareWith, &prefix, &itemSource, &stime, &permissions, &shareType, &fileTarget)
+		err := rows.Scan(&id, &uidInitiator, &shareWith, &instance, &inode, &createdAt, &permissions, &isGroup, &initialPath)
 		if err != nil {
 			return nil, err
 		}
-		dbShare := &dbShare{ID: id, UIDOwner: uidOwner, Prefix: prefix, ItemSource: itemSource, ShareWith: shareWith, STime: stime, Permissions: permissions, ShareType: shareType, FileTarget: fileTarget}
+		t, err := time.Parse("2006-01-02 15:04:05", createdAt)
+		if err != nil {
+			fmt.Println("Error parsing time:", err)
+			return nil, err
+		}
+		dbShare := &dbShare{ID: id, UIDOwner: uidInitiator, Prefix: instance, ItemSource: inode, ShareWith: shareWith, STime: int(t.Unix()), Permissions: permissions, ShareType: isGroup, FileTarget: filepath.Base(initialPath)}
 		dbShares = append(dbShares, dbShare)
 
 	}

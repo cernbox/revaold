@@ -198,9 +198,24 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 
 	created := time.Unix(int64(time.Now().Unix()), 0)
 
+	tx, err := lm.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	result, err := tx.Exec("INSERT INTO share_ids () VALUES ()")
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+	lastId, err := result.LastInsertId()
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
 	// This is incorrect for projects... The owner should be the service account
-	stmtString := "insert into public_links set created_at=?,updated_at=?,uid_owner=?,uid_initiator=?,item_type=?,initial_path=?,inode=?,instance=?,permissions=?,orphan=?,token=?,quicklink=?,notify_uploads=?"
-	stmtValues := []interface{}{created, created, u.AccountId, u.AccountId, itemType, md.EosFile, itemSource, prefix, uint8(permissions), 0, token, 0, 0}
+	stmtString := "INSERT INTO public_links SET id=?,created_at=?,updated_at=?,uid_owner=?,uid_initiator=?,item_type=?,initial_path=?,inode=?,instance=?,permissions=?,orphan=?,token=?,quicklink=?,notify_uploads=?"
+	stmtValues := []interface{}{lastId, created, created, u.AccountId, u.AccountId, itemType, md.EosFile, itemSource, prefix, uint8(permissions), 0, token, 0, 0}
 
 	if opt.Password != "" {
 		hashedPassword, err := hashPassword(opt.Password)
@@ -217,24 +232,22 @@ func (lm *linkManager) CreatePublicLink(ctx context.Context, path string, opt *a
 		stmtString += ",expiration=?"
 		stmtValues = append(stmtValues, t)
 	}
-
-	stmt, err := lm.db.Prepare(stmtString)
+	stmt, err := tx.Prepare(stmtString)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
 
-	result, err := stmt.Exec(stmtValues...)
+	_, err = stmt.Exec(stmtValues...)
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	lastId, err := result.LastInsertId()
-	if err != nil {
-		l.Error("", zap.Error(err))
+
+	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	l.Info("created oc share", zap.Int64("share_id", lastId))
+	l.Info("created public link", zap.Int64("share_id", lastId))
 
 	pb, err := lm.InspectPublicLink(ctx, fmt.Sprintf("%d", lastId))
 	if err != nil {

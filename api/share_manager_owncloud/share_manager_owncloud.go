@@ -361,17 +361,11 @@ func (sm *shareManager) AddFolderShare(ctx context.Context, p string, recipient 
 
 	created := time.Unix(int64(time.Now().Unix()), 0)
 
-	// This is incorrect for projects... The owner should be the service account
-	stmtString := "insert into shares set created_at=?,updated_at=?,uid_owner=?,uid_initiator=?,item_type=?,initial_path=?,inode=?,instance=?,permissions=?,orphan=?,share_with=?,shared_with_is_group=?"
-	stmtValues := []interface{}{created, created, u.AccountId, u.AccountId, itemType, md.EosFile, itemSource, prefix, uint8(permissions), 0, recipient.Identity, recipient.Type == api.ShareRecipient_GROUP}
-
-	stmt, err := sm.db.Prepare(stmtString)
+	tx, err := sm.db.Begin()
 	if err != nil {
-		l.Error("", zap.Error(err))
 		return nil, err
 	}
-
-	result, err := stmt.Exec(stmtValues...)
+	result, err := tx.Exec("INSERT INTO share_ids () VALUES ()")
 	if err != nil {
 		l.Error("", zap.Error(err))
 		return nil, err
@@ -381,7 +375,27 @@ func (sm *shareManager) AddFolderShare(ctx context.Context, p string, recipient 
 		l.Error("", zap.Error(err))
 		return nil, err
 	}
-	l.Info("created oc share", zap.Int64("share_id", lastId))
+
+	// This is incorrect for projects... The owner should be the service account
+	stmtString := "INSERT INTO shares SET id=?,created_at=?,updated_at=?,uid_owner=?,uid_initiator=?,item_type=?,initial_path=?,inode=?,instance=?,permissions=?,orphan=?,share_with=?,shared_with_is_group=?"
+	stmtValues := []interface{}{lastId, created, created, u.AccountId, u.AccountId, itemType, md.EosFile, itemSource, prefix, uint8(permissions), 0, recipient.Identity, recipient.Type == api.ShareRecipient_GROUP}
+
+	stmt, err := tx.Prepare(stmtString)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
+	_, err = stmt.Exec(stmtValues...)
+	if err != nil {
+		l.Error("", zap.Error(err))
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+	l.Info("created share", zap.Int64("share_id", lastId))
 
 	share, err := sm.GetFolderShare(ctx, fmt.Sprintf("%d", lastId))
 	if err != nil {

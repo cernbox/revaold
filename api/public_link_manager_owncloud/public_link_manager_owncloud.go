@@ -3,6 +3,7 @@ package public_link_manager_owncloud
 import (
 	"context"
 	"fmt"
+	"math/big"
 	gopath "path"
 	"strconv"
 	"strings"
@@ -10,8 +11,8 @@ import (
 
 	"github.com/cernbox/revaold/api"
 
+	"crypto/rand"
 	"database/sql"
-	"math/rand"
 
 	"github.com/bluele/gcache"
 	_ "github.com/go-sql-driver/mysql"
@@ -21,8 +22,6 @@ import (
 )
 
 func init() {
-	// Seed the random source with unix nano time
-	rand.Seed(time.Now().UTC().UnixNano())
 }
 
 // TODO(labkode): add owner_id to other public link queries when consulting db
@@ -717,8 +716,13 @@ func getVersionFolder(p string) string {
 
 func genToken() string {
 	b := make([]byte, tokenLength)
+	nLetters := int64(len(letterBytes))
 	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+		nrandom, err := rand.Int(rand.Reader, big.NewInt(nLetters))
+		if err != nil {
+			panic(err)
+		}
+		b[i] = letterBytes[nrandom.Int64()]
 	}
 	return string(b)
 }

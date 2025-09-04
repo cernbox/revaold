@@ -5965,6 +5965,7 @@ func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
 	minor := "1"
 	micro := "1"
 	edition := "cernbox"
+	product := "reva"
 
 	version := fmt.Sprintf("%s.%s.%s.4", major, minor, micro)
 	versionString := fmt.Sprintf("%s.%s.%s", major, minor, micro)
@@ -5974,12 +5975,16 @@ func (p *proxy) status(w http.ResponseWriter, r *http.Request) {
 		Version       string `json:"version"`
 		VersionString string `json:"versionstring"`
 		Edition       string `json:"edition"`
+		ProductName   string `json:"productname"`
+		Product       string `json:"product"`
 	}{
 		true,
 		false,
 		version,
 		versionString,
 		edition,
+		product,
+		product,
 	}
 
 	statusJSON, err := json.MarshalIndent(status, "", "    ")

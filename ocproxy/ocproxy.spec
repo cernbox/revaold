@@ -4,7 +4,7 @@
 
 Name: ocproxy
 Summary: ownCloud Proxy
-Version: 0.0.91
+Version: 0.0.92
 Release: 1%{?dist}
 License: AGPLv3
 BuildRoot: %{_tmppath}/%{name}-buildroot
@@ -54,6 +54,8 @@ rm -rf %buildroot/
 
 
 %changelog
+* Thu Sep 04 2025 Diogo Castro <diogo.castro@cern.ch> 0.0.92
+- Include product name and product in the status endpoint (fixes mobile app)
 * Fri May 03 2024 Diogo Castro <diogo.castro@cern.ch> 0.0.91
 - Handle lack of username in url for PROPFIND
 * Mon Oct 31 2023 Diogo Castro <diogo.castro@cern.ch> 0.0.90

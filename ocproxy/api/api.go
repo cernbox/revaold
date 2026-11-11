@@ -4822,7 +4822,9 @@ func (p *proxy) createShare(w http.ResponseWriter, r *http.Request) {
 		p.createPublicLinkShare(ctx, newShare, readOnly, dropOnly, expiration, w, r)
 		return
 	} else if newShare.ShareType == ShareTypeUser || newShare.ShareType == ShareTypeGroup {
-		p.createFolderShare(ctx, newShare, readOnly, w, r)
+		// disabled, shares should only be created through new reva to ensure their consistency
+		// p.createFolderShare(ctx, newShare, readOnly, w, r)
+		p.writeSharingDisabled(w, r)
 		return
 	} else {
 		w.WriteHeader(http.StatusNotImplemented)
@@ -5424,24 +5426,19 @@ func (p *proxy) deleteShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if found {
-		res, err := p.getShareClient().UnshareFolder(gCtx, &reva_api.UnshareFolderReq{Id: shareID})
-		if err != nil {
-			p.logger.Error("", zap.Error(err))
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		if res.Status != reva_api.StatusCode_OK {
-			p.writeError(res.Status, w, r)
-			return
-		}
-
-		p.writeOCSResponse(w, r, "ok", 200, nil, nil, "")
+		// disabled, shares should only be created through new reva to ensure their consistency
+		// res, err := p.getShareClient().UnshareFolder(gCtx, &reva_api.UnshareFolderReq{Id: shareID})
+		p.writeSharingDisabled(w, r)
 		return
 	}
 
 	p.logger.Warn("share not found: " + shareID)
 	p.writeOCSResponse(w, r, "failure", 404, nil, nil, "")
+}
+
+func (p *proxy) writeSharingDisabled(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusForbidden)
+	p.writeOCSResponse(w, r, "failure", 403, nil, nil, "Sharing with users and groups is temporarily disabled for sync clients")
 }
 
 func (p *proxy) isPublicLinkShare(ctx context.Context, shareID string) (bool, error) {
@@ -5674,7 +5671,9 @@ func (p *proxy) updateShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if found {
-		p.updateFolderShare(shareID, readOnly, w, r)
+		// disabled, shares should only be created through new reva to ensure their consistency
+		// p.updateFolderShare(shareID, readOnly, w, r)
+		p.writeSharingDisabled(w, r)
 		return
 	}
 

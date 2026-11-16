@@ -57,17 +57,18 @@ func (fs *eosStorage) GetPathByID(ctx context.Context, id string) (string, error
 	return "", api.NewError(api.StorageNotSupportedErrorCode)
 }
 
-func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (api.Storage, string, string) {
+func (fs *eosStorage) getStorageForLetter(ctx context.Context, letter string) (api.Storage, string, string, error) {
 	s, ok := fs.newUserMap[letter]
 	if !ok {
-		panic("storage not found for letter: " + letter)
+		fs.logger.Warn("storage not found for letter", zap.String("letter", letter))
+		return nil, "", "", api.NewError(api.StorageNotFoundErrorCode)
 	}
 	mountID := fmt.Sprintf("newuser-%s", letter)
 	mountPrefix := fmt.Sprintf("/new/user/%s", letter)
-	return s, mountID, mountPrefix
+	return s, mountID, mountPrefix, nil
 }
 
-func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) (api.Storage, string, string, string) {
+func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) (api.Storage, string, string, string, error) {
 	var userPath, letter string
 	tokens := strings.Split(strings.TrimPrefix(letterPath, "/"), "/")
 	if len(tokens) > 1 {
@@ -86,10 +87,13 @@ func (fs *eosStorage) getStorageForPath(ctx context.Context, letterPath string) 
 	// add /eos/user to the userPath
 	userPath = path.Join("/eos/user", userPath)
 
-	s, mountID, mountPrefix := fs.getStorageForLetter(ctx, letter)
+	s, mountID, mountPrefix, err := fs.getStorageForLetter(ctx, letter)
+	if err != nil {
+		return nil, "", "", "", err
+	}
 	fs.logger.Info("forwarding to newuser", zap.String("path", letterPath), zap.String("user", userPath))
 	// remove letter as /new/user/l mount already contains letter info
-	return s, mountID, mountPrefix, strings.TrimPrefix(letterPath, fmt.Sprintf("/%s", letter))
+	return s, mountID, mountPrefix, strings.TrimPrefix(letterPath, fmt.Sprintf("/%s", letter)), nil
 }
 
 func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, recipient *api.ShareRecipient, shareList []*api.FolderShare) error {
@@ -98,7 +102,10 @@ func (fs *eosStorage) SetACL(ctx context.Context, path string, readOnly bool, re
 		return err
 	}
 
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.SetACL(ctx, path, readOnly, recipient, shareList)
 
 }
@@ -108,7 +115,10 @@ func (fs *eosStorage) UnsetACL(ctx context.Context, path string, recipient *api.
 	if err != nil {
 		return err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.UnsetACL(ctx, path, recipient, shareList)
 
 }
@@ -119,7 +129,10 @@ func (fs *eosStorage) UpdateACL(ctx context.Context, path string, readOnly bool,
 		return err
 	}
 
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.UpdateACL(ctx, path, readOnly, recipient, shareList)
 }
 
@@ -128,7 +141,10 @@ func (fs *eosStorage) GetQuota(ctx context.Context, p string) (int, int, error) 
 	if err != nil {
 		return 0, 0, err
 	}
-	ts, _, _, p := fs.getStorageForPath(ctx, p)
+	ts, _, _, p, err := fs.getStorageForPath(ctx, p)
+	if err != nil {
+		return 0, 0, err
+	}
 	return ts.GetQuota(ctx, p)
 
 }
@@ -138,7 +154,10 @@ func (fs *eosStorage) GetMetadata(ctx context.Context, p string) (*api.Metadata,
 		return nil, err
 	}
 
-	ts, mountID, mountPrefix, p := fs.getStorageForPath(ctx, p)
+	ts, mountID, mountPrefix, p, err := fs.getStorageForPath(ctx, p)
+	if err != nil {
+		return nil, err
+	}
 	md, err := ts.GetMetadata(ctx, p)
 	if err != nil {
 		return nil, err
@@ -168,7 +187,10 @@ func (fs *eosStorage) ListFolder(ctx context.Context, p string) ([]*api.Metadata
 		return nil, err
 	}
 
-	ts, mountID, mountPrefix, p := fs.getStorageForPath(ctx, p)
+	ts, mountID, mountPrefix, p, err := fs.getStorageForPath(ctx, p)
+	if err != nil {
+		return nil, err
+	}
 	mds, err := ts.ListFolder(ctx, p)
 	if err != nil {
 		return nil, err
@@ -191,7 +213,10 @@ func (fs *eosStorage) CreateDir(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.CreateDir(ctx, path)
 }
 
@@ -200,7 +225,10 @@ func (fs *eosStorage) Delete(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.Delete(ctx, path)
 }
 
@@ -209,8 +237,14 @@ func (fs *eosStorage) Move(ctx context.Context, oldPath, newPath string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _, oldPath := fs.getStorageForPath(ctx, oldPath)
-	ts, _, _, newPath = fs.getStorageForPath(ctx, newPath)
+	ts, _, _, oldPath, err := fs.getStorageForPath(ctx, oldPath)
+	if err != nil {
+		return err
+	}
+	ts, _, _, newPath, err = fs.getStorageForPath(ctx, newPath)
+	if err != nil {
+		return err
+	}
 	return ts.Move(ctx, oldPath, newPath)
 }
 
@@ -219,7 +253,10 @@ func (fs *eosStorage) Download(ctx context.Context, path string) (io.ReadCloser,
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
 	return ts.Download(ctx, path)
 }
 
@@ -228,7 +265,10 @@ func (fs *eosStorage) Upload(ctx context.Context, path string, r io.ReadCloser) 
 	if err != nil {
 		return err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.Upload(ctx, path, r)
 }
 
@@ -237,7 +277,10 @@ func (fs *eosStorage) ListRevisions(ctx context.Context, path string) ([]*api.Re
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
 	return ts.ListRevisions(ctx, path)
 }
 
@@ -246,7 +289,10 @@ func (fs *eosStorage) DownloadRevision(ctx context.Context, path, revisionKey st
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
 	return ts.DownloadRevision(ctx, path, revisionKey)
 }
 
@@ -255,7 +301,10 @@ func (fs *eosStorage) RestoreRevision(ctx context.Context, path, revisionKey str
 	if err != nil {
 		return err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.RestoreRevision(ctx, path, revisionKey)
 }
 
@@ -264,7 +313,10 @@ func (fs *eosStorage) EmptyRecycle(ctx context.Context, path string) error {
 	if err != nil {
 		return err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return err
+	}
 	return ts.EmptyRecycle(ctx, path)
 }
 
@@ -273,7 +325,10 @@ func (fs *eosStorage) ListRecycle(ctx context.Context, path, from, to string) ([
 	if err != nil {
 		return nil, err
 	}
-	ts, _, _, path := fs.getStorageForPath(ctx, path)
+	ts, _, _, path, err := fs.getStorageForPath(ctx, path)
+	if err != nil {
+		return nil, err
+	}
 	return ts.ListRecycle(ctx, path, from, to)
 }
 
@@ -283,6 +338,9 @@ func (fs *eosStorage) RestoreRecycleEntry(ctx context.Context, restoreKey string
 		return err
 	}
 	// TODO(labkode): get mount/storage from restore key?
-	ts, _, _, _ := fs.getStorageForPath(ctx, "")
+	ts, _, _, _, err := fs.getStorageForPath(ctx, "")
+	if err != nil {
+		return err
+	}
 	return ts.RestoreRecycleEntry(ctx, restoreKey)
 }
